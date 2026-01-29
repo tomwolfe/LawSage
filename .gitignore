@@ -78,6 +78,7 @@ coverage.xml
 .pytest_cache/
 .pyre/
 .pytype/
+.mypy_cache/
 mypy_cache/
 .hypothesis/
 
@@ -94,3 +95,22 @@ ENV/
 .env/
 .env.sh
 python_env_*/
+
+# macOS
+.DS_Store
+.DS_Store?
+._DS_Store
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Linux
+*~
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
