@@ -16,7 +16,7 @@ from .models import (
     LegalResult,
 )
 
-app = FastAPI()
+app = FastAPI(redirect_slashes=False)
 
 app.add_middleware(
     CORSMiddleware,
@@ -133,3 +133,7 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str = Hea
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=8000)
