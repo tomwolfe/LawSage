@@ -10,6 +10,8 @@
 
 # testing
 /coverage
+*.coverage
+.cov
 
 # next.js
 /.next/
@@ -55,3 +57,40 @@ build/
 dist/
 *.egg-info/
 .pytest_cache/
+.coverage
+*.sqlite
+*.db
+*.log
+__pycache__/
+*.so
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git/
+.pytest_cache/
+.pyre/
+.pytype/
+mypy_cache/
+.hypothesis/
+
+# Python FastAPI/uvicorn
+*.sqlite3
+uvicorn_error.log
+uvicorn_access.log
+
+# Local Python Virtual Environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+.env.sh
+python_env_*/
