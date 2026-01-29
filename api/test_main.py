@@ -59,3 +59,33 @@ def test_generate_legal_help_success(mock_genai_client):
     assert len(data["sources"]) == 1
     assert data["sources"][0]["title"] == "Test Source"
     assert data["sources"][0]["uri"] == "https://example.com"
+
+@patch("google.genai.Client")
+def test_generate_legal_help_missing_delimiter(mock_genai_client):
+    # Mock the response from Google GenAI WITHOUT the delimiter
+    mock_instance = mock_genai_client.return_value
+    
+    mock_response = MagicMock()
+    mock_candidate = MagicMock()
+    
+    # Mock parts
+    mock_part = MagicMock()
+    mock_part.text = "Just strategy, no delimiter here."
+    mock_candidate.content.parts = [mock_part]
+    
+    # Mock grounding metadata
+    mock_candidate.grounding_metadata = None
+    
+    mock_response.candidates = [mock_candidate]
+    mock_instance.models.generate_content.return_value = mock_response
+    
+    response = client.post(
+        "/api/generate",
+        json={"user_input": "test", "jurisdiction": "California"},
+        headers={"X-Gemini-API-Key": "test-key"}
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert "---" in data["text"]
+    assert "No filings generated" in data["text"]

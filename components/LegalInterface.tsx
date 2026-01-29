@@ -237,9 +237,12 @@ export default function LegalInterface() {
                   Download .md
                 </button>
                 <div className="mt-8 bg-slate-900 rounded-xl p-6 text-slate-300 font-mono text-sm whitespace-pre-wrap overflow-x-auto">
-                  {result.text.match(/[\s]*---[\s]*/) 
-                    ? result.text.split(/[\s]*---[\s]*/).slice(1).join('---') 
-                    : "No filings generated. Please try a more specific request or check the strategy tab."}
+                  {(() => {
+                    const parts = result.text.split(/[\s]*---[\s]*/);
+                    return parts.length > 1 
+                      ? parts.slice(1).join('\n\n---\n\n') 
+                      : "No filings generated. Please try a more specific request or check the strategy tab.";
+                  })()}
                 </div>
               </div>
             )}

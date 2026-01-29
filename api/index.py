@@ -2,41 +2,19 @@ from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from google import genai
 from google.genai import types
-from pydantic import BaseModel
-from typing import List, Optional
 import os
 
-class LegalRequest(BaseModel):
-    user_input: str
-    jurisdiction: str
-
-class WebChunk(BaseModel):
-    title: str
-    uri: str
-
-class GroundingChunk(BaseModel):
-    web: Optional[WebChunk] = None
-
-class GroundingMetadata(BaseModel):
-    grounding_chunks: Optional[List[GroundingChunk]] = None
-
-class Part(BaseModel):
-    text: str
-
-class Content(BaseModel):
-    parts: List[Part]
-
-class GeminiCandidate(BaseModel):
-    content: Content
-    grounding_metadata: Optional[GroundingMetadata] = None
-
-class Source(BaseModel):
-    title: str
-    uri: str
-
-class LegalResult(BaseModel):
-    text: str
-    sources: List[Source]
+from .models import (
+    LegalRequest,
+    WebChunk,
+    GroundingChunk,
+    GroundingMetadata,
+    Part,
+    Content,
+    GeminiCandidate,
+    Source,
+    LegalResult,
+)
 
 app = FastAPI()
 
@@ -101,21 +79,32 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str = Hea
             
             gm = None
             try:
-                if raw_candidate.grounding_metadata:
+                # Use getattr or .get() safely if it were a dict, but SDK objects use attributes.
+                # Here we use getattr to safely check for attributes.
+                raw_gm = getattr(raw_candidate, 'grounding_metadata', None)
+                if raw_gm:
                     chunks = []
-                    if raw_candidate.grounding_metadata.grounding_chunks:
-                        for chunk in raw_candidate.grounding_metadata.grounding_chunks:
-                            if chunk.web:
-                                chunks.append(GroundingChunk(web=WebChunk(title=chunk.web.title, uri=chunk.web.uri)))
+                    raw_chunks = getattr(raw_gm, 'grounding_chunks', None)
+                    if raw_chunks:
+                        for chunk in raw_chunks:
+                            web = getattr(chunk, 'web', None)
+                            if web:
+                                title = getattr(web, 'title', "Untitled Source")
+                                uri = getattr(web, 'uri', "#")
+                                chunks.append(GroundingChunk(web=WebChunk(title=title, uri=uri)))
                     gm = GroundingMetadata(grounding_chunks=chunks)
             except Exception:
-                # Handle cases where search grounding is unavailable
+                # Handle cases where search grounding is unavailable or malformed
                 gm = None
 
             candidate = GeminiCandidate(content=content, grounding_metadata=gm)
             
             if candidate.content.parts:
                 text_output = candidate.content.parts[0].text
+
+            # Reliability Delimiter: Ensure '---' exists for frontend split logic
+            if '---' not in text_output:
+                text_output += "\n\n---\n\nNo filings generated. Please try a more specific request."
             
             if candidate.grounding_metadata and candidate.grounding_metadata.grounding_chunks:
                 for chunk in candidate.grounding_metadata.grounding_chunks:
@@ -126,6 +115,9 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str = Hea
             text=text_output,
             sources=sources
         )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
