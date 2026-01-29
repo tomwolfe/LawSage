@@ -62,7 +62,7 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str = Hea
         
         # Enable Grounding with Google Search
         search_tool = types.Tool(
-            google_search_retrieval=types.GoogleSearchRetrieval()
+            google_search=types.GoogleSearch()
         )
         
         prompt = f"""
@@ -153,10 +153,6 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str = Hea
     except Exception as e:
         print(f"ERROR in generate_legal_help: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/health")
-async def health_check():
-    return {"status": "ok"}
 
 if __name__ == "__main__":
     import uvicorn
