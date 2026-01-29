@@ -99,9 +99,22 @@ export default function LegalInterface() {
         body: JSON.stringify({ user_input: userInput, jurisdiction }),
       });
 
+      const contentType = response.headers.get('content-type');
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.detail || 'Failed to generate response');
+        let errorMessage = 'Failed to generate response';
+        if (contentType && contentType.includes('application/json')) {
+          const errData = await response.json();
+          errorMessage = errData.detail || errorMessage;
+        } else {
+          const textError = await response.text();
+          errorMessage = `Server Error (${response.status}): ${textError.slice(0, 100)}...`;
+        }
+        throw new Error(errorMessage);
+      }
+
+      if (!contentType || !contentType.includes('application/json')) {
+        const textBody = await response.text();
+        throw new Error(`Expected JSON response but received ${contentType}. Body: ${textBody.slice(0, 100)}...`);
       }
 
       const data: LegalResult = await response.json();

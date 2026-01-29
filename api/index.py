@@ -27,6 +27,7 @@ app.add_middleware(
 )
 
 @app.post("/api/generate", response_model=LegalResult)
+@app.post("/generate", response_model=LegalResult)
 async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str = Header(None)):
     if not x_gemini_api_key:
         raise HTTPException(status_code=401, detail="GEMINI_API_KEY is missing")
@@ -70,17 +71,22 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str = Hea
         text_output = ""
         sources = []
         
-        if response.candidates:
+        if response.candidates and len(response.candidates) > 0:
             raw_candidate = response.candidates[0]
             
-            # Parse into Pydantic models
-            parts = [Part(text=p.text) for p in raw_candidate.content.parts] if raw_candidate.content.parts else []
+            # Safe parsing of parts
+            parts = []
+            if raw_candidate.content and raw_candidate.content.parts:
+                for p in raw_candidate.content.parts:
+                    # Check for text attribute safely
+                    t = getattr(p, 'text', None)
+                    if t:
+                        parts.append(Part(text=t))
+            
             content = Content(parts=parts)
             
             gm = None
             try:
-                # Use getattr or .get() safely if it were a dict, but SDK objects use attributes.
-                # Here we use getattr to safely check for attributes.
                 raw_gm = getattr(raw_candidate, 'grounding_metadata', None)
                 if raw_gm:
                     chunks = []
@@ -89,18 +95,20 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str = Hea
                         for chunk in raw_chunks:
                             web = getattr(chunk, 'web', None)
                             if web:
-                                title = getattr(web, 'title', "Untitled Source")
-                                uri = getattr(web, 'uri', "#")
-                                chunks.append(GroundingChunk(web=WebChunk(title=title, uri=uri)))
+                                chunks.append(GroundingChunk(web=WebChunk(
+                                    title=getattr(web, 'title', "Untitled Source"),
+                                    uri=getattr(web, 'uri', "#")
+                                )))
                     gm = GroundingMetadata(grounding_chunks=chunks)
-            except Exception:
-                # Handle cases where search grounding is unavailable or malformed
+            except Exception as e:
+                print(f"Error parsing grounding metadata: {e}")
                 gm = None
 
             candidate = GeminiCandidate(content=content, grounding_metadata=gm)
             
             if candidate.content.parts:
-                text_output = candidate.content.parts[0].text
+                # Join all text parts if there are multiple
+                text_output = "\n".join([p.text for p in candidate.content.parts])
 
             # Reliability Delimiter: Ensure '---' exists for frontend split logic
             if '---' not in text_output:
@@ -110,17 +118,18 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str = Hea
                 for chunk in candidate.grounding_metadata.grounding_chunks:
                     if chunk.web:
                         sources.append(Source(title=chunk.web.title, uri=chunk.web.uri))
+        else:
+            text_output = "I'm sorry, I couldn't generate a response for that situation. Please try rephrasing.\n\n---\n\nNo filings generated."
 
         return LegalResult(
             text=text_output,
             sources=sources
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-    except Exception as e:
+        print(f"ERROR in generate_legal_help: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/health")
+@app.get("/health")
 async def health_check():
     return {"status": "ok"}
