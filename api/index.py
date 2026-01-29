@@ -87,6 +87,7 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
         
         if response.candidates and len(response.candidates) > 0:
             raw_candidate = response.candidates[0]
+            print(f"Raw response candidate: {raw_candidate}")
             
             try:
                 # Use Pydantic to validate the raw candidate object

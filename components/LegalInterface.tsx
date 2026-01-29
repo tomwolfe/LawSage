@@ -232,33 +232,42 @@ export default function LegalInterface() {
           </div>
 
           <div className="flex-1 p-6 overflow-y-auto">
-            {activeTab === 'strategy' && (
-              <div className="prose max-w-none prose-slate">
-                <div className="whitespace-pre-wrap font-sans leading-relaxed text-slate-700">
-                  {result.text.split(/[\s]*---[\s]*/)[0]}
-                </div>
-              </div>
-            )}
+            {(() => {
+              const [strategy, ...filings] = result.text.includes('---') 
+                ? result.text.split('---') 
+                : [result.text, 'No filings generated. Please try a more specific request or check the strategy tab.'];
+              
+              const strategyText = strategy.trim();
+              const filingsText = filings.join('---').trim();
 
-            {activeTab === 'filings' && (
-              <div className="relative">
-                <button 
-                  onClick={downloadFilings}
-                  className="absolute top-0 right-0 p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors"
-                >
-                  <Download size={16} />
-                  Download .md
-                </button>
-                <div className="mt-8 bg-slate-900 rounded-xl p-6 text-slate-300 font-mono text-sm whitespace-pre-wrap overflow-x-auto">
-                  {(() => {
-                    const parts = result.text.split(/[\s]*---[\s]*/);
-                    return parts.length > 1 
-                      ? parts.slice(1).join('\n\n---\n\n') 
-                      : "No filings generated. Please try a more specific request or check the strategy tab.";
-                  })()}
-                </div>
-              </div>
-            )}
+              if (activeTab === 'strategy') {
+                return (
+                  <div className="prose max-w-none prose-slate">
+                    <div className="whitespace-pre-wrap font-sans leading-relaxed text-slate-700">
+                      {strategyText}
+                    </div>
+                  </div>
+                );
+              }
+
+              if (activeTab === 'filings') {
+                return (
+                  <div className="relative">
+                    <button 
+                      onClick={downloadFilings}
+                      className="absolute top-0 right-0 p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors"
+                    >
+                      <Download size={16} />
+                      Download .md
+                    </button>
+                    <div className="mt-8 bg-slate-900 rounded-xl p-6 text-slate-300 font-mono text-sm whitespace-pre-wrap overflow-x-auto">
+                      {filingsText || "No filings generated."}
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             {activeTab === 'sources' && (
               <div className="space-y-4">
