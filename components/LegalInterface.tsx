@@ -5,8 +5,36 @@ import { Mic, Send, FileText, Gavel, Link as LinkIcon, Loader2, Download, AlertC
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+declare global {
+  interface Window {
+    webkitSpeechRecognition: {
+      new (): SpeechRecognition;
+    };
+  }
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  onstart: () => void;
+  onend: () => void;
+  onerror: (event: unknown) => void;
+  onresult: (event: { results: { [key: number]: { [key: number]: { transcript: string } } } }) => void;
+  start: () => void;
+}
+
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+interface Source {
+  title: string;
+  uri: string;
+}
+
+interface LegalResult {
+  text: string;
+  sources: Source[];
 }
 
 const US_STATES = [
@@ -22,7 +50,7 @@ export default function LegalInterface() {
   const [jurisdiction, setJurisdiction] = useState('California');
   const [isListening, setIsListening] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<{text: string, sources: any[]} | null>(null);
+  const [result, setResult] = useState<LegalResult | null>(null);
   const [activeTab, setActiveTab] = useState<'strategy' | 'filings' | 'sources'>('strategy');
   const [error, setError] = useState('');
 
@@ -32,7 +60,7 @@ export default function LegalInterface() {
       return;
     }
 
-    const recognition = new (window as any).webkitSpeechRecognition();
+    const recognition = new window.webkitSpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = false;
 
@@ -40,7 +68,7 @@ export default function LegalInterface() {
     recognition.onend = () => setIsListening(false);
     recognition.onerror = () => setIsListening(false);
     
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: { results: { [key: number]: { [key: number]: { transcript: string } } } }) => {
       const transcript = event.results[0][0].transcript;
       setUserInput(prev => prev + (prev ? ' ' : '') + transcript);
     };
@@ -76,11 +104,11 @@ export default function LegalInterface() {
         throw new Error(errData.detail || 'Failed to generate response');
       }
 
-      const data = await response.json();
+      const data: LegalResult = await response.json();
       setResult(data);
       setActiveTab('strategy');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {
       setLoading(false);
     }
@@ -194,7 +222,7 @@ export default function LegalInterface() {
             {activeTab === 'strategy' && (
               <div className="prose max-w-none prose-slate">
                 <div className="whitespace-pre-wrap font-sans leading-relaxed text-slate-700">
-                  {result.text.split('---')[0]}
+                  {result.text.split(/[\s]*---[\s]*/)[0]}
                 </div>
               </div>
             )}
@@ -209,7 +237,9 @@ export default function LegalInterface() {
                   Download .md
                 </button>
                 <div className="mt-8 bg-slate-900 rounded-xl p-6 text-slate-300 font-mono text-sm whitespace-pre-wrap overflow-x-auto">
-                  {result.text.includes('---') ? result.text.split('---').slice(1).join('---') : result.text}
+                  {result.text.match(/[\s]*---[\s]*/) 
+                    ? result.text.split(/[\s]*---[\s]*/).slice(1).join('---') 
+                    : "No filings generated. Please try a more specific request or check the strategy tab."}
                 </div>
               </div>
             )}

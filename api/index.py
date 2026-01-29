@@ -1,9 +1,42 @@
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 from google import genai
 from google.genai import types
+from pydantic import BaseModel
+from typing import List, Optional
 import os
+
+class LegalRequest(BaseModel):
+    user_input: str
+    jurisdiction: str
+
+class WebChunk(BaseModel):
+    title: str
+    uri: str
+
+class GroundingChunk(BaseModel):
+    web: Optional[WebChunk] = None
+
+class GroundingMetadata(BaseModel):
+    grounding_chunks: Optional[List[GroundingChunk]] = None
+
+class Part(BaseModel):
+    text: str
+
+class Content(BaseModel):
+    parts: List[Part]
+
+class GeminiCandidate(BaseModel):
+    content: Content
+    grounding_metadata: Optional[GroundingMetadata] = None
+
+class Source(BaseModel):
+    title: str
+    uri: str
+
+class LegalResult(BaseModel):
+    text: str
+    sources: List[Source]
 
 app = FastAPI()
 
@@ -15,11 +48,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class LegalRequest(BaseModel):
-    user_input: str
-    jurisdiction: str
-
-@app.post("/api/generate")
+@app.post("/api/generate", response_model=LegalResult)
 async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str = Header(None)):
     if not x_gemini_api_key:
         raise HTTPException(status_code=401, detail="GEMINI_API_KEY is missing")
@@ -28,7 +57,6 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str = Hea
         client = genai.Client(api_key=x_gemini_api_key, http_options={'api_version': 'v1alpha'})
         
         # Enable Grounding with Google Search
-        # Note: Using the google-genai SDK format
         search_tool = types.Tool(
             google_search_retrieval=types.GoogleSearchRetrieval()
         )
@@ -51,7 +79,7 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str = Hea
         Explicitly state that you are an AI helping the user represent themselves (Pro Se) and that this is legal information, not legal advice.
         """
         
-        MODEL_ID = "gemini-3-flash-preview" # or "gemini-2.0-flash" if available
+        MODEL_ID = "gemini-3-flash-preview"
         
         response = client.models.generate_content(
             model=MODEL_ID,
@@ -61,32 +89,43 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str = Hea
             )
         )
         
-        # Extract content and grounding metadata
         text_output = ""
         sources = []
         
         if response.candidates:
-            candidate = response.candidates[0]
+            raw_candidate = response.candidates[0]
+            
+            # Parse into Pydantic models
+            parts = [Part(text=p.text) for p in raw_candidate.content.parts] if raw_candidate.content.parts else []
+            content = Content(parts=parts)
+            
+            gm = None
+            try:
+                if raw_candidate.grounding_metadata:
+                    chunks = []
+                    if raw_candidate.grounding_metadata.grounding_chunks:
+                        for chunk in raw_candidate.grounding_metadata.grounding_chunks:
+                            if chunk.web:
+                                chunks.append(GroundingChunk(web=WebChunk(title=chunk.web.title, uri=chunk.web.uri)))
+                    gm = GroundingMetadata(grounding_chunks=chunks)
+            except Exception:
+                # Handle cases where search grounding is unavailable
+                gm = None
+
+            candidate = GeminiCandidate(content=content, grounding_metadata=gm)
+            
             if candidate.content.parts:
                 text_output = candidate.content.parts[0].text
-            
-            # Grounding metadata might contain links
-            if candidate.grounding_metadata and candidate.grounding_metadata.search_entry_point:
-                 # The search_entry_point.rendered_content might contain HTML/Link
-                 pass
             
             if candidate.grounding_metadata and candidate.grounding_metadata.grounding_chunks:
                 for chunk in candidate.grounding_metadata.grounding_chunks:
                     if chunk.web:
-                        sources.append({
-                            "title": chunk.web.title,
-                            "uri": chunk.web.uri
-                        })
+                        sources.append(Source(title=chunk.web.title, uri=chunk.web.uri))
 
-        return {
-            "text": text_output,
-            "sources": sources
-        }
+        return LegalResult(
+            text=text_output,
+            sources=sources
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

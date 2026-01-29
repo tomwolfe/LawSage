@@ -9,7 +9,9 @@ export default function SettingsModal() {
 
   useEffect(() => {
     const savedKey = localStorage.getItem('GEMINI_API_KEY');
-    if (savedKey) setApiKey(savedKey);
+    if (savedKey) {
+      setTimeout(() => setApiKey(savedKey), 0);
+    }
   }, []);
 
   const saveKey = () => {
