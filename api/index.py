@@ -29,7 +29,14 @@ except ImportError:
         LegalResult,
     )
 
-app = FastAPI(redirect_slashes=False)
+app = FastAPI()
+
+@app.middleware("http")
+async def log_requests(request, call_next):
+    print(f"Incoming request: {request.method} {request.url.path}")
+    response = await call_next(request)
+    print(f"Response status: {response.status_code}")
+    return response
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,7 +46,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "message": "LawSage API is running"}
+
 @app.post("/generate", response_model=LegalResult)
+@app.post("/api/generate", response_model=LegalResult)
 async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str = Header(None)):
     if not x_gemini_api_key:
         raise HTTPException(status_code=401, detail="GEMINI_API_KEY is missing")
@@ -70,7 +83,7 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str = Hea
         Explicitly state that you are an AI helping the user represent themselves (Pro Se) and that this is legal information, not legal advice.
         """
         
-        MODEL_ID = "gemini-3-flash-preview"
+        MODEL_ID = "gemini-2.5-flash"
         
         response = client.models.generate_content(
             model=MODEL_ID,
