@@ -3,36 +3,25 @@ from fastapi.middleware.cors import CORSMiddleware
 from google import genai
 from google.genai import types
 import os
-
-try:
-    from .models import (
-        LegalRequest,
-        WebChunk,
-        GroundingChunk,
-        GroundingMetadata,
-        Part,
-        Content,
-        GeminiCandidate,
-        Source,
-        LegalResult,
-    )
-except ImportError:
-    from models import (
-        LegalRequest,
-        WebChunk,
-        GroundingChunk,
-        GroundingMetadata,
-        Part,
-        Content,
-        GeminiCandidate,
-        Source,
-        LegalResult,
-    )
+from typing import Any, Callable
+from pydantic import BaseModel
+from .models import (
+    LegalRequest,
+    WebChunk,
+    GroundingChunk,
+    GroundingMetadata,
+    Part,
+    Content,
+    GeminiCandidate,
+    Source,
+    LegalResult,
+    HealthResponse,
+)
 
 app = FastAPI()
 
 @app.middleware("http")
-async def log_requests(request, call_next):
+async def log_requests(request: Any, call_next: Callable[[Any], Any]) -> Any:
     print(f"Incoming request: {request.method} {request.url.path}")
     response = await call_next(request)
     print(f"Response status: {response.status_code}")
@@ -48,12 +37,12 @@ app.add_middleware(
 
 @app.get("/")
 @app.get("/health")
-async def health_check():
-    return {"status": "ok", "message": "LawSage API is running"}
+async def health_check() -> HealthResponse:
+    return HealthResponse(status="ok", message="LawSage API is running")
 
 @app.post("/generate", response_model=LegalResult)
 @app.post("/api/generate", response_model=LegalResult)
-async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str = Header(None)):
+async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | None = Header(None)) -> LegalResult:
     if not x_gemini_api_key:
         raise HTTPException(status_code=401, detail="GEMINI_API_KEY is missing")
     
@@ -99,50 +88,25 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str = Hea
         if response.candidates and len(response.candidates) > 0:
             raw_candidate = response.candidates[0]
             
-            # Safe parsing of parts
-            parts = []
-            if raw_candidate.content and raw_candidate.content.parts:
-                for p in raw_candidate.content.parts:
-                    # Check for text attribute safely
-                    t = getattr(p, 'text', None)
-                    if t:
-                        parts.append(Part(text=t))
-            
-            content = Content(parts=parts)
-            
-            gm = None
             try:
-                raw_gm = getattr(raw_candidate, 'grounding_metadata', None)
-                if raw_gm:
-                    chunks = []
-                    raw_chunks = getattr(raw_gm, 'grounding_chunks', None)
-                    if raw_chunks:
-                        for chunk in raw_chunks:
-                            web = getattr(chunk, 'web', None)
-                            if web:
-                                chunks.append(GroundingChunk(web=WebChunk(
-                                    title=getattr(web, 'title', "Untitled Source"),
-                                    uri=getattr(web, 'uri', "#")
-                                )))
-                    gm = GroundingMetadata(grounding_chunks=chunks)
-            except Exception as e:
-                print(f"Error parsing grounding metadata: {e}")
-                gm = None
-
-            candidate = GeminiCandidate(content=content, grounding_metadata=gm)
-            
-            if candidate.content.parts:
+                # Use Pydantic to validate the raw candidate object
+                candidate = GeminiCandidate.model_validate(raw_candidate)
+                
                 # Join all text parts if there are multiple
                 text_output = "\n".join([p.text for p in candidate.content.parts])
 
-            # Reliability Delimiter: Ensure '---' exists for frontend split logic
-            if '---' not in text_output:
-                text_output += "\n\n---\n\nNo filings generated. Please try a more specific request."
-            
-            if candidate.grounding_metadata and candidate.grounding_metadata.grounding_chunks:
-                for chunk in candidate.grounding_metadata.grounding_chunks:
-                    if chunk.web:
-                        sources.append(Source(title=chunk.web.title, uri=chunk.web.uri))
+                # Reliability Delimiter: Ensure '---' exists for frontend split logic
+                if '---' not in text_output:
+                    text_output += "\n\n---\n\nNo filings generated. Please try a more specific request."
+                
+                if candidate.grounding_metadata and candidate.grounding_metadata.grounding_chunks:
+                    for chunk in candidate.grounding_metadata.grounding_chunks:
+                        if chunk.web:
+                            sources.append(Source(title=chunk.web.title, uri=chunk.web.uri))
+            except Exception as e:
+                print(f"Error validating candidate: {e}")
+                # Fallback to manual parsing if Pydantic fails
+                text_output = "Error processing model response.\n\n---\n\nNo filings generated."
         else:
             text_output = "I'm sorry, I couldn't generate a response for that situation. Please try rephrasing.\n\n---\n\nNo filings generated."
 

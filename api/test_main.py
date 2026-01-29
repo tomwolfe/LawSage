@@ -11,17 +11,17 @@ from api.index import app
 
 client = TestClient(app)
 
-def test_health_check():
+def test_health_check() -> None:
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    assert response.json() == {"status": "ok", "message": "LawSage API is running"}
 
-def test_generate_legal_help_no_api_key():
+def test_generate_legal_help_no_api_key() -> None:
     response = client.post("/generate", json={"user_input": "test", "jurisdiction": "California"})
     assert response.status_code == 401
 
 @patch("google.genai.Client")
-def test_generate_legal_help_success(mock_genai_client):
+def test_generate_legal_help_success(mock_genai_client: MagicMock) -> None:
     # Mock the response from Google GenAI
     mock_instance = mock_genai_client.return_value
     
@@ -61,7 +61,7 @@ def test_generate_legal_help_success(mock_genai_client):
     assert data["sources"][0]["uri"] == "https://example.com"
 
 @patch("google.genai.Client")
-def test_generate_legal_help_missing_delimiter(mock_genai_client):
+def test_generate_legal_help_missing_delimiter(mock_genai_client: MagicMock) -> None:
     # Mock the response from Google GenAI WITHOUT the delimiter
     mock_instance = mock_genai_client.return_value
     
