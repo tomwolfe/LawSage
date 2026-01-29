@@ -4,17 +4,30 @@ from google import genai
 from google.genai import types
 import os
 
-from .models import (
-    LegalRequest,
-    WebChunk,
-    GroundingChunk,
-    GroundingMetadata,
-    Part,
-    Content,
-    GeminiCandidate,
-    Source,
-    LegalResult,
-)
+try:
+    from .models import (
+        LegalRequest,
+        WebChunk,
+        GroundingChunk,
+        GroundingMetadata,
+        Part,
+        Content,
+        GeminiCandidate,
+        Source,
+        LegalResult,
+    )
+except ImportError:
+    from models import (
+        LegalRequest,
+        WebChunk,
+        GroundingChunk,
+        GroundingMetadata,
+        Part,
+        Content,
+        GeminiCandidate,
+        Source,
+        LegalResult,
+    )
 
 app = FastAPI(redirect_slashes=False)
 
@@ -26,7 +39,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.post("/api/generate", response_model=LegalResult)
 @app.post("/generate", response_model=LegalResult)
 async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str = Header(None)):
     if not x_gemini_api_key:
@@ -129,7 +141,6 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str = Hea
         print(f"ERROR in generate_legal_help: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/health")
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}

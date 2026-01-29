@@ -12,12 +12,12 @@ from api.index import app
 client = TestClient(app)
 
 def test_health_check():
-    response = client.get("/api/health")
+    response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
 def test_generate_legal_help_no_api_key():
-    response = client.post("/api/generate", json={"user_input": "test", "jurisdiction": "California"})
+    response = client.post("/generate", json={"user_input": "test", "jurisdiction": "California"})
     assert response.status_code == 401
 
 @patch("google.genai.Client")
@@ -46,7 +46,7 @@ def test_generate_legal_help_success(mock_genai_client):
     mock_instance.models.generate_content.return_value = mock_response
     
     response = client.post(
-        "/api/generate",
+        "/generate",
         json={"user_input": "I need help with a traffic ticket", "jurisdiction": "California"},
         headers={"X-Gemini-API-Key": "test-key"}
     )
@@ -80,7 +80,7 @@ def test_generate_legal_help_missing_delimiter(mock_genai_client):
     mock_instance.models.generate_content.return_value = mock_response
     
     response = client.post(
-        "/api/generate",
+        "/generate",
         json={"user_input": "test", "jurisdiction": "California"},
         headers={"X-Gemini-API-Key": "test-key"}
     )
