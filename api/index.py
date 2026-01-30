@@ -1,8 +1,9 @@
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from google import genai
-from google.genai import types
+from google.genai import types, errors
 from google.api_core import exceptions as google_exceptions
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 import os
 from typing import Any, Callable
 from pydantic import BaseModel
@@ -80,6 +81,27 @@ class ResponseValidator:
             
         return fixed_text
 
+def is_rate_limit_error(e: Exception) -> bool:
+    """Returns True if the exception is a Gemini API rate limit error."""
+    if isinstance(e, errors.ClientError):
+        msg = str(e).upper()
+        return "429" in msg or "RESOURCE_EXHAUSTED" in msg
+    return False
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=4, max=10),
+    retry=retry_if_exception(is_rate_limit_error),
+    reraise=True
+)
+def generate_content_with_retry(client: genai.Client, model: str, contents: Any, config: Any) -> Any:
+    """Wraps Gemini content generation with exponential backoff retries."""
+    return client.models.generate_content(
+        model=model,
+        contents=contents,
+        config=config
+    )
+
 app = FastAPI()
 
 @app.middleware("http")
@@ -141,7 +163,8 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
 
         MODEL_ID = "gemini-3-flash-preview"
 
-        response = client.models.generate_content(
+        response = generate_content_with_retry(
+            client=client,
             model=MODEL_ID,
             contents=prompt,
             config=types.GenerateContentConfig(
@@ -197,8 +220,14 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
             text=text_output,
             sources=sources
         )
+    except errors.ClientError as e:
+        if is_rate_limit_error(e):
+            print(f"RATE LIMIT ERROR: {str(e)}")
+            raise HTTPException(status_code=429, detail="AI service rate limit exceeded. Please try again in a few minutes.")
+        print(f"CLIENT ERROR: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
     except google_exceptions.ResourceExhausted as e:
-        print(f"RATE LIMIT ERROR: {str(e)}")
+        print(f"RATE LIMIT ERROR (CORE): {str(e)}")
         raise HTTPException(status_code=429, detail="AI service rate limit exceeded. Please try again in a few minutes.")
     except Exception as e:
         print(f"ERROR in generate_legal_help: {str(e)}")
