@@ -45,6 +45,19 @@ const US_STATES = [
   "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming"
 ];
 
+function parseLegalOutput(text: string): { strategy: string; filings: string } {
+  if (!text.includes('---')) {
+    return {
+      strategy: text.trim(),
+      filings: 'No filings generated. Please try a more specific request or check the strategy tab.'
+    };
+  }
+  const parts = text.split('---');
+  const strategy = parts[0].trim();
+  const filings = parts.slice(1).join('---').trim();
+  return { strategy, filings };
+}
+
 export default function LegalInterface() {
   const [userInput, setUserInput] = useState('');
   const [jurisdiction, setJurisdiction] = useState('California');
@@ -77,6 +90,7 @@ export default function LegalInterface() {
   };
 
   const handleSubmit = async () => {
+    setError(''); // Ensure error is cleared at start
     const apiKey = localStorage.getItem('GEMINI_API_KEY');
     if (!apiKey) {
       setError('Please set your Gemini API Key in Settings first.');
@@ -87,8 +101,10 @@ export default function LegalInterface() {
       return;
     }
 
-    setError('');
     setLoading(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+
     try {
       const response = await fetch('/api/generate', {
         method: 'POST',
@@ -97,7 +113,10 @@ export default function LegalInterface() {
           'X-Gemini-API-Key': apiKey,
         },
         body: JSON.stringify({ user_input: userInput, jurisdiction }),
+        signal: controller.signal,
       });
+
+      clearTimeout(timeoutId);
 
       const contentType = response.headers.get('content-type');
       if (!response.ok) {
@@ -121,7 +140,11 @@ export default function LegalInterface() {
       setResult(data);
       setActiveTab('strategy');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      if (err instanceof Error && err.name === 'AbortError') {
+        setError('Request timed out. Please try again.');
+      } else {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      }
     } finally {
       setLoading(false);
     }
@@ -233,12 +256,7 @@ export default function LegalInterface() {
 
           <div className="flex-1 p-6 overflow-y-auto">
             {(() => {
-              const [strategy, ...filings] = result.text.includes('---') 
-                ? result.text.split('---') 
-                : [result.text, 'No filings generated. Please try a more specific request or check the strategy tab.'];
-              
-              const strategyText = strategy.trim();
-              const filingsText = filings.join('---').trim();
+              const { strategy: strategyText, filings: filingsText } = parseLegalOutput(result.text);
 
               if (activeTab === 'strategy') {
                 return (
@@ -261,7 +279,7 @@ export default function LegalInterface() {
                       Download .md
                     </button>
                     <div className="mt-8 bg-slate-900 rounded-xl p-6 text-slate-300 font-mono text-sm whitespace-pre-wrap overflow-x-auto">
-                      {filingsText || "No filings generated."}
+                      {filingsText}
                     </div>
                   </div>
                 );

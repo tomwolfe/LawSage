@@ -8,8 +8,8 @@ class LegalRequest(BaseModel):
 
 class WebChunk(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)
-    title: str
-    uri: str
+    title: Optional[str] = None
+    uri: Optional[str] = None
 
 class GroundingChunk(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)
@@ -21,21 +21,22 @@ class GroundingMetadata(BaseModel):
 
 class Part(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)
-    text: str
+    text: Optional[str] = None
 
 class Content(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)
-    parts: List[Part]
+    parts: Optional[List[Part]] = None
 
 class GeminiCandidate(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)
-    content: Content
+    content: Optional[Content] = None
+    finish_reason: Optional[str] = None
     grounding_metadata: Optional[GroundingMetadata] = None
 
 class Source(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)
-    title: str
-    uri: str
+    title: Optional[str] = None
+    uri: Optional[str] = None
 
 class LegalResult(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)

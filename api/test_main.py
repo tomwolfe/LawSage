@@ -17,7 +17,7 @@ def test_health_check() -> None:
     assert response.json() == {"status": "ok", "message": "LawSage API is running"}
 
 def test_generate_legal_help_no_api_key() -> None:
-    response = client.post("/generate", json={"user_input": "test", "jurisdiction": "California"})
+    response = client.post("/api/generate", json={"user_input": "test", "jurisdiction": "California"})
     assert response.status_code == 401
 
 @patch("google.genai.Client")
@@ -27,6 +27,9 @@ def test_generate_legal_help_success(mock_genai_client: MagicMock) -> None:
     
     mock_response = MagicMock()
     mock_candidate = MagicMock()
+    
+    # Mock finish reason
+    mock_candidate.finish_reason = "STOP"
     
     # Mock parts
     mock_part = MagicMock()
@@ -46,7 +49,7 @@ def test_generate_legal_help_success(mock_genai_client: MagicMock) -> None:
     mock_instance.models.generate_content.return_value = mock_response
     
     response = client.post(
-        "/generate",
+        "/api/generate",
         json={"user_input": "I need help with a traffic ticket", "jurisdiction": "California"},
         headers={"X-Gemini-API-Key": "test-key"}
     )
@@ -68,6 +71,9 @@ def test_generate_legal_help_missing_delimiter(mock_genai_client: MagicMock) -> 
     mock_response = MagicMock()
     mock_candidate = MagicMock()
     
+    # Mock finish reason
+    mock_candidate.finish_reason = "STOP"
+    
     # Mock parts
     mock_part = MagicMock()
     mock_part.text = "Just strategy, no delimiter here."
@@ -80,7 +86,7 @@ def test_generate_legal_help_missing_delimiter(mock_genai_client: MagicMock) -> 
     mock_instance.models.generate_content.return_value = mock_response
     
     response = client.post(
-        "/generate",
+        "/api/generate",
         json={"user_input": "test", "jurisdiction": "California"},
         headers={"X-Gemini-API-Key": "test-key"}
     )

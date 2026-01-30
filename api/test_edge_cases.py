@@ -24,6 +24,12 @@ def test_empty_parts():
     candidate = GeminiCandidate.model_validate(data)
     assert len(candidate.content.parts) == 0
 
+def test_missing_content():
+    """Mock a response where content is missing entirely."""
+    data = {}
+    candidate = GeminiCandidate.model_validate(data)
+    assert candidate.content is None
+
 def test_extra_fields():
     """Pass a dictionary with extra keys to GeminiCandidate.model_validate to verify it ignores them."""
     data = {
