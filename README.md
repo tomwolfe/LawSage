@@ -23,7 +23,7 @@ LawSage is built on a modern, performant full-stack architecture:
 
 *   **Frontend:** Next.js 16 (React 19) with Tailwind CSS and Lucide Icons.
 *   **Backend:** FastAPI (Python) for a robust, asynchronous API.
-*   **AI Engine:** Google Gemini 3 Flash (via the Google AI Python SDK) with web search grounding for real-time legal research.
+*   **AI Engine:** Google Gemini 2.5 Flash (via the Google AI Python SDK) with web search grounding for real-time legal research.
 *   **AI Safety & Structure:** Custom Python validation layer ensures consistent, safe output with mandatory disclaimers and structure.
 *   **State Management:** Local browser storage (localStorage) for user preferences and case history.
 *   **Deployment:** Optimized for Vercel (frontend) and local/Python hosting (backend).

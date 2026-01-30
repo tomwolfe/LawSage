@@ -22,6 +22,7 @@ class GroundingMetadata(BaseModel):
 class Part(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)
     text: Optional[str] = None
+    thought: Optional[bool] = None
 
 class Content(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)
