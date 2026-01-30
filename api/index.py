@@ -206,11 +206,21 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
                 text_output = ResponseValidator.validate_and_fix(text_output)
                 
                 seen_uris = set()
+                seen_titles = set()
                 if candidate.grounding_metadata and candidate.grounding_metadata.grounding_chunks:
                     for chunk in candidate.grounding_metadata.grounding_chunks:
-                        if chunk.web and chunk.web.uri and chunk.web.uri not in seen_uris:
-                            sources.append(Source(title=chunk.web.title, uri=chunk.web.uri))
-                            seen_uris.add(chunk.web.uri)
+                        if chunk.web:
+                            title = chunk.web.title
+                            uri = chunk.web.uri
+                            
+                            # Add if it has a URI we haven't seen, or if it has a title we haven't seen (even without URI)
+                            if uri and uri not in seen_uris:
+                                sources.append(Source(title=title, uri=uri))
+                                seen_uris.add(uri)
+                                if title: seen_titles.add(title)
+                            elif not uri and title and title not in seen_titles:
+                                sources.append(Source(title=title, uri=None))
+                                seen_titles.add(title)
             except Exception as e:
                 print(f"Error validating candidate: {e}")
                 # Fallback to manual parsing if Pydantic fails

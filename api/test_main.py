@@ -66,6 +66,42 @@ def test_generate_legal_help_success(mock_genai_client: MagicMock) -> None:
     assert data["sources"][0]["uri"] == "https://example.com"
 
 @patch("google.genai.Client")
+def test_generate_legal_help_source_no_uri(mock_genai_client: MagicMock) -> None:
+    # Mock the response with a source that has a title but no URI
+    mock_instance = mock_genai_client.return_value
+    
+    mock_response = MagicMock()
+    mock_candidate = MagicMock()
+    mock_candidate.finish_reason = "STOP"
+    mock_part = MagicMock()
+    mock_part.text = "Strategy --- Filings"
+    mock_part.thought = False
+    mock_candidate.content.parts = [mock_part]
+    
+    mock_web = MagicMock()
+    mock_web.title = "Source Without Link"
+    mock_web.uri = None
+    mock_chunk = MagicMock()
+    mock_chunk.web = mock_web
+    
+    mock_candidate.grounding_metadata.grounding_chunks = [mock_chunk]
+    
+    mock_response.candidates = [mock_candidate]
+    mock_instance.models.generate_content.return_value = mock_response
+    
+    response = client.post(
+        "/api/generate",
+        json={"user_input": "test", "jurisdiction": "California"},
+        headers={"X-Gemini-API-Key": "test-key"}
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["sources"]) == 1
+    assert data["sources"][0]["title"] == "Source Without Link"
+    assert data["sources"][0]["uri"] is None
+
+@patch("google.genai.Client")
 def test_generate_legal_help_missing_delimiter(mock_genai_client: MagicMock) -> None:
     # Mock the response from Google GenAI WITHOUT the delimiter
     mock_instance = mock_genai_client.return_value

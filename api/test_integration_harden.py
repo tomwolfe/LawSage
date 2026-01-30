@@ -51,3 +51,21 @@ def test_parse_legal_output_multi_delimiter_split():
     assert "Filing 1" in parsed["filings"]
     assert "--- inside filing ---" in parsed["filings"]
 
+def test_parse_legal_output_empty_strategy():
+    text = "---\nFilings only"
+    parsed = parse_legal_output_with_delimiter(text)
+    assert parsed["strategy"] == ""
+    assert parsed["filings"] == "Filings only"
+
+def test_parse_legal_output_empty_filings():
+    text = "Strategy only\n---"
+    parsed = parse_legal_output_with_delimiter(text)
+    assert parsed["strategy"] == "Strategy only"
+    assert "No filings generated" in parsed["filings"]
+
+def test_parse_legal_output_whitespace_only_filings():
+    text = "Strategy\n---\n   \n"
+    parsed = parse_legal_output_with_delimiter(text)
+    assert parsed["strategy"] == "Strategy"
+    assert "No filings generated" in parsed["filings"]
+
