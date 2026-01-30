@@ -34,6 +34,7 @@ def test_generate_legal_help_success(mock_genai_client: MagicMock) -> None:
     # Mock parts
     mock_part = MagicMock()
     mock_part.text = "Strategy text --- Filings text"
+    mock_part.thought = False
     mock_candidate.content.parts = [mock_part]
     
     # Mock grounding metadata
@@ -78,6 +79,7 @@ def test_generate_legal_help_missing_delimiter(mock_genai_client: MagicMock) -> 
     # Mock parts
     mock_part = MagicMock()
     mock_part.text = "Just strategy, no delimiter here."
+    mock_part.thought = False
     mock_candidate.content.parts = [mock_part]
     
     # Mock grounding metadata

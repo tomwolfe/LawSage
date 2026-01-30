@@ -38,7 +38,9 @@ def test_retry_mechanism(mock_sleep: MagicMock, mock_genai_client: MagicMock) ->
     mock_candidate.finish_reason = "STOP"
     mock_part = MagicMock()
     mock_part.text = "Success --- Filings"
+    mock_part.thought = False
     mock_candidate.content.parts = [mock_part]
+    
     mock_candidate.grounding_metadata = None
     mock_response.candidates = [mock_candidate]
     

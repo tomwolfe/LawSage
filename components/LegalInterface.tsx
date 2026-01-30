@@ -5,6 +5,7 @@ import { Mic, Send, Loader2, AlertCircle, Clock, Trash2 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ResultDisplay from './ResultDisplay';
+import HistoryActions from './HistoryActions';
 
 declare global {
   interface Window {
@@ -257,13 +258,16 @@ export default function LegalInterface() {
               <Clock size={20} />
               Case History
             </h2>
-            <button
-              onClick={clearHistory}
-              className="flex items-center gap-1 text-red-600 hover:text-red-800 text-sm font-medium"
-            >
-              <Trash2 size={16} />
-              Clear History
-            </button>
+            <div className="flex items-center gap-4">
+              <HistoryActions history={history} onImport={setHistory} />
+              <button
+                onClick={clearHistory}
+                className="flex items-center gap-1 text-red-600 hover:text-red-800 text-sm font-medium"
+              >
+                <Trash2 size={16} />
+                Clear History
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
