@@ -33,15 +33,15 @@ def test_validate_and_fix_existing_disclaimer_casing():
     # Test with existing disclaimer in different casing
     text = "i am an ai helping you represent yourself pro se. strategy\n---\nfilings"
     fixed = ResponseValidator.validate_and_fix(text)
-    # Should NOT add another disclaimer because "pro se" is present
-    assert fixed.count("LEGAL DISCLAIMER") == 0
-    assert "pro se" in fixed.lower()
+    # Should prepend LEGAL DISCLAIMER because it didn't start with it
+    assert fixed.startswith("LEGAL DISCLAIMER")
+    assert fixed.count("LEGAL DISCLAIMER") == 1
 
 def test_validate_and_fix_existing_disclaimer_variation():
     text = "This is legal information, not legal advice. strategy\n---\nfilings"
     fixed = ResponseValidator.validate_and_fix(text)
-    assert fixed.count("LEGAL DISCLAIMER") == 0
-    assert "legal information" in fixed.lower()
+    assert fixed.startswith("LEGAL DISCLAIMER")
+    assert fixed.count("LEGAL DISCLAIMER") == 1
 
 def test_parse_legal_output_multi_delimiter_split():
     text = "Strategy part 1\n--- inside strategy ---\nStrategy part 2\n---\nFiling 1\n--- inside filing ---\nFiling 2"

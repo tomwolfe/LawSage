@@ -8,6 +8,10 @@ import os
 from typing import Any, Callable
 from pydantic import BaseModel
 try:
+    from .config_loader import get_settings
+except ImportError:
+    from config_loader import get_settings
+try:
     from .models import (
         LegalRequest,
         WebChunk,
@@ -57,27 +61,47 @@ class ResponseValidator:
         """
         Ensures the '---' delimiter and legal disclaimer are present.
         If missing, performs a one-time fix-up.
+        Enforces disclaimer at the very beginning of the string.
         """
         has_delimiter = '---' in text
         
         # Check for multiple forms of disclaimer
-        disclaimer_keywords = ["pro se", "legal information", "not legal advice", "not an attorney"]
+        disclaimer_keywords = ["pro se", "legal information", "not legal advice", "not an attorney", "legal disclaimer"]
         lower_text = text.lower()
-        has_disclaimer = any(keyword in lower_text for keyword in disclaimer_keywords)
+        
+        standard_disclaimer = (
+            "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. "
+            "This is legal information, not legal advice. Always consult with a qualified attorney.\n\n"
+        )
+        
+        # Check if any disclaimer keyword is at the very start
+        is_disclaimer_at_start = any(lower_text.startswith(kw) for kw in disclaimer_keywords)
         
         fixed_text = text
         
-        # Fix missing delimiter
-        if not has_delimiter:
-            fixed_text = fixed_text.strip() + "\n\n---\n\nNo filings generated. Please try a more specific request or check the strategy tab."
+        # If disclaimer keywords exist but not at the start, remove them and prepend standard one
+        has_disclaimer_anywhere = any(keyword in lower_text for keyword in disclaimer_keywords)
         
-        # Fix missing disclaimer
-        if not has_disclaimer:
-            disclaimer = (
-                "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. "
-                "This is legal information, not legal advice. Always consult with a qualified attorney.\n\n"
-            )
-            fixed_text = disclaimer + fixed_text
+        if has_disclaimer_anywhere and not is_disclaimer_at_start:
+            # Simple approach: remove common disclaimer-like sentences if they exist, 
+            # but to be safe and thorough as per instruction: 
+            # "extracts/removes it from its current position and prepends standard block"
+            # We will use a regex-like approach or just prepend and let the user see the move.
+            # Actually, to "remove" them accurately might be tricky without regex for each keyword.
+            # Let's try to remove sentences containing the keywords if they are not at the start.
+            import re
+            for kw in disclaimer_keywords:
+                # This regex tries to find a sentence-like block containing the keyword
+                pattern = rf'([^.!?\n]*{re.escape(kw)}[^.!?\n]*[.!?\n]*)'
+                fixed_text = re.sub(pattern, '', fixed_text, flags=re.IGNORECASE)
+            
+            fixed_text = standard_disclaimer + fixed_text.strip()
+        elif not has_disclaimer_anywhere:
+            fixed_text = standard_disclaimer + fixed_text.strip()
+        
+        # Fix missing delimiter
+        if '---' not in fixed_text:
+            fixed_text = fixed_text.strip() + "\n\n---\n\nNo filings generated. Please try a more specific request or check the strategy tab."
             
         return fixed_text
 
@@ -162,7 +186,7 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
         Explicitly state that you are an AI helping the user represent themselves (Pro Se) and that this is legal information, not legal advice.
         """
 
-        MODEL_ID = "gemini-2.5-flash"
+        MODEL_ID = get_settings()["model"]["id"]
 
         response = generate_content_with_retry(
             client=client,
