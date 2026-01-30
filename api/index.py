@@ -84,10 +84,13 @@ app.add_middleware(
 )
 
 @app.get("/")
+@app.get("/api")
 @app.get("/health")
+@app.get("/api/health")
 async def health_check() -> HealthResponse:
     return HealthResponse(status="ok", message="LawSage API is running")
 
+@app.post("/generate")
 @app.post("/api/generate", response_model=LegalResult)
 async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | None = Header(None)) -> LegalResult:
     if not x_gemini_api_key:

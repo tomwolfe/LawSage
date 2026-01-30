@@ -70,7 +70,7 @@ export default function LegalInterface() {
   useEffect(() => {
     const checkHealth = async () => {
       try {
-        const response = await fetch('/health');
+        const response = await fetch('/api/health');
         if (!response.ok) {
           setBackendUnreachable(true);
         } else {
