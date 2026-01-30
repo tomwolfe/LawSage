@@ -33,14 +33,24 @@ function parseLegalOutput(text: string): { strategy: string; filings: string } {
       filings: 'No filings generated. Please try a more specific request or check the strategy tab.'
     };
   }
-  const parts = text.split('---');
-  const strategy = parts[0].trim();
-  const filings = parts.slice(1).join('---').trim();
+  // Use the first occurrence of '---' as the split point to handle multiple delimiters
+  const delimiterIndex = text.indexOf('---');
+  const strategy = text.substring(0, delimiterIndex).trim();
+  const filings = text.substring(delimiterIndex + 3).trim(); // +3 to skip '---'
+
+  // If filings section is empty, provide a warning
+  if (!filings) {
+    return {
+      strategy,
+      filings: 'No filings generated. Please try a more specific request or check the strategy tab.'
+    };
+  }
+
   return { strategy, filings };
 }
 
 export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdiction }: ResultDisplayProps) {
-  const [copyStatus, setCopyStatus] = useState<{[key: string]: boolean}>({});
+  const [copyStatus, setCopyStatus] = useState<{[key: string]: boolean}>({ all: false });
 
   const copyToClipboard = async (text: string, section: string) => {
     try {
@@ -67,6 +77,21 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
   };
 
   const { strategy: strategyText, filings: filingsText } = parseLegalOutput(result.text);
+
+  // Function to aggregate all content for copying
+  const copyAllToClipboard = async () => {
+    const allContent = `# Legal Strategy & Analysis\n\n${strategyText}\n\n# Generated Filings\n\n${filingsText}\n\n# Sources\n\n${result.sources.map(source => `- [${source.title}](${source.uri})`).join('\n')}`;
+    try {
+      await navigator.clipboard.writeText(allContent);
+      setCopyStatus(prev => ({ ...prev, all: true }));
+      // Reset the status after 2 seconds
+      setTimeout(() => {
+        setCopyStatus(prev => ({ ...prev, all: false }));
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to copy all content: ', err);
+    }
+  };
 
   return (
     <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden min-h-[500px] flex flex-col">
@@ -144,6 +169,12 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                     <Download size={16} />
                     Download .md
                   </button>
+                  <button
+                    onClick={() => window.print()}
+                    className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors"
+                  >
+                    Print
+                  </button>
                 </div>
                 <div className="mt-8 bg-slate-900 rounded-xl p-6 text-slate-300 font-mono text-sm whitespace-pre-wrap overflow-x-auto">
                   {filingsText}
@@ -179,6 +210,18 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
             </div>
           );
         })()}
+      </div>
+
+      {/* Copy All Button - appears at the bottom of all tabs */}
+      <div className="p-4 border-t border-slate-200 flex justify-end">
+        <button
+          onClick={copyAllToClipboard}
+          className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors"
+          title={copyStatus.all ? "Copied!" : "Copy all content to clipboard"}
+        >
+          <Copy size={16} />
+          <span>{copyStatus.all ? "Copied All!" : "Copy All"}</span>
+        </button>
       </div>
     </div>
   );

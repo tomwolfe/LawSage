@@ -144,15 +144,23 @@ export default function LegalInterface() {
 
       const contentType = response.headers.get('content-type');
       if (!response.ok) {
-        let errorMessage = 'Failed to generate response';
-        if (contentType && contentType.includes('application/json')) {
-          const errData = await response.json();
-          errorMessage = errData.detail || errorMessage;
+        if (response.status === 429) {
+          setError('Rate limit exceeded. Please check your API quota or try again later.');
+          return;
+        } else if (response.status === 401) {
+          setError('Invalid API key. Please update your key in Settings.');
+          return;
         } else {
-          const textError = await response.text();
-          errorMessage = `Server Error (${response.status}): ${textError.slice(0, 100)}...`;
+          let errorMessage = 'Failed to generate response';
+          if (contentType && contentType.includes('application/json')) {
+            const errData = await response.json();
+            errorMessage = errData.detail || errorMessage;
+          } else {
+            const textError = await response.text();
+            errorMessage = `Server Error (${response.status}): ${textError.slice(0, 100)}...`;
+          }
+          throw new Error(errorMessage);
         }
-        throw new Error(errorMessage);
       }
 
       if (!contentType || !contentType.includes('application/json')) {

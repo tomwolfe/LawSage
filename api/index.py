@@ -18,6 +18,21 @@ from .models import (
     HealthResponse,
 )
 
+# System instruction to enforce consistent output structure
+SYSTEM_INSTRUCTION = """
+You are a legal assistant helping pro se litigants (people representing themselves).
+Always format your response with a clear delimiter '---' separating strategy/advice from legal filings.
+
+BEFORE the '---': Provide legal strategy, analysis, and step-by-step procedural roadmap.
+AFTER the '---': Provide actual legal filing templates and documents.
+
+CRITICAL: The '---' delimiter MUST appear in your response. If you cannot provide filings,
+still include the delimiter and state that no filings are available.
+
+ALWAYS include a disclaimer that this is legal information, not legal advice,
+and recommend consulting with a qualified attorney for complex matters.
+"""
+
 app = FastAPI()
 
 @app.middleware("http")
@@ -44,54 +59,58 @@ async def health_check() -> HealthResponse:
 async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | None = Header(None)) -> LegalResult:
     if not x_gemini_api_key:
         raise HTTPException(status_code=401, detail="GEMINI_API_KEY is missing")
-    
+
     try:
         client = genai.Client(api_key=x_gemini_api_key, http_options={'api_version': 'v1alpha'})
-        
+
         # Enable Grounding with Google Search
         search_tool = types.Tool(
             google_search=types.GoogleSearch()
         )
-        
+
+        # Construct the prompt with clear instructions about the delimiter
         prompt = f"""
+        {SYSTEM_INSTRUCTION}
+
         User Situation: {request.user_input}
         Jurisdiction: {request.jurisdiction}
-        
-        Act as a Universal Public Defender. 
+
+        Act as a Universal Public Defender.
         1. Search for current statutes and local court procedures relevant to this situation.
         2. Provide a breakdown of the situation in plain English.
         3. Generate a procedural roadmap (step-by-step instructions).
-        
+
         ---
-        
+
         4. Generate the text for necessary legal filings that are court-admissible in the specified jurisdiction.
-        
+
         Format the response such that the strategy and roadmap come BEFORE the '---' delimiter, and the actual legal filings come AFTER the '---' delimiter.
-        
+
         Explicitly state that you are an AI helping the user represent themselves (Pro Se) and that this is legal information, not legal advice.
         """
-        
+
         MODEL_ID = "gemini-2.5-flash"
-        
+
         response = client.models.generate_content(
             model=MODEL_ID,
             contents=prompt,
             config=types.GenerateContentConfig(
-                tools=[search_tool]
+                tools=[search_tool],
+                system_instruction=SYSTEM_INSTRUCTION  # Pass system instruction directly to the model
             )
         )
         
         text_output = ""
         sources = []
-        
+
         if response.candidates and len(response.candidates) > 0:
             raw_candidate = response.candidates[0]
             print(f"Raw response candidate: {raw_candidate}")
-            
+
             try:
                 # Use Pydantic to validate the raw candidate object
                 candidate = GeminiCandidate.model_validate(raw_candidate)
-                
+
                 # Check for safety or other non-success finish reasons
                 if candidate.finish_reason in ["SAFETY", "RECITATION", "OTHER"]:
                     return LegalResult(
@@ -107,7 +126,8 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
 
                 # Reliability Delimiter: Ensure '---' exists for frontend split logic
                 if '---' not in text_output:
-                    text_output += "\n\n---\n\nNo filings generated. Please try a more specific request."
+                    # If the model failed to include the delimiter, add it manually
+                    text_output = text_output + "\n\n---\n\nNo filings generated. Please try a more specific request or check the strategy tab."
                 
                 if candidate.grounding_metadata and candidate.grounding_metadata.grounding_chunks:
                     for chunk in candidate.grounding_metadata.grounding_chunks:
@@ -127,6 +147,28 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
     except Exception as e:
         print(f"ERROR in generate_legal_help: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+def parse_legal_output_with_delimiter(text: str) -> dict[str, str]:
+    """
+    Parse legal output ensuring the '---' delimiter exists and separates strategy from filings.
+    If the delimiter is missing, default the entire text to strategy and provide a warning for filings.
+    """
+    if '---' not in text:
+        return {
+            "strategy": text.strip(),
+            "filings": "No filings generated. Please try a more specific request or check the strategy tab."
+        }
+
+    parts = text.split('---')
+    strategy = parts[0].strip()
+    # Use the first occurrence of '---' as the split point, join any remaining parts as filings
+    filings = '---'.join(parts[1:]).strip() if len(parts) > 1 else ""
+
+    return {
+        "strategy": strategy,
+        "filings": filings if filings else "No filings generated. Please try a more specific request or check the strategy tab."
+    }
+
 
 if __name__ == "__main__":
     import uvicorn
