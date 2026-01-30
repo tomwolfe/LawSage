@@ -65,6 +65,23 @@ export default function LegalInterface() {
   const [error, setError] = useState('');
   const [history, setHistory] = useState<CaseHistoryItem[]>([]);
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<string | null>(null);
+  const [backendUnreachable, setBackendUnreachable] = useState(false);
+
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const response = await fetch('/health');
+        if (!response.ok) {
+          setBackendUnreachable(true);
+        } else {
+          setBackendUnreachable(false);
+        }
+      } catch (err) {
+        setBackendUnreachable(true);
+      }
+    };
+    checkHealth();
+  }, []);
 
   useEffect(() => {
     // Load history from localStorage on component mount
@@ -224,6 +241,14 @@ export default function LegalInterface() {
 
   return (
     <div className="space-y-8">
+      {backendUnreachable && (
+        <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-3 text-amber-800 shadow-sm">
+          <AlertCircle className="shrink-0" size={20} />
+          <p className="text-sm font-medium">
+            Backend API unreachable. Please ensure the FastAPI server is running on port 8000.
+          </p>
+        </div>
+      )}
       {/* History Section */}
       {history.length > 0 && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">

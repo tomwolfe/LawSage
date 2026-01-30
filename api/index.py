@@ -161,10 +161,12 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
                 # Harden the response with ResponseValidator
                 text_output = ResponseValidator.validate_and_fix(text_output)
                 
+                seen_uris = set()
                 if candidate.grounding_metadata and candidate.grounding_metadata.grounding_chunks:
                     for chunk in candidate.grounding_metadata.grounding_chunks:
-                        if chunk.web:
+                        if chunk.web and chunk.web.uri and chunk.web.uri not in seen_uris:
                             sources.append(Source(title=chunk.web.title, uri=chunk.web.uri))
+                            seen_uris.add(chunk.web.uri)
             except Exception as e:
                 print(f"Error validating candidate: {e}")
                 # Fallback to manual parsing if Pydantic fails
@@ -196,10 +198,10 @@ def parse_legal_output_with_delimiter(text: str) -> dict[str, str]:
             "filings": "No filings generated. Please try a more specific request or check the strategy tab."
         }
 
-    parts = text.split('---')
+    # Use the first occurrence of '---' as the split point, preserve any subsequent '---'
+    parts = text.split('---', 1)
     strategy = parts[0].strip()
-    # Use the first occurrence of '---' as the split point, join any remaining parts as filings
-    filings = '---'.join(parts[1:]).strip() if len(parts) > 1 else ""
+    filings = parts[1].strip()
 
     return {
         "strategy": strategy,
