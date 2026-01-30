@@ -83,14 +83,18 @@ class ResponseValidator:
 
 def is_rate_limit_error(e: Exception) -> bool:
     """Returns True if the exception is a Gemini API rate limit error."""
+    # Catch the SDK-specific client error
     if isinstance(e, errors.ClientError):
         msg = str(e).upper()
         return "429" in msg or "RESOURCE_EXHAUSTED" in msg
+    # Catch the core Google API exception
+    if isinstance(e, google_exceptions.ResourceExhausted):
+        return True
     return False
 
 @retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=4, max=10),
+    stop=stop_after_attempt(5), # Increase attempts
+    wait=wait_exponential(multiplier=2, min=5, max=30), # Wait longer between tries
     retry=retry_if_exception(is_rate_limit_error),
     reraise=True
 )
@@ -133,7 +137,7 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
         raise HTTPException(status_code=401, detail="GEMINI_API_KEY is missing")
 
     try:
-        client = genai.Client(api_key=x_gemini_api_key, http_options={'api_version': 'v1alpha'})
+        client = genai.Client(api_key=x_gemini_api_key)
 
         # Enable Grounding with Google Search
         search_tool = types.Tool(
