@@ -82,13 +82,10 @@ class ResponseValidator:
         return fixed_text
 
 def is_rate_limit_error(e: Exception) -> bool:
-    """Returns True if the exception is a Gemini API rate limit error."""
+    """Returns True only if it is a genuine quota/rate limit issue."""
     msg = str(e).lower()
-    # Actual rate limits usually mention "quota" or "rate limit"
-    # "Resource exhausted" without those words often means token limit hit
-    if "quota" in msg or "rate limit" in msg:
-        return True
-    if isinstance(e, google_exceptions.ResourceExhausted) and "limit" in msg:
+    # Check for the specific 429 status code or explicit quota messages
+    if "429" in msg or "quota exceeded" in msg or "rate limit" in msg:
         return True
     return False
 
@@ -165,7 +162,7 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
         Explicitly state that you are an AI helping the user represent themselves (Pro Se) and that this is legal information, not legal advice.
         """
 
-        MODEL_ID = "gemini-3-flash-preview"
+        MODEL_ID = "gemini-2.5-flash"
 
         response = generate_content_with_retry(
             client=client,
