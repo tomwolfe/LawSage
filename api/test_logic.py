@@ -19,3 +19,8 @@ def test_legal_request_null_values() -> None:
     with pytest.raises(ValidationError):
         # Mypy might complain here if we are strict, but we want to test runtime validation
         LegalRequest(user_input=None, jurisdiction="California") # type: ignore
+
+def test_legal_request_federal_jurisdiction() -> None:
+    req = LegalRequest(user_input="Help", jurisdiction="Federal")
+    assert req.user_input == "Help"
+    assert req.jurisdiction == "Federal"

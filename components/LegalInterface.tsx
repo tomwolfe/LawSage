@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { Mic, Send, FileText, Gavel, Link as LinkIcon, Loader2, Download, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Mic, Send, Loader2, AlertCircle, Clock, Trash2 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import ResultDisplay from './ResultDisplay';
 
 declare global {
   interface Window {
@@ -37,26 +38,22 @@ interface LegalResult {
   sources: Source[];
 }
 
+interface CaseHistoryItem {
+  id: string;
+  timestamp: Date;
+  jurisdiction: string;
+  userInput: string;
+  result: LegalResult;
+}
+
 const US_STATES = [
-  "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", 
-  "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", 
-  "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey", 
-  "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", 
-  "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming"
+  "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia",
+  "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland",
+  "Massachusetts", "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey",
+  "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina",
+  "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming", "Federal"
 ];
 
-function parseLegalOutput(text: string): { strategy: string; filings: string } {
-  if (!text.includes('---')) {
-    return {
-      strategy: text.trim(),
-      filings: 'No filings generated. Please try a more specific request or check the strategy tab.'
-    };
-  }
-  const parts = text.split('---');
-  const strategy = parts[0].trim();
-  const filings = parts.slice(1).join('---').trim();
-  return { strategy, filings };
-}
 
 export default function LegalInterface() {
   const [userInput, setUserInput] = useState('');
@@ -66,6 +63,33 @@ export default function LegalInterface() {
   const [result, setResult] = useState<LegalResult | null>(null);
   const [activeTab, setActiveTab] = useState<'strategy' | 'filings' | 'sources'>('strategy');
   const [error, setError] = useState('');
+  const [history, setHistory] = useState<CaseHistoryItem[]>([]);
+  const [selectedHistoryItem, setSelectedHistoryItem] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Load history from localStorage on component mount
+    const savedHistory = localStorage.getItem('lawsage_history');
+    if (savedHistory) {
+      try {
+        const parsedHistory: unknown = JSON.parse(savedHistory);
+        // Convert timestamp strings back to Date objects
+        if (Array.isArray(parsedHistory)) {
+          const historyWithDates = parsedHistory.map((item: unknown) => {
+            if (typeof item === 'object' && item !== null && 'timestamp' in item) {
+              return {
+                ...item as CaseHistoryItem,
+                timestamp: new Date((item as { timestamp: string }).timestamp)
+              };
+            }
+            return item as CaseHistoryItem;
+          });
+          setHistory(historyWithDates);
+        }
+      } catch (error) {
+        console.error('Failed to parse history from localStorage:', error);
+      }
+    }
+  }, []);
 
   const handleVoice = () => {
     if (!('webkitSpeechRecognition' in window)) {
@@ -139,6 +163,19 @@ export default function LegalInterface() {
       const data: LegalResult = await response.json();
       setResult(data);
       setActiveTab('strategy');
+
+      // Add to history
+      const newHistoryItem: CaseHistoryItem = {
+        id: Date.now().toString(),
+        timestamp: new Date(),
+        jurisdiction,
+        userInput,
+        result: data
+      };
+
+      const updatedHistory = [newHistoryItem, ...history];
+      setHistory(updatedHistory);
+      localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         setError('Request timed out. Please try again.');
@@ -150,25 +187,81 @@ export default function LegalInterface() {
     }
   };
 
-  const downloadFilings = () => {
-    if (!result) return;
-    const blob = new Blob([result.text], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `legal_filings_${jurisdiction.toLowerCase()}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const loadFromHistory = (itemId: string) => {
+    const item = history.find(h => h.id === itemId);
+    if (item) {
+      setResult(item.result);
+      setUserInput(item.userInput);
+      setJurisdiction(item.jurisdiction);
+      setSelectedHistoryItem(itemId);
+      setActiveTab('strategy');
+    }
+  };
+
+  const clearHistory = () => {
+    setHistory([]);
+    localStorage.removeItem('lawsage_history');
+    setSelectedHistoryItem(null);
+  };
+
+  const formatDate = (date: Date) => {
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
   };
 
   return (
     <div className="space-y-8">
+      {/* History Section */}
+      {history.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+              <Clock size={20} />
+              Case History
+            </h2>
+            <button
+              onClick={clearHistory}
+              className="flex items-center gap-1 text-red-600 hover:text-red-800 text-sm font-medium"
+            >
+              <Trash2 size={16} />
+              Clear History
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {history.map((item) => (
+              <div
+                key={item.id}
+                onClick={() => loadFromHistory(item.id)}
+                className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                  selectedHistoryItem === item.id
+                    ? 'border-indigo-500 bg-indigo-50'
+                    : 'border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <div className="font-medium text-slate-800 truncate">
+                  {item.userInput.substring(0, 60)}{item.userInput.length > 60 ? '...' : ''}
+                </div>
+                <div className="text-xs text-slate-500 mt-1">
+                  {formatDate(item.timestamp)} • {item.jurisdiction}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Input Section */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
         <div className="flex flex-col md:flex-row gap-4 mb-4">
           <div className="flex-1">
             <label className="block text-sm font-semibold text-slate-700 mb-2">Your Situation</label>
-            <textarea 
+            <textarea
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
               placeholder="Tell your story. Describe what happened and what you need help with..."
@@ -177,7 +270,7 @@ export default function LegalInterface() {
           </div>
           <div className="md:w-64">
             <label className="block text-sm font-semibold text-slate-700 mb-2">Jurisdiction</label>
-            <select 
+            <select
               value={jurisdiction}
               onChange={(e) => setJurisdiction(e.target.value)}
               className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -186,9 +279,9 @@ export default function LegalInterface() {
                 <option key={state} value={state}>{state}</option>
               ))}
             </select>
-            
+
             <div className="mt-6 flex flex-col gap-2">
-              <button 
+              <button
                 onClick={handleVoice}
                 className={cn(
                   "flex items-center justify-center gap-2 py-2 rounded-lg border-2 transition-all",
@@ -198,8 +291,8 @@ export default function LegalInterface() {
                 <Mic size={18} />
                 <span>{isListening ? 'Listening...' : 'Voice Input'}</span>
               </button>
-              
-              <button 
+
+              <button
                 onClick={handleSubmit}
                 disabled={loading}
                 className="flex items-center justify-center gap-2 py-3 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 disabled:bg-slate-300 transition-colors"
@@ -220,101 +313,12 @@ export default function LegalInterface() {
 
       {/* Output Section */}
       {result && (
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden min-h-[500px] flex flex-col">
-          <div className="flex border-b overflow-x-auto">
-            <button 
-              onClick={() => setActiveTab('strategy')}
-              className={cn(
-                "px-6 py-4 font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap",
-                activeTab === 'strategy' ? "border-indigo-600 text-indigo-600 bg-indigo-50/30" : "border-transparent text-slate-500 hover:text-slate-700"
-              )}
-            >
-              <Gavel size={18} />
-              Strategy & Analysis
-            </button>
-            <button 
-              onClick={() => setActiveTab('filings')}
-              className={cn(
-                "px-6 py-4 font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap",
-                activeTab === 'filings' ? "border-indigo-600 text-indigo-600 bg-indigo-50/30" : "border-transparent text-slate-500 hover:text-slate-700"
-              )}
-            >
-              <FileText size={18} />
-              Generated Filings
-            </button>
-            <button 
-              onClick={() => setActiveTab('sources')}
-              className={cn(
-                "px-6 py-4 font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap",
-                activeTab === 'sources' ? "border-indigo-600 text-indigo-600 bg-indigo-50/30" : "border-transparent text-slate-500 hover:text-slate-700"
-              )}
-            >
-              <LinkIcon size={18} />
-              Legal Sources
-            </button>
-          </div>
-
-          <div className="flex-1 p-6 overflow-y-auto">
-            {(() => {
-              const { strategy: strategyText, filings: filingsText } = parseLegalOutput(result.text);
-
-              if (activeTab === 'strategy') {
-                return (
-                  <div className="prose max-w-none prose-slate">
-                    <div className="whitespace-pre-wrap font-sans leading-relaxed text-slate-700">
-                      {strategyText}
-                    </div>
-                  </div>
-                );
-              }
-
-              if (activeTab === 'filings') {
-                return (
-                  <div className="relative">
-                    <button 
-                      onClick={downloadFilings}
-                      className="absolute top-0 right-0 p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors"
-                    >
-                      <Download size={16} />
-                      Download .md
-                    </button>
-                    <div className="mt-8 bg-slate-900 rounded-xl p-6 text-slate-300 font-mono text-sm whitespace-pre-wrap overflow-x-auto">
-                      {filingsText}
-                    </div>
-                  </div>
-                );
-              }
-              return null;
-            })()}
-
-            {activeTab === 'sources' && (
-              <div className="space-y-4">
-                <h3 className="font-bold text-slate-800">Citations & Grounding</h3>
-                {result.sources.length > 0 ? (
-                  <div className="grid gap-4">
-                    {result.sources.map((source, i) => (
-                      <a 
-                        key={i} 
-                        href={source.uri} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors flex justify-between items-center group"
-                      >
-                        <div>
-                          <p className="font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">{source.title}</p>
-                          <p className="text-sm text-slate-500 truncate max-w-md">{source.uri}</p>
-                        </div>
-                        <LinkIcon size={16} className="text-slate-400" />
-                      </a>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-slate-500 italic">No direct links available. The AI used search grounding to inform its response.</p>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+        <ResultDisplay
+          result={result}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          jurisdiction={jurisdiction}
+        />
       )}
     </div>
   );
