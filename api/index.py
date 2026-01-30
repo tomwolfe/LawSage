@@ -71,7 +71,7 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
         Explicitly state that you are an AI helping the user represent themselves (Pro Se) and that this is legal information, not legal advice.
         """
         
-        MODEL_ID = "gemini-2.0-flash"
+        MODEL_ID = "gemini-2.5-flash"
         
         response = client.models.generate_content(
             model=MODEL_ID,
