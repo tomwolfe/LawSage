@@ -69,16 +69,19 @@ export default function LegalInterface() {
   const [backendUnreachable, setBackendUnreachable] = useState(false);
 
   useEffect(() => {
-    const checkHealth = async () => {
+    const checkHealth = async (retries = 3, delay = 1000) => {
       try {
         const response = await fetch('/api/health');
         if (!response.ok) {
-          setBackendUnreachable(true);
-        } else {
-          setBackendUnreachable(false);
+          throw new Error('Health check failed');
         }
-      } catch (err) {
-        setBackendUnreachable(true);
+        setBackendUnreachable(false);
+      } catch {
+        if (retries > 0) {
+          setTimeout(() => checkHealth(retries - 1, delay * 2), delay);
+        } else {
+          setBackendUnreachable(true);
+        }
       }
     };
     checkHealth();
@@ -259,7 +262,7 @@ export default function LegalInterface() {
               Case History
             </h2>
             <div className="flex items-center gap-4">
-              <HistoryActions history={history} onImport={setHistory} />
+              <HistoryActions onImport={setHistory} />
               <button
                 onClick={clearHistory}
                 className="flex items-center gap-1 text-red-600 hover:text-red-800 text-sm font-medium"

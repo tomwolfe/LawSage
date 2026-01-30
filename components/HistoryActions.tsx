@@ -26,7 +26,7 @@ interface HistoryActionsProps {
   onImport: (newHistory: CaseHistoryItem[]) => void;
 }
 
-export default function HistoryActions({ history, onImport }: HistoryActionsProps) {
+export default function HistoryActions({ onImport }: Omit<HistoryActionsProps, 'history'>) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExport = () => {
@@ -92,7 +92,7 @@ export default function HistoryActions({ history, onImport }: HistoryActionsProp
         let existingHistory: CaseHistoryItem[] = [];
         if (existingHistoryStr) {
           try {
-            existingHistory = JSON.parse(existingHistoryStr).map((item: any) => ({
+            existingHistory = JSON.parse(existingHistoryStr).map((item: CaseHistoryItem) => ({
               ...item,
               timestamp: new Date(item.timestamp)
             }));

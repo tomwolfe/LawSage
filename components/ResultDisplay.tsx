@@ -4,6 +4,8 @@ import { Copy, Download, FileText, Gavel, Link as LinkIcon } from 'lucide-react'
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -35,21 +37,22 @@ function parseLegalOutput(text: string): { strategy: string; filings: string } {
   }
 
   const delimiter = '---';
-  if (!text.includes(delimiter)) {
+  const lowerText = text.toLowerCase();
+  const delimiterIndex = lowerText.indexOf(delimiter);
+
+  if (delimiterIndex === -1) {
     return {
       strategy: text.trim(),
-      filings: 'No filings generated. Please try a more specific request or check the strategy tab.'
+      filings: 'No filings generated.'
     };
   }
 
-  // Use the first occurrence of '---' as the split point to handle multiple delimiters
-  const delimiterIndex = text.indexOf(delimiter);
   const strategy = text.substring(0, delimiterIndex).trim();
   const filings = text.substring(delimiterIndex + delimiter.length).trim();
 
   return {
     strategy: strategy || 'No strategy provided.',
-    filings: filings || 'No filings generated. Please try a more specific request or check the strategy tab.'
+    filings: filings || 'No filings generated.'
   };
 }
 
@@ -71,7 +74,8 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
 
   const downloadFilings = () => {
     if (!result) return;
-    const blob = new Blob([result.text], { type: 'text/markdown' });
+    const { filings } = parseLegalOutput(result.text);
+    const blob = new Blob([filings], { type: 'text/markdown' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -139,16 +143,16 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
               <div className="relative">
                 <button
                   onClick={() => copyToClipboard(strategyText, 'strategy')}
-                  className="absolute top-0 right-0 p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors"
+                  className="absolute top-0 right-0 p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors z-10"
                   title={copyStatus.strategy ? "Copied!" : "Copy to clipboard"}
                 >
                   <Copy size={16} />
                   <span>{copyStatus.strategy ? "Copied!" : "Copy"}</span>
                 </button>
                 <div className="prose max-w-none prose-slate mt-8">
-                  <div className="whitespace-pre-wrap font-sans leading-relaxed text-slate-700">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {strategyText}
-                  </div>
+                  </ReactMarkdown>
                 </div>
               </div>
             );
@@ -157,7 +161,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
           if (activeTab === 'filings') {
             return (
               <div className="relative">
-                <div className="absolute top-0 right-0 flex gap-2">
+                <div className="absolute top-0 right-0 flex gap-2 z-10">
                   <button
                     onClick={() => copyToClipboard(filingsText, 'filings')}
                     className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors"
@@ -180,8 +184,16 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                     Print
                   </button>
                 </div>
-                <div className="mt-8 bg-slate-900 rounded-xl p-6 text-slate-300 font-mono text-sm whitespace-pre-wrap overflow-x-auto">
-                  {filingsText}
+                <div className="mt-8 bg-slate-900 rounded-xl p-6 text-slate-300 font-mono text-sm overflow-x-auto">
+                  {filingsText === 'No filings generated.' ? (
+                    <div className="text-slate-500 italic">No filings generated.</div>
+                  ) : (
+                    <div className="markdown-filings">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {filingsText}
+                      </ReactMarkdown>
+                    </div>
+                  )}
                 </div>
               </div>
             );
