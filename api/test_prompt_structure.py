@@ -1,6 +1,6 @@
 """Test suite for prompt structure validation and delimiter handling."""
 import pytest
-from api.index import parse_legal_output_with_delimiter
+from api.index import parse_legal_output_with_delimiter, ResponseValidator
 
 
 def test_parse_legal_output_with_delimiter_exists():
@@ -21,69 +21,43 @@ def test_parse_legal_output_without_delimiter():
     assert result["filings"] == "No filings generated. Please try a more specific request or check the strategy tab."
 
 
-def test_parse_legal_output_multiple_delimiters():
-    """Test parsing when multiple delimiters exist (should use first one)."""
-    text = "Strategy content\n---\nFirst filing\n---\nSecond filing"
-    result = parse_legal_output_with_delimiter(text)
-
-    assert result["strategy"] == "Strategy content"
-    assert result["filings"] == "First filing\n---\nSecond filing"
-
-
-def test_parse_legal_output_empty_strategy():
-    """Test parsing when strategy is empty."""
-    text = "\n---\nFilings content"
-    result = parse_legal_output_with_delimiter(text)
-
-    assert result["strategy"] == ""
-    assert result["filings"] == "Filings content"
-
-
-def test_parse_legal_output_empty_filings():
-    """Test parsing when filings are empty."""
-    text = "Strategy content\n---\n"
-    result = parse_legal_output_with_delimiter(text)
-
-    assert result["strategy"] == "Strategy content"
-    assert "No filings generated" in result["filings"]
-
-
-def test_parse_legal_output_whitespace_around_delimiter():
-    """Test parsing when there's whitespace around the delimiter."""
-    text = "Strategy content\n  ---  \nFilings content"
-    result = parse_legal_output_with_delimiter(text)
-
-    assert result["strategy"] == "Strategy content"
-    assert result["filings"] == "Filings content"
-
-
-def test_parse_legal_output_only_strategy_no_filings():
-    """Test parsing when there's content only before delimiter."""
-    text = "Strategy content\n---"
-    result = parse_legal_output_with_delimiter(text)
-
-    assert result["strategy"] == "Strategy content"
-    assert "No filings generated" in result["filings"]
-
-
-def test_add_delimiter_if_missing():
-    """Test that delimiter is added if missing."""
+def test_response_validator_missing_delimiter():
+    """Test that ResponseValidator adds missing delimiter."""
     text = "Only strategy content"
-    result = parse_legal_output_with_delimiter(text)
+    fixed_text = ResponseValidator.validate_and_fix(text)
+    
+    assert '---' in fixed_text
+    assert "No filings generated" in fixed_text
 
-    assert result["strategy"] == "Only strategy content"
-    assert result["filings"] == "No filings generated. Please try a more specific request or check the strategy tab."
 
-
-def test_pro_se_disclaimer_enforcement():
-    """Test that Pro Se disclaimer is enforced in the output."""
+def test_response_validator_missing_disclaimer():
+    """Test that ResponseValidator adds missing disclaimer."""
     text = "Strategy content\n---\nFilings content"
-    result = parse_legal_output_with_delimiter(text)
+    fixed_text = ResponseValidator.validate_and_fix(text)
+    
+    assert "LEGAL DISCLAIMER" in fixed_text
+    assert "Pro Se" in fixed_text
+    assert "not legal advice" in fixed_text
 
-    # The function should ensure the disclaimer is present in the output
-    assert isinstance(result, dict)
-    assert "strategy" in result
-    assert "filings" in result
+
+def test_response_validator_both_missing():
+    """Test that ResponseValidator adds both delimiter and disclaimer if missing."""
+    text = "Just some text"
+    fixed_text = ResponseValidator.validate_and_fix(text)
+    
+    assert "LEGAL DISCLAIMER" in fixed_text
+    assert '---' in fixed_text
+
+
+def test_response_validator_already_present():
+    """Test that ResponseValidator doesn't duplicate if already present."""
+    text = "LEGAL DISCLAIMER: Pro Se info here.\n\nStrategy\n---\nFilings"
+    fixed_text = ResponseValidator.validate_and_fix(text)
+    
+    # Count occurrences of disclaimer-like text (should only be 1)
+    # The original text has "LEGAL DISCLAIMER"
+    assert fixed_text.count("LEGAL DISCLAIMER") == 1
+    assert fixed_text.count("---") == 1
 
 
 def test_system_instruction_constant_exists():

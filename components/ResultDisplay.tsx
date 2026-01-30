@@ -10,8 +10,8 @@ function cn(...inputs: ClassValue[]) {
 }
 
 interface Source {
-  title: string;
-  uri: string;
+  title: string | null;
+  uri: string | null;
 }
 
 interface LegalResult {
@@ -27,26 +27,30 @@ interface ResultDisplayProps {
 }
 
 function parseLegalOutput(text: string): { strategy: string; filings: string } {
-  if (!text.includes('---')) {
+  if (!text || typeof text !== 'string') {
+    return {
+      strategy: 'No content available.',
+      filings: 'No filings generated.'
+    };
+  }
+
+  const delimiter = '---';
+  if (!text.includes(delimiter)) {
     return {
       strategy: text.trim(),
       filings: 'No filings generated. Please try a more specific request or check the strategy tab.'
     };
   }
+
   // Use the first occurrence of '---' as the split point to handle multiple delimiters
-  const delimiterIndex = text.indexOf('---');
+  const delimiterIndex = text.indexOf(delimiter);
   const strategy = text.substring(0, delimiterIndex).trim();
-  const filings = text.substring(delimiterIndex + 3).trim(); // +3 to skip '---'
+  const filings = text.substring(delimiterIndex + delimiter.length).trim();
 
-  // If filings section is empty, provide a warning
-  if (!filings) {
-    return {
-      strategy,
-      filings: 'No filings generated. Please try a more specific request or check the strategy tab.'
-    };
-  }
-
-  return { strategy, filings };
+  return {
+    strategy: strategy || 'No strategy provided.',
+    filings: filings || 'No filings generated. Please try a more specific request or check the strategy tab.'
+  };
 }
 
 export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdiction }: ResultDisplayProps) {
@@ -80,7 +84,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
 
   // Function to aggregate all content for copying
   const copyAllToClipboard = async () => {
-    const allContent = `# Legal Strategy & Analysis\n\n${strategyText}\n\n# Generated Filings\n\n${filingsText}\n\n# Sources\n\n${result.sources.map(source => `- [${source.title}](${source.uri})`).join('\n')}`;
+    const allContent = `# Legal Strategy & Analysis\n\n${strategyText}\n\n# Generated Filings\n\n${filingsText}\n\n# Sources\n\n${result.sources.map(source => `- [${source.title || 'Legal Resource'}](${source.uri || 'No direct link'})`).join('\n')}`;
     try {
       await navigator.clipboard.writeText(allContent);
       setCopyStatus(prev => ({ ...prev, all: true }));
@@ -191,16 +195,23 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                   {result.sources.map((source, i) => (
                     <a
                       key={i}
-                      href={source.uri}
+                      href={source.uri || '#'}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-4 border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors flex justify-between items-center group"
+                      className={cn(
+                        "p-4 border border-slate-200 rounded-xl transition-colors flex justify-between items-center group",
+                        source.uri ? "hover:bg-slate-50" : "pointer-events-none opacity-80"
+                      )}
                     >
                       <div>
-                        <p className="font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">{source.title}</p>
-                        <p className="text-sm text-slate-500 truncate max-w-md">{source.uri}</p>
+                        <p className="font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                          {source.title || "Legal Resource"}
+                        </p>
+                        <p className="text-sm text-slate-500 truncate max-w-md">
+                          {source.uri || "Source context available but no direct link provided."}
+                        </p>
                       </div>
-                      <LinkIcon size={16} className="text-slate-400" />
+                      {source.uri && <LinkIcon size={16} className="text-slate-400" />}
                     </a>
                   ))}
                 </div>

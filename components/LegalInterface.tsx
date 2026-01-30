@@ -29,8 +29,8 @@ function cn(...inputs: ClassValue[]) {
 }
 
 interface Source {
-  title: string;
-  uri: string;
+  title: string | null;
+  uri: string | null;
 }
 
 interface LegalResult {
@@ -312,9 +312,21 @@ export default function LegalInterface() {
           </div>
         </div>
         {error && (
-          <div className="flex items-center gap-2 text-red-600 text-sm mt-2 p-3 bg-red-50 rounded-lg">
-            <AlertCircle size={16} />
-            <p>{error}</p>
+          <div className="space-y-3 mt-2">
+            <div className="flex items-center justify-between gap-2 text-red-600 text-sm p-3 bg-red-50 rounded-lg border border-red-100">
+              <div className="flex items-center gap-2">
+                <AlertCircle size={16} />
+                <p>{error}</p>
+              </div>
+              <button
+                onClick={handleSubmit}
+                disabled={loading}
+                className="flex items-center gap-1 px-3 py-1 bg-red-600 text-white rounded-md font-semibold hover:bg-red-700 transition-colors disabled:bg-red-300"
+              >
+                <Send size={14} />
+                Retry
+              </button>
+            </div>
           </div>
         )}
       </div>

@@ -58,7 +58,8 @@ def test_generate_legal_help_success(mock_genai_client: MagicMock) -> None:
     data = response.json()
     assert "text" in data
     assert "sources" in data
-    assert data["text"] == "Strategy text --- Filings text"
+    assert "LEGAL DISCLAIMER" in data["text"]
+    assert "Strategy text --- Filings text" in data["text"]
     assert len(data["sources"]) == 1
     assert data["sources"][0]["title"] == "Test Source"
     assert data["sources"][0]["uri"] == "https://example.com"
