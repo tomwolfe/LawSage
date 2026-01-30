@@ -14,8 +14,8 @@ client = TestClient(app)
 
 @patch("api.index.generate_content_with_retry")
 def test_generate_legal_help_rate_limit(mock_generate: MagicMock) -> None:
-    # Mock generate_content_with_retry to raise ClientError with 429
-    mock_generate.side_effect = errors.ClientError("429 Resource Exhausted", response_json={})
+    # Mock generate_content_with_retry to raise ClientError with 429 and quota info
+    mock_generate.side_effect = errors.ClientError("429 Quota exceeded for model", response_json={})
     
     response = client.post(
         "/api/generate",
@@ -32,7 +32,7 @@ def test_retry_mechanism(mock_sleep: MagicMock, mock_genai_client: MagicMock) ->
     # Mock the response from Google GenAI
     mock_instance = mock_genai_client.return_value
     
-    # First two calls fail with 429, third succeeds
+    # First call fails with 429 quota, second succeeds
     mock_response = MagicMock()
     mock_candidate = MagicMock()
     mock_candidate.finish_reason = "STOP"
@@ -43,8 +43,7 @@ def test_retry_mechanism(mock_sleep: MagicMock, mock_genai_client: MagicMock) ->
     mock_response.candidates = [mock_candidate]
     
     mock_instance.models.generate_content.side_effect = [
-        errors.ClientError("429 Resource Exhausted", response_json={}),
-        errors.ClientError("429 Resource Exhausted", response_json={}),
+        errors.ClientError("429 Quota exceeded", response_json={}),
         mock_response
     ]
     
@@ -56,4 +55,4 @@ def test_retry_mechanism(mock_sleep: MagicMock, mock_genai_client: MagicMock) ->
     
     assert response.status_code == 200
     assert "Success" in response.json()["text"]
-    assert mock_instance.models.generate_content.call_count == 3
+    assert mock_instance.models.generate_content.call_count == 2

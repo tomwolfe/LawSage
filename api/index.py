@@ -83,18 +83,18 @@ class ResponseValidator:
 
 def is_rate_limit_error(e: Exception) -> bool:
     """Returns True if the exception is a Gemini API rate limit error."""
-    # Catch the SDK-specific client error
-    if isinstance(e, errors.ClientError):
-        msg = str(e).upper()
-        return "429" in msg or "RESOURCE_EXHAUSTED" in msg
-    # Catch the core Google API exception
-    if isinstance(e, google_exceptions.ResourceExhausted):
+    msg = str(e).lower()
+    # Actual rate limits usually mention "quota" or "rate limit"
+    # "Resource exhausted" without those words often means token limit hit
+    if "quota" in msg or "rate limit" in msg:
+        return True
+    if isinstance(e, google_exceptions.ResourceExhausted) and "limit" in msg:
         return True
     return False
 
 @retry(
-    stop=stop_after_attempt(5), # Increase attempts
-    wait=wait_exponential(multiplier=2, min=5, max=30), # Wait longer between tries
+    stop=stop_after_attempt(2), # Only retry once
+    wait=wait_exponential(multiplier=1, min=2, max=4),
     retry=retry_if_exception(is_rate_limit_error),
     reraise=True
 )
@@ -173,7 +173,10 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
             contents=prompt,
             config=types.GenerateContentConfig(
                 tools=[search_tool],
-                system_instruction=SYSTEM_INSTRUCTION  # Pass system instruction directly to the model
+                system_instruction=SYSTEM_INSTRUCTION,
+                # Add these to stabilize the preview model
+                max_output_tokens=2048,
+                thinking_config={'include_thoughts': True}
             )
         )
         
