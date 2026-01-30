@@ -6,18 +6,32 @@ from google.api_core import exceptions as google_exceptions
 import os
 from typing import Any, Callable
 from pydantic import BaseModel
-from .models import (
-    LegalRequest,
-    WebChunk,
-    GroundingChunk,
-    GroundingMetadata,
-    Part,
-    Content,
-    GeminiCandidate,
-    Source,
-    LegalResult,
-    HealthResponse,
-)
+try:
+    from .models import (
+        LegalRequest,
+        WebChunk,
+        GroundingChunk,
+        GroundingMetadata,
+        Part,
+        Content,
+        GeminiCandidate,
+        Source,
+        LegalResult,
+        HealthResponse,
+    )
+except ImportError:
+    from models import (
+        LegalRequest,
+        WebChunk,
+        GroundingChunk,
+        GroundingMetadata,
+        Part,
+        Content,
+        GeminiCandidate,
+        Source,
+        LegalResult,
+        HealthResponse,
+    )
 
 # System instruction to enforce consistent output structure
 SYSTEM_INSTRUCTION = """

@@ -1,5 +1,7 @@
 google-genai
+google-api-core
 fastapi
 pydantic>=2.0.0
 uvicorn
 python-multipart
+httpx
