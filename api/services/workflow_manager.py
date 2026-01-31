@@ -24,7 +24,7 @@ class LegalWorkflowManager:
             
             # 1. Transcription if audio
             if filename.lower().endswith(('.mp3', '.wav', '.m4a')):
-                transcript = AudioProcessor.transcribe(content)
+                transcript = AudioProcessor.transcribe(content, self.api_key)
                 transcripts.append(transcript)
                 # Add to vector store
                 self.vector_service.add_documents(

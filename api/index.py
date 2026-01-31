@@ -47,7 +47,7 @@ async def upload_evidence(
     content = await file.read()
     
     if filename.lower().endswith(('.mp3', '.wav', '.m4a')):
-        text = AudioProcessor.transcribe(content)
+        text = AudioProcessor.transcribe(content, x_gemini_api_key)
         metadata_type = "evidence_transcript"
     else:
         if filename.endswith(".pdf"):
