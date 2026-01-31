@@ -27,11 +27,20 @@ class VectorStoreService:
     def add_documents(self, texts: List[str], metadatas: Optional[List[dict]] = None):
         self.vector_store.add_texts(texts=texts, metadatas=metadatas)
 
-    def search(self, query: str, jurisdiction: str, k: int = 5) -> List[Document]:
-        # Filter by jurisdiction if provided in metadata
+    def search(self, query: str, jurisdiction: str, case_id: Optional[str] = None, k: int = 5) -> List[Document]:
+        # Filter by jurisdiction and case_id if provided in metadata
         search_kwargs = {"k": k}
+        filter_dict = {}
         if jurisdiction:
-            search_kwargs["filter"] = {"jurisdiction": jurisdiction}
+            filter_dict["jurisdiction"] = jurisdiction
+        if case_id:
+            filter_dict["case_id"] = case_id
+        
+        if filter_dict:
+            if len(filter_dict) > 1:
+                search_kwargs["filter"] = {"$and": [{k: v} for k, v in filter_dict.items()]}
+            else:
+                search_kwargs["filter"] = filter_dict
         
         try:
             return self.vector_store.similarity_search(query, **search_kwargs)

@@ -11,6 +11,7 @@ class LegalRequest(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)
     user_input: str = Field(..., min_length=1)
     jurisdiction: str = Field(..., min_length=1)
+    case_id: Optional[str] = None
 
 class WebChunk(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)

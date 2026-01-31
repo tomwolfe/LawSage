@@ -9,15 +9,13 @@ LawSage is an open-source AI-powered platform designed to empower individuals re
 ## Features
 
 *   **Voice Input:** Describe your situation naturally using your microphone.
+*   **High-Reliability Pipeline:** A 4-stage agentic workflow (Researcher, Reasoner, Formatter, Verifier) powered by LangGraph ensures accuracy and structural integrity.
+*   **Automated Citation Verification:** Integrated "Verification Loop" cross-references every cited statute against grounding data, triggering an automatic re-search if hallucinations are detected.
+*   **Offline-First Grounding:** Local SQLite database with FTS5 (Full-Text Search) provides instant access to common state statutes even without web access.
+*   **Case-Aware RAG:** Segment your research and uploads by `case_id` to maintain strict context between different legal matters.
 *   **Jurisdiction-Specific Analysis:** Tailor your legal strategy and filings to your specific state or federal jurisdiction.
-*   **AI-Powered Strategy:** Receive clear, plain-language analysis and a step-by-step procedural roadmap.
-*   **Court-Admissible Filings:** Generate draft legal documents (motions, answers, etc.) formatted for court submission.
-*   **Real-Time Grounding:** All responses are grounded in current statutes and legal resources, with direct links to sources.
-*   **Local & Private:** Your data never leaves your browser. Your API key is stored locally in `localStorage`.
-*   **Comprehensive History:** Save and revisit your past cases with a full audit trail.
-*   **Document Upload:** Analyze PDF, DOCX, or TXT files to receive a "Red Team" analysis identifying weaknesses and recommendations.
-*   **Export & Share:** Copy all content to your clipboard or download your filings as a Markdown file.
-*   **Import/Export History:** Backup your case history to a JSON file or restore it on another device.
+*   **Structured Legal Templates:** Uses jurisdiction-compliant JSON templates for common filings like Motions to Dismiss, Answers, and Summary Judgments.
+*   **Local & Private:** Your data remains private. Your API key and local database stay on your machine.
 
 ## Technology Stack
 
@@ -25,12 +23,11 @@ LawSage is built on a modern, performant full-stack architecture:
 
 *   **Frontend:** Next.js 16 (React 19) with Tailwind CSS and Lucide Icons.
 *   **Backend:** FastAPI (Python) for a robust, asynchronous API.
-*   **AI Engine:** Google Gemini 2.5 Flash (via the Google AI Python SDK) with web search grounding for real-time legal research.
-*   **AI Safety & Structure:** Custom Python validation layer ensures consistent, safe output with mandatory disclaimers and structure.
-*   **State Management:** Local browser storage (`localStorage`) for user preferences and case history.
-*   **Document Processing:** PyPDF2 and python-docx for extracting text from uploaded documents.
-*   **Vector Search:** LangChain with Google Generative AI embeddings for semantic search over local legal documents.
-*   **Deployment:** Optimized for Vercel (frontend) and local/Python hosting (backend).
+*   **Workflow Orchestration:** **LangGraph** for complex multi-agent state management and iterative loops.
+*   **AI Engine:** Google Gemini 2.5 Flash with web search grounding for real-time legal research.
+*   **Offline Cache:** **SQLite with FTS5** for high-performance local statute indexing.
+*   **Vector Search:** LangChain with Google Generative AI embeddings (ChromaDB) for semantic search over case-specific documents.
+*   **AI Safety & Structure:** Multi-stage validation layer enforces consistent output with mandatory disclaimers and structured filings.
 
 ## Getting Started
 
@@ -58,11 +55,15 @@ LawSage is built on a modern, performant full-stack architecture:
     pip install -r api/requirements.txt
     ```
 
-4.  **Set Your API Key**
+4.  **Seed the Offline Database**
+    ```bash
+    python3 scripts/seed_offline_db.py
+    ```
+
+5.  **Set Your API Key**
     *   Open the application in your browser (`http://localhost:3000`).
     *   Click the "Settings" button in the top right corner.
     *   Enter your Google Gemini API Key and click "Save Settings".
-    *   *Your key is stored securely in your browser's `localStorage` and is never sent to any server except when making requests to Google's API.*
 
 ### Running the Application
 
@@ -71,21 +72,15 @@ Start both the Next.js frontend and the FastAPI backend simultaneously:
 npm run dev
 ```
 
-This command runs `next dev` and `uvicorn api.index:app --host 127.0.0.1 --port 8000 --reload` in parallel.
-
-Open your browser and navigate to [http://localhost:3000](http://localhost:3000) to begin.
-
 ## How It Works
 
-1.  **Input:** Describe your legal issue in plain language (e.g., "I was evicted from my apartment without notice").
-2.  **Jurisdiction:** Select your relevant state or "Federal" from the dropdown.
-3.  **Analyze:** Click "Analyze Case" or use the voice input button.
-4.  **Output:** LawSage's AI:
-    *   Searches the web for the latest statutes and court rules.
-    *   Generates a clear, step-by-step legal strategy and procedural roadmap.
-    *   Creates a draft, court-admissible legal filing (e.g., an Answer or Motion).
-    *   Provides direct links to the legal sources used for grounding.
-5.  **Action:** Review, edit, and copy the generated content to use in your case. You can also download it as a `.md` file.
+LawSage uses a **4-Stage High-Reliability Pipeline** to process your request:
+
+1.  **Researcher (Search):** Queries the local SQLite database and Google Search (site:.gov) to find relevant statutes and codes.
+2.  **Reasoner (Strategy):** Analyzes the research results to develop a procedural roadmap and legal theory.
+3.  **Formatter (Templates):** Applies the strategy to structured JSON templates to generate court-admissible documents.
+4.  **Verifier (Citation Check):** Scans the final draft for legal citations. If it finds a citation not present in the grounding data, it **automatically routes back to the Researcher** to find the missing info and re-draft the document.
+
 
 ### Document Analysis (Red Team)
 

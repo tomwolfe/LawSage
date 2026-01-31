@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List
 
 class ResponseValidator:
     """Utility to verify and fix AI output for legal safety and structure."""
@@ -109,6 +109,24 @@ class ResponseValidator:
                 return f"{text.strip()}{warning}"
         
         return text
+
+    @classmethod
+    def verify_citations_strict(cls, text: str, sources_content: str) -> List[str]:
+        """
+        Strictly verify citations and return a list of unverified ones.
+        """
+        import re
+        statute_pattern = re.compile(r'([A-Z][a-z\.]+\s*(?:Code|Stat\.|U\.S\.C\.)\s*(?:§|section)?\s*\d+(?:\.\d+)?)', re.IGNORECASE)
+        
+        found_citations = statute_pattern.findall(text)
+        unverified = []
+        
+        for citation in found_citations:
+            clean_citation = citation.strip()
+            if clean_citation.lower() not in sources_content.lower():
+                unverified.append(clean_citation)
+        
+        return list(set(unverified))
 
     @classmethod
     def parse_to_dict(cls, text: str) -> Dict[str, str]:

@@ -5,7 +5,7 @@ from google.genai import types, errors
 from google.api_core import exceptions as google_exceptions
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 import os
-from typing import Any, Callable, List
+from typing import Any, Callable, List, Optional
 from pydantic import BaseModel
 
 from api.config_loader import get_settings
@@ -22,49 +22,11 @@ from api.models import (
     AnalysisResponse,
     HealthResponse,
 )
+from api.utils import generate_content_with_retry
 from api.processor import ResponseValidator
 from api.exceptions import global_exception_handler, AppException
 from api.services.document_processor import DocumentProcessor
 from api.services.vector_store import VectorStoreService
-
-# System instruction to enforce consistent output structure
-SYSTEM_INSTRUCTION = """
-You are a legal assistant helping pro se litigants (people representing themselves).
-Always format your response with a clear delimiter '---' separating strategy/advice from legal filings.
-
-BEFORE the '---': Provide legal strategy, analysis, and step-by-step procedural roadmap.
-AFTER the '---': Provide actual legal filing templates and documents.
-
-CRITICAL: The '---' delimiter MUST appear in your response. If you cannot provide filings,
-still include the delimiter and state that no filings are available.
-
-ALWAYS include a disclaimer that this is legal information, not legal advice,
-and recommend consulting with a qualified attorney for complex matters.
-
-STRICT GROUNDING: Use ONLY the provided 'Grounding Data' to answer. If the 'Grounding Data' does not contain enough information to answer a specific legal question or identify a statute, you MUST state: "I cannot find a specific statute for this". Do NOT hallucinate legal facts.
-"""
-
-def is_rate_limit_error(e: Exception) -> bool:
-    """Returns True only if it is a genuine quota/rate limit issue."""
-    msg = str(e).lower()
-    # Check for the specific 429 status code or explicit quota messages
-    if "429" in msg or "quota exceeded" in msg or "rate limit" in msg:
-        return True
-    return False
-
-@retry(
-    stop=stop_after_attempt(2), # Only retry once
-    wait=wait_exponential(multiplier=1, min=2, max=4),
-    retry=retry_if_exception(is_rate_limit_error),
-    reraise=True
-)
-def generate_content_with_retry(client: genai.Client, model: str, contents: Any, config: Any) -> Any:
-    """Wraps Gemini content generation with exponential backoff retries."""
-    return client.models.generate_content(
-        model=model,
-        contents=contents,
-        config=config
-    )
 
 app = FastAPI()
 app.add_exception_handler(Exception, global_exception_handler)
@@ -114,7 +76,7 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
     vector_service = VectorStoreService(api_key=x_gemini_api_key)
     
     # RAG Search
-    rag_docs = vector_service.search(request.user_input, request.jurisdiction)
+    rag_docs = vector_service.search(request.user_input, request.jurisdiction, case_id=request.case_id)
     grounding_data = "\n\n".join([doc.page_content for doc in rag_docs])
     
     if not grounding_data:
@@ -128,8 +90,11 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
         "jurisdiction": request.jurisdiction,
         "grounding_data": grounding_data,
         "research_results": "",
+        "strategy": "",
         "final_output": "",
         "sources": [],
+        "unverified_citations": [],
+        "missing_info_prompt": "",
         "thinking_steps": []
     }
     
@@ -163,6 +128,7 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
 @app.post("/api/analyze-document", response_model=AnalysisResponse)
 async def analyze_document(
     jurisdiction: str = Form(...),
+    case_id: Optional[str] = Form(None),
     file: UploadFile = File(...),
     x_gemini_api_key: str | None = Header(None)
 ) -> AnalysisResponse:
@@ -212,7 +178,7 @@ async def analyze_document(
     
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
     chunks = text_splitter.split_text(text)
-    metadatas = [{"jurisdiction": jurisdiction, "source": filename} for _ in chunks]
+    metadatas = [{"jurisdiction": jurisdiction, "source": filename, "case_id": case_id} for _ in chunks]
     vector_service.add_documents(chunks, metadatas=metadatas)
 
     if response.parsed:

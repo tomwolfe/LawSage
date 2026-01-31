@@ -1,0 +1,84 @@
+{
+  "motion_to_dismiss": {
+    "header": {
+      "court_name": "[COURT NAME]",
+      "parties": "[PLAINTIFF] v. [DEFENDANT]",
+      "case_number": "Case No. [CASE NUMBER]"
+    },
+    "title": "MOTION TO DISMISS",
+    "sections": [
+      {
+        "id": "introduction",
+        "title": "Introduction",
+        "content_template": "Defendant, appearing Pro Se, moves this Court to dismiss the complaint pursuant to [RULE NUMBER]."
+      },
+      {
+        "id": "grounds",
+        "title": "Grounds for Dismissal",
+        "content_template": "Dismissal is warranted because: [GROUNDS]"
+      },
+      {
+        "id": "argument",
+        "title": "Argument",
+        "content_template": "[LEGAL ARGUMENT WITH CITATIONS]"
+      },
+      {
+        "id": "conclusion",
+        "title": "Conclusion",
+        "content_template": "For the foregoing reasons, Defendant respectfully requests that the Court dismiss this action."
+      }
+    ],
+    "signature_block": {
+      "pro_se_info": "[NAME]\n[ADDRESS]\n[PHONE]\n[EMAIL]",
+      "date_line": "Dated: [DATE]"
+    }
+  },
+  "answer": {
+    "header": {
+      "court_name": "[COURT NAME]",
+      "parties": "[PLAINTIFF] v. [DEFENDANT]",
+      "case_number": "Case No. [CASE NUMBER]"
+    },
+    "title": "ANSWER TO COMPLAINT",
+    "sections": [
+      {
+        "id": "responses",
+        "title": "Responses to Allegations",
+        "content_template": "1. Defendant denies the allegations in paragraph 1...\n[ADDITIONAL RESPONSES]"
+      },
+      {
+        "id": "affirmative_defenses",
+        "title": "Affirmative Defenses",
+        "content_template": "FIRST AFFIRMATIVE DEFENSE: [DEFENSE]\nSECOND AFFIRMATIVE DEFENSE: [DEFENSE]"
+      }
+    ],
+    "signature_block": {
+      "pro_se_info": "[NAME]\n[ADDRESS]\n[PHONE]\n[EMAIL]",
+      "date_line": "Dated: [DATE]"
+    }
+  },
+  "motion_for_summary_judgment": {
+    "header": {
+      "court_name": "[COURT NAME]",
+      "parties": "[PLAINTIFF] v. [DEFENDANT]",
+      "case_number": "Case No. [CASE NUMBER]"
+    },
+    "title": "MOTION FOR SUMMARY JUDGMENT",
+    "sections": [
+      {
+        "id": "statement_of_facts",
+        "title": "Statement of Undisputed Material Facts",
+        "content_template": "Pursuant to [RULE], Defendant submits the following undisputed facts: [FACTS]"
+      },
+      {
+        "id": "argument",
+        "title": "Argument",
+        "content_template": "Summary judgment is appropriate because there is no genuine dispute as to any material fact and the moving party is entitled to judgment as a matter of law."
+      }
+    ],
+    "signature_block": {
+      "pro_se_info": "[NAME]\n[ADDRESS]\n[PHONE]\n[EMAIL]",
+      "date_line": "Dated: [DATE]"
+    }
+  }
+}
