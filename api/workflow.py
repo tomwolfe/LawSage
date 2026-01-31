@@ -21,6 +21,18 @@ Focus on procedural steps, applicable legal theories, and specific statutes that
 Do NOT format the final documents; focus only on the logic and strategy.
 """
 
+DRAFTER_INSTRUCTION = """
+You are a Legal Drafter. Your task is to write a formal legal memo based on the provided strategy and research.
+You MUST follow the IRAC (Issue, Rule, Application, Conclusion) format strictly.
+Use the following headers:
+ISSUE: [Describe the legal question]
+RULE: [Cite the relevant statutes and case law]
+APPLICATION: [Apply the rules to the specific facts of the case]
+CONCLUSION: [State the final legal conclusion or recommendation]
+
+DO NOT use any other format. Failure to use IRAC will result in a system error.
+"""
+
 FORMATTER_INSTRUCTION = """
 You are a Legal Formatter. Use the provided JSON templates and the strategy from the Reasoner to generate jurisdiction-compliant legal filings.
 Ensure all placeholders in the templates are filled appropriately based on the user's case.
@@ -133,6 +145,34 @@ def create_reasoner_node(api_key: str):
         }
     return reasoner
 
+def create_drafter_node(api_key: str):
+    client = Client(api_key=api_key)
+    model_id = get_settings()["model"]["id"]
+
+    def drafter(state: AgentState):
+        thinking_step = "Drafter: Preparing IRAC memo..."
+        
+        prompt = f"""
+        {DRAFTER_INSTRUCTION}
+        
+        Strategy:
+        {state['strategy']}
+        
+        Research:
+        {state['research_results']}
+        
+        User Input: {state['user_input']}
+        """
+        
+        response = generate_content_with_retry(client, model_id, prompt, None)
+        memo = response.candidates[0].content.parts[0].text if response.candidates else ""
+        
+        return {
+            "final_output": memo,
+            "thinking_steps": [thinking_step]
+        }
+    return drafter
+
 def create_formatter_node(api_key: str):
     client = Client(api_key=api_key)
     model_id = get_settings()["model"]["id"]
@@ -152,9 +192,13 @@ def create_formatter_node(api_key: str):
         Strategy:
         {state['strategy']}
         
+        Drafted Memo:
+        {state['final_output']}
+        
         User Input: {state['user_input']}
         
         Generate the final output. Remember to use '---' to separate strategy from filings.
+        Append the IRAC memo to the output.
         """
         
         response = generate_content_with_retry(client, model_id, prompt, None)
@@ -168,6 +212,7 @@ def create_formatter_node(api_key: str):
             "thinking_steps": [thinking_step]
         }
     return formatter
+
 
 def create_verifier_node(api_key: str):
     def verifier(state: AgentState):
@@ -200,12 +245,14 @@ def create_workflow(api_key: str):
     
     workflow.add_node("researcher", create_researcher_node(api_key))
     workflow.add_node("reasoner", create_reasoner_node(api_key))
+    workflow.add_node("drafter", create_drafter_node(api_key))
     workflow.add_node("formatter", create_formatter_node(api_key))
     workflow.add_node("verifier", create_verifier_node(api_key))
     
     workflow.set_entry_point("researcher")
     workflow.add_edge("researcher", "reasoner")
-    workflow.add_edge("reasoner", "formatter")
+    workflow.add_edge("reasoner", "drafter")
+    workflow.add_edge("drafter", "formatter")
     workflow.add_edge("formatter", "verifier")
     
     workflow.add_conditional_edges(
@@ -218,4 +265,5 @@ def create_workflow(api_key: str):
     )
     
     return workflow.compile()
+
 

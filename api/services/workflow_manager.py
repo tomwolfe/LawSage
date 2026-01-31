@@ -1,0 +1,81 @@
+from typing import List, Optional, Any
+from api.services.document_processor import DocumentProcessor
+from api.services.audio_processor import AudioProcessor
+from api.services.vector_store import VectorStoreService
+from api.workflow import create_workflow
+
+class LegalWorkflowManager:
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.vector_service = VectorStoreService(api_key=api_key)
+        self.workflow = create_workflow(api_key)
+
+    async def process_case(self, user_input: str, jurisdiction: str, files: List[Any], case_id: Optional[str] = None):
+        """Orchestrates the full legal workflow for a case."""
+        timeline = []
+        transcripts = []
+        
+        for file in files:
+            content = await file.read()
+            filename = file.filename
+            
+            # 1. Transcription if audio
+            if filename.lower().endswith(('.mp3', '.wav', '.m4a')):
+                transcript = AudioProcessor.transcribe(content)
+                transcripts.append(transcript)
+                # Add to vector store
+                self.vector_service.add_documents(
+                    [transcript], 
+                    metadatas=[{"jurisdiction": jurisdiction, "source": filename, "type": "evidence_transcript", "case_id": case_id}]
+                )
+                text_to_process = transcript
+            elif filename.lower().endswith('.pdf'):
+                text_to_process = DocumentProcessor.extract_text_from_pdf(content)
+            elif filename.lower().endswith('.docx'):
+                text_to_process = DocumentProcessor.extract_text_from_docx(content)
+            else:
+                text_to_process = content.decode("utf-8", errors="ignore")
+
+            # 2. Timeline Extraction
+            file_timeline = DocumentProcessor.extract_timeline(text_to_process, self.api_key)
+            timeline.extend(file_timeline)
+            
+            # Ingest other docs if not already handled
+            if not filename.lower().endswith(('.mp3', '.wav', '.m4a')):
+                chunks = DocumentProcessor.chunk_text(text_to_process)
+                self.vector_service.add_documents(
+                    chunks,
+                    metadatas=[{"jurisdiction": jurisdiction, "source": filename, "case_id": case_id} for _ in chunks]
+                )
+
+        # 3. RAG Search
+        rag_docs = self.vector_service.search(user_input, jurisdiction, case_id=case_id)
+        grounding_data = "\n\n".join([doc.page_content for doc in rag_docs])
+
+        # 4. Run LangGraph Workflow
+        result = self.generate_memo(user_input, jurisdiction, grounding_data)
+        
+        return {
+            "analysis": result,
+            "timeline": timeline,
+            "transcripts": transcripts
+        }
+
+    def generate_memo(self, user_input: str, jurisdiction: str, grounding_data: str) -> str:
+        """Runs the LangGraph workflow to generate an IRAC memo."""
+        initial_state = {
+            "user_input": user_input,
+            "jurisdiction": jurisdiction,
+            "grounding_data": grounding_data,
+            "research_results": "",
+            "strategy": "",
+            "final_output": "",
+            "sources": [],
+            "unverified_citations": [],
+            "missing_info_prompt": "",
+            "thinking_steps": []
+        }
+        
+        result = self.workflow.invoke(initial_state)
+        return result.get("final_output", "")
+

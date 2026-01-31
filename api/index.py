@@ -27,10 +27,53 @@ from api.processor import ResponseValidator
 from api.exceptions import global_exception_handler, AppException
 from api.services.document_processor import DocumentProcessor
 from api.services.vector_store import VectorStoreService
+from api.services.audio_processor import AudioProcessor
 
 app = FastAPI()
 app.add_exception_handler(Exception, global_exception_handler)
 app.add_exception_handler(HTTPException, global_exception_handler)
+
+@app.post("/api/upload-evidence")
+async def upload_evidence(
+    jurisdiction: str = Form(...),
+    case_id: Optional[str] = Form(None),
+    file: UploadFile = File(...),
+    x_gemini_api_key: str | None = Header(None)
+) -> Any:
+    if not x_gemini_api_key:
+        raise HTTPException(status_code=401, detail="Gemini API Key is missing.")
+
+    filename = file.filename or "unknown"
+    content = await file.read()
+    
+    if filename.lower().endswith(('.mp3', '.wav', '.m4a')):
+        text = AudioProcessor.transcribe(content)
+        metadata_type = "evidence_transcript"
+    else:
+        if filename.endswith(".pdf"):
+            text = DocumentProcessor.extract_text_from_pdf(content)
+        elif filename.endswith(".docx"):
+            text = DocumentProcessor.extract_text_from_docx(content)
+        else:
+            text = content.decode("utf-8", errors="ignore")
+        metadata_type = "document"
+
+    # Ingest into Vector Store
+    vector_service = VectorStoreService(api_key=x_gemini_api_key)
+    
+    if metadata_type == "evidence_transcript":
+        vector_service.add_documents([text], metadatas=[{"jurisdiction": jurisdiction, "source": filename, "type": metadata_type, "case_id": case_id}])
+    else:
+        chunks = DocumentProcessor.chunk_text(text)
+        metadatas = [{"jurisdiction": jurisdiction, "source": filename, "type": metadata_type, "case_id": case_id} for _ in chunks]
+        vector_service.add_documents(chunks, metadatas=metadatas)
+
+    return {
+        "status": "success",
+        "filename": filename,
+        "transcript": text if metadata_type == "evidence_transcript" else None,
+        "message": "Evidence uploaded and processed."
+    }
 
 @app.middleware("http")
 async def log_requests(request: Any, call_next: Callable[[Any], Any]) -> Any:
