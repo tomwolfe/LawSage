@@ -36,9 +36,17 @@ interface Source {
   uri: string | null;
 }
 
+interface AuditEntry {
+  node: string;
+  query: string;
+  raw_results: string[];
+  timestamp: string;
+}
+
 interface LegalResult {
   text: string;
   sources: Source[];
+  grounding_audit_log?: AuditEntry[];
 }
 
 interface AnalysisResult {
@@ -72,7 +80,7 @@ export default function LegalInterface() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<LegalResult | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
-  const [activeTab, setActiveTab] = useState<'strategy' | 'filings' | 'sources' | 'analysis'>('strategy');
+  const [activeTab, setActiveTab] = useState<'strategy' | 'filings' | 'sources' | 'analysis' | 'audit'>('strategy');
   const [error, setError] = useState('');
   const [history, setHistory] = useState<CaseHistoryItem[]>([]);
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<string | null>(null);
@@ -268,7 +276,8 @@ export default function LegalInterface() {
       const data = await response.json();
       setResult({
         text: data.text,
-        sources: data.sources
+        sources: data.sources,
+        grounding_audit_log: data.grounding_audit_log
       });
       if (data.thinking_steps) {
         setThinkingSteps(data.thinking_steps);

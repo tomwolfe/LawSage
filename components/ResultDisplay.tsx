@@ -1,6 +1,6 @@
 'use client';
 
-import { Copy, Download, FileText, Gavel, Link as LinkIcon, ShieldAlert } from 'lucide-react';
+import { Copy, Download, FileText, Gavel, Link as LinkIcon, ShieldAlert, ListChecks, Search, ShieldCheck, Clock } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useState } from 'react';
@@ -16,9 +16,17 @@ interface Source {
   uri: string | null;
 }
 
+interface AuditEntry {
+  node: string;
+  query: string;
+  raw_results: string[];
+  timestamp: string;
+}
+
 interface LegalResult {
   text: string;
   sources: Source[];
+  grounding_audit_log?: AuditEntry[];
 }
 
 interface AnalysisResult {
@@ -27,11 +35,13 @@ interface AnalysisResult {
   recommendations: string[];
 }
 
+type TabType = 'strategy' | 'filings' | 'sources' | 'analysis' | 'audit';
+
 interface ResultDisplayProps {
   result: LegalResult | null;
   analysisResult?: AnalysisResult | null;
-  activeTab: 'strategy' | 'filings' | 'sources' | 'analysis';
-  setActiveTab: (tab: 'strategy' | 'filings' | 'sources' | 'analysis') => void;
+  activeTab: TabType;
+  setActiveTab: (tab: TabType) => void;
   jurisdiction: string;
 }
 
@@ -137,6 +147,15 @@ export default function ResultDisplay({ result, analysisResult, activeTab, setAc
     let allContent = '';
     if (result) {
       allContent += `# Legal Strategy & Analysis\n\n${strategyText}\n\n# Generated Filings\n\n${filingsText}\n\n# Sources\n\n${result.sources.map(source => `- [${source.title || 'Legal Resource'}](${source.uri || 'No direct link'})`).join('\n')}`;
+      
+      if (result.grounding_audit_log && result.grounding_audit_log.length > 0) {
+        allContent += '\n\n# Grounding Audit Log\n\n';
+        result.grounding_audit_log.forEach(entry => {
+          allContent += `## ${entry.node.toUpperCase()} - ${new Date(entry.timestamp).toLocaleString()}\n`;
+          allContent += `**Query:** ${entry.query}\n`;
+          allContent += `**Results:**\n${entry.raw_results.map(r => `- ${r}`).join('\n')}\n\n`;
+        });
+      }
     }
     
     if (analysisResult) {
@@ -202,6 +221,16 @@ export default function ResultDisplay({ result, analysisResult, activeTab, setAc
             >
               <LinkIcon size={18} />
               Legal Sources
+            </button>
+            <button
+              onClick={() => setActiveTab('audit')}
+              className={cn(
+                "px-6 py-4 font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap",
+                activeTab === 'audit' ? "border-indigo-600 text-indigo-600 bg-indigo-50/30" : "border-transparent text-slate-500 hover:text-slate-700"
+              )}
+            >
+              <ListChecks size={18} />
+              Audit Trail
             </button>
           </>
         )}
@@ -357,6 +386,84 @@ export default function ResultDisplay({ result, analysisResult, activeTab, setAc
             );
           }
 
+          if (activeTab === 'audit' && result) {
+            return (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    <ListChecks className="text-indigo-600" size={24} />
+                    Machine-Verifiable Audit Trail
+                  </h3>
+                  <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-1 rounded">
+                    TRANSPARENCY LOG V1.0
+                  </span>
+                </div>
+
+                {result.grounding_audit_log && result.grounding_audit_log.length > 0 ? (
+                  <div className="space-y-4">
+                    {result.grounding_audit_log.map((entry, i) => (
+                      <div key={i} className="border border-slate-200 rounded-xl overflow-hidden bg-slate-50/50">
+                        <div className="bg-slate-100 px-4 py-2 border-b border-slate-200 flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            {entry.node === 'researcher' ? (
+                              <Search size={14} className="text-blue-600" />
+                            ) : (
+                              <ShieldCheck size={14} className="text-green-600" />
+                            )}
+                            <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                              Agent: {entry.node}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 text-slate-500">
+                            <Clock size={12} />
+                            <span className="text-[10px] font-mono">
+                              {new Date(entry.timestamp).toLocaleTimeString()}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-4 space-y-3">
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Raw Query / Citation</p>
+                            <code className="text-xs bg-white p-2 rounded border border-slate-200 block text-slate-800 break-all">
+                              {entry.query}
+                            </code>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Retrieved Data Snippets</p>
+                            <ul className="space-y-1">
+                              {entry.raw_results.map((res, j) => (
+                                <li key={j} className="text-xs text-slate-600 flex gap-2">
+                                  <span className="text-slate-300">↳</span>
+                                  <span className="italic">{res}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                    <ListChecks size={48} className="mx-auto text-slate-300 mb-4" />
+                    <p className="text-slate-500 italic">No audit log entries available for this session.</p>
+                  </div>
+                )}
+                
+                <div className="mt-8 p-4 bg-indigo-50 border border-indigo-100 rounded-xl">
+                  <h4 className="text-sm font-bold text-indigo-900 mb-2 flex items-center gap-2">
+                    <ShieldCheck size={16} />
+                    Verification Guarantee
+                  </h4>
+                  <p className="text-xs text-indigo-800 leading-relaxed">
+                    Every legal claim made in the 'Strategy' and 'Filings' tabs has been cross-referenced against the raw data shown above. 
+                    This log provides full transparency into the AI's research process, allowing you to verify its "sources of truth" directly.
+                  </p>
+                </div>
+              </div>
+            );
+          }
+
           return null;
         })()}
       </div>
@@ -375,3 +482,4 @@ export default function ResultDisplay({ result, analysisResult, activeTab, setAc
     </div>
   );
 }
+

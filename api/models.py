@@ -66,6 +66,13 @@ class VerificationReport(BaseModel):
     senior_attorney_feedback: Optional[str] = None
     is_approved: bool = True
     exhibit_list: List[str] = Field(default_factory=list)
+    grounding_audit_log: List['AuditEntry'] = Field(default_factory=list)
+
+class AuditEntry(BaseModel):
+    node: str
+    query: str
+    raw_results: List[str]
+    timestamp: str
 
 class LegalHelpResponse(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)
@@ -75,6 +82,7 @@ class LegalHelpResponse(BaseModel):
     chat_history: Optional[List[dict]] = Field(default_factory=list)
     discovery_questions: Optional[List[str]] = Field(default_factory=list)
     verification_report: Optional[VerificationReport] = None
+    grounding_audit_log: List[AuditEntry] = Field(default_factory=list)
 
 class AnalysisResponse(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)

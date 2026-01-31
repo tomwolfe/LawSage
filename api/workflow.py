@@ -2,6 +2,7 @@ import operator
 import json
 from typing import Annotated, List, TypedDict, Union, Optional, Dict
 import re
+from datetime import datetime
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage
@@ -101,6 +102,7 @@ class AgentState(TypedDict):
     discovery_chat_history: List[BaseMessage]
     context_summary: str
     thinking_steps: Annotated[List[str], operator.add]
+    grounding_audit_log: Annotated[List[dict], operator.add]
     is_approved: bool
 
 def create_interrogator_node(api_key: str):
@@ -205,6 +207,7 @@ def create_researcher_node(api_key: str):
         
         research_output = ""
         sources = []
+        raw_results = []
         if response.candidates:
             candidate = response.candidates[0]
             if candidate.content and candidate.content.parts:
@@ -214,14 +217,23 @@ def create_researcher_node(api_key: str):
                 for chunk in candidate.grounding_metadata.grounding_chunks:
                     if chunk.web:
                         sources.append({"title": chunk.web.title, "uri": chunk.web.uri})
+                        raw_results.append(f"{chunk.web.title}: {chunk.web.uri}")
 
         new_research = (research_output + "\n" + offline_text).strip()
         
+        audit_entry = {
+            "node": "researcher",
+            "query": full_query,
+            "raw_results": raw_results[:3], # Top 3 as requested
+            "timestamp": datetime.now().isoformat()
+        }
+
         if is_adversarial:
             return {
                 "counter_grounding_results": (state.get("counter_grounding_results", "") + "\n" + research_output).strip(),
                 "sources": state.get("sources", []) + sources,
                 "thinking_steps": [thinking_step],
+                "grounding_audit_log": [audit_entry],
                 "missing_info_prompt": ""
             }
 
@@ -229,6 +241,7 @@ def create_researcher_node(api_key: str):
             "research_results": (state.get("research_results", "") + "\n" + new_research).strip(),
             "sources": sources,
             "thinking_steps": [thinking_step],
+            "grounding_audit_log": [audit_entry],
             "missing_info_prompt": "" # Clear it after use
         }
     return researcher
@@ -486,6 +499,7 @@ def create_verifier_node(api_key: str):
 
         unverified = []
         reasoning_mismatches = []
+        audit_entries = []
         search_tool = types.Tool(google_search=types.GoogleSearch())
         
         # API Verification with CourtListener
@@ -500,6 +514,14 @@ def create_verifier_node(api_key: str):
             status = res.get("status", "NOT_FOUND")
             cl_count = res.get("count", 0)
             
+            # Audit log entry for CourtListener
+            audit_entries.append({
+                "node": "verifier",
+                "query": cit,
+                "raw_results": [f"Status: {status}", f"Result Count: {cl_count}"],
+                "timestamp": datetime.now().isoformat()
+            })
+
             if not is_verified_api:
                 if status == "PENDING_MANUAL_VERIFICATION":
                     unverified.append(f"PENDING_MANUAL: {cit}")
@@ -553,7 +575,8 @@ def create_verifier_node(api_key: str):
             "reasoning_mismatches": list(set(reasoning_mismatches)),
             "missing_info_prompt": missing_info_prompt,
             "final_output": updated_final_output,
-            "thinking_steps": [thinking_step]
+            "thinking_steps": [thinking_step],
+            "grounding_audit_log": audit_entries
         }
     return verifier
 
