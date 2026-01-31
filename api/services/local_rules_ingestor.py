@@ -12,7 +12,7 @@ class LocalRulesIngestor:
         self.api_key = api_key
         self.vector_service = VectorStoreService(api_key=api_key)
 
-    def ingest_rules(self, file_path: str, county: str, jurisdiction: str):
+    def ingest_rules(self, file_path: str, county: str, jurisdiction: str, rule_type: str = "local_rule"):
         """
         Reads a file, chunks it, and adds to ChromaDB with local rule metadata.
         """
@@ -30,7 +30,7 @@ class LocalRulesIngestor:
         chunks = DocumentProcessor.chunk_text(text)
         metadatas = [
             {
-                "type": "local_rule",
+                "type": rule_type,
                 "county": county,
                 "jurisdiction": jurisdiction,
                 "source": os.path.basename(file_path)
@@ -39,21 +39,21 @@ class LocalRulesIngestor:
         ]
 
         self.vector_service.add_documents(chunks, metadatas=metadatas)
-        print(f"Successfully ingested {len(chunks)} rule chunks for {county}, {jurisdiction}.")
+        print(f"Successfully ingested {len(chunks)} {rule_type} chunks for {county}, {jurisdiction}.")
 
-    def search_rules(self, query: str, county: str, jurisdiction: str, k: int = 5) -> List[Document]:
+    def search_rules(self, query: str, county: str, jurisdiction: str, rule_type: Optional[str] = None, k: int = 5) -> List[Document]:
         """
         Queries ChromaDB specifically for local rules.
         """
         filter_dict = {
-            "type": "local_rule",
             "county": county,
             "jurisdiction": jurisdiction
         }
-        
-        # We bypass the complex search in VectorStoreService to use a simple filtered search for rules
-        return self.vector_service.vector_store.similarity_search(
-            query, 
-            k=k, 
-            filter=filter_dict
-        )
+        if rule_type:
+            filter_dict["type"] = rule_type
+        else:
+            # If not specified, default to searching both local rules and standing orders
+            # However, ChromaDB filter is usually exact match. 
+            # If we want multiple, we might need a different filter structure.
+            # For now, let's just use local_rule if none specified for backward compatibility.
+            filter_dict["type"] = "local_rule"

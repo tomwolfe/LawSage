@@ -46,6 +46,17 @@ class Source(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)
     title: Optional[str] = None
     uri: Optional[str] = None
+    confidence_score: Optional[float] = Field(default=0.0, ge=0.0, le=1.0)
+
+class LegalElement(BaseModel):
+    name: str
+    definition: str
+    evidence_links: List[str] = Field(default_factory=list)
+    confidence: float = 0.0
+
+class FactLawMatrix(BaseModel):
+    elements: List[LegalElement]
+    summary: str
 
 class VerificationReport(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)

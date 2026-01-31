@@ -103,9 +103,11 @@ class LegalWorkflowManager:
             "unverified_citations": result.get("unverified_citations", []),
             "reasoning_mismatches": result.get("reasoning_mismatches", []),
             "fallacies_found": result.get("fallacies_found", []),
+            "procedural_violations": result.get("procedural_violations", []),
             "senior_attorney_feedback": result.get("missing_info_prompt") if not result.get("is_approved") else None,
             "is_approved": result.get("is_approved", True),
-            "exhibit_list": result.get("exhibit_list", [])
+            "exhibit_list": result.get("exhibit_list", []),
+            "shadow_brief": result.get("shadow_brief", "")
         }
 
         return {
@@ -114,6 +116,7 @@ class LegalWorkflowManager:
             "transcripts": transcripts,
             "evidence_descriptions": evidence_descriptions,
             "evidence_mapping": evidence_mapping,
+            "fact_law_matrix": result.get("fact_law_matrix", {}),
             "chat_history": result.get("discovery_chat_history", []),
             "discovery_questions": result.get("discovery_questions", []),
             "verification_report": verification_report
@@ -137,16 +140,20 @@ class LegalWorkflowManager:
             "jurisdiction": jurisdiction,
             "grounding_data": grounding_data,
             "research_results": "",
+            "counter_grounding_results": "",
             "procedural_checklist": "",
             "evidence_descriptions": evidence_descriptions or [],
             "evidence_mapping": evidence_mapping or {},
+            "fact_law_matrix": {},
             "exhibit_list": [],
             "strategy": "",
+            "shadow_brief": "",
             "final_output": "",
             "sources": [],
             "unverified_citations": [],
             "reasoning_mismatches": [],
             "fallacies_found": [],
+            "procedural_violations": [],
             "missing_info_prompt": "",
             "discovery_questions": [],
             "discovery_chat_history": formatted_history,

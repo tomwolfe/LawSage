@@ -117,6 +117,39 @@ class VerificationService:
             logging.error(f"Negative treatment check failed for {citation}: {e}")
             return {"is_valid": True, "status": "UNKNOWN", "error": str(e)}
 
+    def calculate_confidence_score(self, cit: str, courtlistener_count: int, grounding_consistency: float) -> float:
+        """
+        Weights CourtListener 'count' data against Gemini search grounding consistency.
+        """
+        # courtlistener_count > 0 is a strong signal. 
+        # grounding_consistency (0-1) reflects how many search results agree it's good law.
+        cl_score = 1.0 if courtlistener_count > 0 else 0.0
+        # If count is very high (many citations), it's more likely to be stable/well-known
+        cl_weight = 0.4 + min(0.1, courtlistener_count * 0.01)
+        grounding_weight = 1.0 - cl_weight
+        
+        return (cl_score * cl_weight) + (grounding_consistency * grounding_weight)
+
+    def circular_verification(self, citation: str, jurisdiction: str, depth: int = 0) -> Dict[str, any]:
+        """
+        Recursively checks if a citation is valid, and if overruled, if the overruling case is also valid.
+        """
+        if depth > 2: # Prevent infinite recursion or too deep search
+            return {"is_valid": True, "status": "MAX_DEPTH_REACHED"}
+
+        status_res = self.check_negative_treatment(citation, jurisdiction)
+        
+        if not status_res.get("is_valid", True) and status_res.get("replacement_citation"):
+            overruling_case = status_res["replacement_citation"]
+            logging.info(f"Checking validity of overruling case: {overruling_case}")
+            circular_res = self.circular_verification(overruling_case, jurisdiction, depth + 1)
+            
+            if not circular_res.get("is_valid", True):
+                status_res["explanation"] += f" ALSO, the overruling case {overruling_case} is itself {circular_res.get('status')}!"
+                status_res["is_circular_invalid"] = True
+        
+        return status_res
+
     def verify_citation(self, citation: str) -> Dict[str, any]:
         """
         Queries CourtListener to see if a citation exists.
