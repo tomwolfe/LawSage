@@ -13,12 +13,8 @@ langchain
 python-docx
 langchain-community
 langchain-text-splitters
-pinecone-client
+langgraph
+chromadb
 rank_bm25
-numba==0.59.0
-llvmlite==0.42.0
-pytest
-pytest-cov
-pytest-asyncio
-pytest-mock
 cryptography
+pillow

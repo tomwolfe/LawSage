@@ -4,5 +4,20 @@
       "source": "/api/(.*)",
       "destination": "api/index.py"
     }
+  ],
+  "functions": {
+    "api/**/*.py": {
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  },
+  "excludeFiles": [
+    "public/models/**",
+    "**/__pycache__/*",
+    "node_modules/**",
+    ".next/cache/**",
+    "chroma_db/**",
+    "data/**",
+    ".pytest_cache/**"
   ]
 }

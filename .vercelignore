@@ -1,0 +1,10 @@
+chroma_db/
+data/
+.pytest_cache/
+.next/
+node_modules/
+*.log
+.coverage
+tests/
+api/tests/
+scripts/
