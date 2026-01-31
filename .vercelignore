@@ -1,3 +1,12 @@
+# Vercel Ignore
+.git/
+.env
+.DS_Store
+.venv/
+env/
+venv/
+__pycache__/
+**/__pycache__/
 chroma_db/
 data/
 .pytest_cache/
@@ -9,7 +18,9 @@ tests/
 api/tests/
 scripts/
 public/models/
-**/__pycache__/
-.git/
-.env
-.DS_Store
+*.pyc
+*.pyo
+*.pyd
+.python-version
+.vscode/
+.idea/
