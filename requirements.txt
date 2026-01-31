@@ -14,6 +14,7 @@ python-docx
 langchain-community
 langchain-text-splitters
 pinecone-client
+rank_bm25
 pytest
 pytest-cov
 pytest-asyncio

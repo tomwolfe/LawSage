@@ -122,14 +122,23 @@ async def process_case(
     user_input: str = Form(...),
     jurisdiction: str = Form(...),
     case_id: Optional[str] = Form(None),
+    chat_history: Optional[str] = Form(None), # JSON string
     files: List[UploadFile] = File([]),
     x_gemini_api_key: str | None = Header(None)
 ) -> Any:
     if not x_gemini_api_key:
         raise HTTPException(status_code=401, detail="Gemini API Key is missing.")
 
+    import json
+    history = []
+    if chat_history:
+        try:
+            history = json.loads(chat_history)
+        except:
+            pass
+
     manager = LegalWorkflowManager(api_key=x_gemini_api_key)
-    result = await manager.process_case(user_input, jurisdiction, files, case_id)
+    result = await manager.process_case(user_input, jurisdiction, files, case_id, history)
     return result
 
 @app.post("/api/generate", response_model=LegalHelpResponse)
@@ -140,11 +149,11 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
             detail="Gemini API Key is missing. Please provide it in the X-Gemini-API-Key header."
         )
     
-    # Basic validation: Gemini keys usually start with AIza and are about 39 chars long
+    # Basic validation
     if not x_gemini_api_key.startswith("AIza") or len(x_gemini_api_key) < 20:
         raise HTTPException(
             status_code=400,
-            detail="Invalid Gemini API Key format. It should start with 'AIza' and be at least 20 characters long."
+            detail="Invalid Gemini API Key format."
         )
 
     # Initialize Vector Store
@@ -157,6 +166,15 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
     if not grounding_data:
         grounding_data = "No specific statutes or case law found in local database."
 
+    from langchain_core.messages import HumanMessage, AIMessage
+    formatted_history = []
+    if request.chat_history:
+        for m in request.chat_history:
+            if m['role'] == 'user':
+                formatted_history.append(HumanMessage(content=m['content']))
+            else:
+                formatted_history.append(AIMessage(content=m['content']))
+
     # Create and run workflow
     app_workflow = create_workflow(x_gemini_api_key)
     
@@ -165,24 +183,31 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
         "jurisdiction": request.jurisdiction,
         "grounding_data": grounding_data,
         "research_results": "",
+        "procedural_checklist": "",
+        "evidence_descriptions": [],
         "strategy": "",
         "final_output": "",
         "sources": [],
         "unverified_citations": [],
         "missing_info_prompt": "",
         "discovery_questions": [],
+        "discovery_chat_history": formatted_history,
         "context_summary": "",
-        "thinking_steps": []
+        "thinking_steps": [],
+        "is_approved": True
     }
     
-    # Execute the workflow
-    # Note: For real-time streaming, we would use app_workflow.stream()
-    # But here we'll run it to completion and return the steps
     result = app_workflow.invoke(initial_state)
     
     text_output = result.get("final_output", "Failed to generate response.")
     thinking_steps = result.get("thinking_steps", [])
     discovery_questions = result.get("discovery_questions", [])
+
+    # Convert history back to dict
+    history_out = []
+    for m in result.get("discovery_chat_history", []):
+        role = "user" if isinstance(m, HumanMessage) else "assistant"
+        history_out.append({"role": role, "content": m.content})
     
     sources = []
     # Add local RAG sources
@@ -200,7 +225,8 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
         "text": text_output,
         "sources": sources,
         "thinking_steps": thinking_steps,
-        "discovery_questions": discovery_questions
+        "discovery_questions": discovery_questions,
+        "chat_history": history_out
     }
 
 @app.post("/analyze-document")

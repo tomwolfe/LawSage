@@ -10,13 +10,14 @@ class LegalWorkflowManager:
         self.vector_service = VectorStoreService(api_key=api_key)
         self.workflow = create_workflow(api_key)
 
-    async def process_case(self, user_input: str, jurisdiction: str, files: List[Any], case_id: Optional[str] = None):
+    async def process_case(self, user_input: str, jurisdiction: str, files: List[Any], case_id: Optional[str] = None, chat_history: List[dict] = None):
         """Orchestrates the full legal workflow for a case."""
         timeline = []
         transcripts = []
         evidence_descriptions = []
         
         for file in files:
+            # ... (no change here)
             content = await file.read()
             filename = file.filename
             
@@ -63,17 +64,30 @@ class LegalWorkflowManager:
         grounding_data = "\n\n".join([doc.page_content for doc in rag_docs])
 
         # 4. Run LangGraph Workflow
-        result = self.generate_memo(user_input, jurisdiction, grounding_data, evidence_descriptions)
+        result = self.generate_memo(user_input, jurisdiction, grounding_data, evidence_descriptions, chat_history)
         
         return {
-            "analysis": result,
+            "analysis": result['final_output'],
             "timeline": timeline,
             "transcripts": transcripts,
-            "evidence_descriptions": evidence_descriptions
+            "evidence_descriptions": evidence_descriptions,
+            "chat_history": result.get("discovery_chat_history", []),
+            "discovery_questions": result.get("discovery_questions", [])
         }
 
-    def generate_memo(self, user_input: str, jurisdiction: str, grounding_data: str, evidence_descriptions: List[str] = None) -> str:
+    def generate_memo(self, user_input: str, jurisdiction: str, grounding_data: str, evidence_descriptions: List[str] = None, chat_history: List[dict] = None) -> dict:
         """Runs the LangGraph workflow to generate an IRAC memo."""
+        from langchain_core.messages import HumanMessage, AIMessage
+        
+        # Convert dict history to BaseMessage
+        formatted_history = []
+        if chat_history:
+            for m in chat_history:
+                if m['role'] == 'user':
+                    formatted_history.append(HumanMessage(content=m['content']))
+                else:
+                    formatted_history.append(AIMessage(content=m['content']))
+
         initial_state = {
             "user_input": user_input,
             "jurisdiction": jurisdiction,
@@ -87,10 +101,20 @@ class LegalWorkflowManager:
             "unverified_citations": [],
             "missing_info_prompt": "",
             "discovery_questions": [],
+            "discovery_chat_history": formatted_history,
             "context_summary": "",
-            "thinking_steps": []
+            "thinking_steps": [],
+            "is_approved": True
         }
         
         result = self.workflow.invoke(initial_state)
-        return result.get("final_output", "")
+        
+        # Convert back to dict for API
+        history_out = []
+        for m in result.get("discovery_chat_history", []):
+            role = "user" if isinstance(m, HumanMessage) else "assistant"
+            history_out.append({"role": role, "content": m.content})
+            
+        result["discovery_chat_history"] = history_out
+        return result
 

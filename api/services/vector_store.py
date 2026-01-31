@@ -6,6 +6,7 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_core.documents import Document
 from langchain_community.vectorstores import Chroma
 from api.services.security import VaultService
+from api.services.hybrid_search import HybridSearchService
 
 class VectorStoreService:
     def __init__(self, api_key: str, encryption_key: Optional[bytes] = None):
@@ -60,15 +61,31 @@ class VectorStoreService:
             else:
                 search_kwargs["filter"] = filter_dict
         
+        # 1. Vector Search
         try:
-            results = self.vector_store.similarity_search(query, **search_kwargs)
+            vector_results = self.vector_store.similarity_search(query, **search_kwargs)
         except Exception:
-            # Fallback to unfiltered search if filter fails
-            results = self.vector_store.similarity_search(query, k=k)
+            vector_results = self.vector_store.similarity_search(query, k=k)
+
+        # 2. BM25 Search
+        try:
+            # Retrieve all relevant docs for BM25 indexing (filtered)
+            all_docs_data = self.vector_store.get(where=filter_dict if filter_dict else None)
+            all_docs = [Document(page_content=text, metadata=meta) 
+                        for text, meta in zip(all_docs_data['documents'], all_docs_data['metadatas'])]
+            
+            hybrid_service = HybridSearchService(all_docs)
+            bm25_results = hybrid_service.search_bm25(query, k=k)
+            
+            # 3. Reciprocal Rank Fusion
+            results = HybridSearchService.reciprocal_rank_fusion(vector_results, bm25_results)
+        except Exception as e:
+            print(f"BM25 Search failed: {e}")
+            results = vector_results
 
         # Task 6: Jurisdictional Search Expansion
-        expanded_results = list(results)
-        statute_pattern = r'\b[A-Z]{2,4}\s\d+(\.\d+)?\b' # Simple pattern for statutes like CCP 430.10
+        expanded_results = list(results[:k]) # Keep top K after fusion
+        statute_pattern = r'\b[A-Z]{2,4}\s\d+(\.\d+)?\b' 
         
         seen_statutes = set()
         for doc in results:

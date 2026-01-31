@@ -8,18 +8,17 @@ LawSage is an open-source AI-powered platform designed to empower individuals re
 
 ## Features
 
-*   **Guided Interview UI:** A step-by-step discovery flow that leads users through Jurisdiction Selection, Fact Gathering, Procedural Review, and Final Export.
+*   **Hierarchical Agent Swarm:** Transitioned from a linear pipeline to a multi-agent swarm featuring a **Senior Attorney** node that red-teams final drafts for logical fallacies (non-sequiturs, circular reasoning) and tactical errors.
+*   **Hybrid Search (Semantic + BM25):** Combines vector-based semantic retrieval with **BM25 keyword ranking** and Reciprocal Rank Fusion (RRF) for ultra-precise legal citation discovery.
+*   **Reasoning-Based Verification:** Upgraded verification service that uses Gemini to validate if the 'holding' of a cited case law actually supports the specific legal argument being made in the memo.
+*   **Local-Local Rules Engine:** Deep intelligence for county-specific superior court rules (starting with **Los Angeles County**), covering specific filing requirements like Mandatory Settlement Conferences and Ex Parte procedures.
+*   **Conversational Discovery Loop:** The Interrogator now supports a multi-turn conversational loop, allowing users to answer discovery questions and clarify facts before research begins.
 *   **Procedural Engine:** Automatically generates jurisdiction-specific court checklists and deadlines (e.g., California CCP rules) to keep your litigation on track.
-*   **The Interrogator (Discovery Phase):** An intelligent entry-point node that analyzes your case for factual gaps and generates targeted discovery questions.
 *   **Multimodal Evidence Intake:** Upload documents (PDF, DOCX), images (PNG, JPG), or audio recordings. Images are processed using **multimodal OCR** to extract facts for the IRAC 'Application' section.
 *   **API-Backed Citation Verification:** Integrates with the **CourtListener (Free Law Project)** API to validate legal citations and flag unverified rules in real-time.
 *   **Map-Reduce Legal Aggregation:** Autonomously handles massive document sets (100+ pages) by summarizing individual chunks and performing a "reduce" step to create a master **Case Fact Sheet**.
-*   **High-Reliability Pipeline:** A 7-stage agentic workflow (Interrogator, Researcher, Procedural Guide, Reasoner, Drafter, Formatter, Verifier) powered by LangGraph.
-*   **Court Export Utility:** Automatically formats final filings into standard **U.S. District Court 28-line numbered pleading templates** for professional submission.
-*   **Strict IRAC Formatting:** Generates legal memos following the professional **Issue, Rule, Application, and Conclusion** framework.
 *   **AES-256 Vault Security:** Local vector data (ChromaDB) is secured with AES-256 encryption using the `cryptography` library.
 *   **Automated Shepardizing:** Integrated "Verification Loop" that performs real-time checks to detect if cited laws have been overruled or superseded.
-*   **Local & Private:** Your data remains private. Your API key and local database stay on your machine.
 
 ## Technology Stack
 
@@ -27,12 +26,12 @@ LawSage is built on a modern, performant full-stack architecture:
 
 *   **Frontend:** Next.js 16 (React 19) with Tailwind CSS and Lucide Icons.
 *   **Backend:** FastAPI (Python) for a robust, asynchronous API.
-*   **Workflow Orchestration:** **LangGraph** for complex multi-agent state management and iterative loops.
-*   **AI Engine:** Google Gemini 2.5 Flash with web search grounding for real-time legal research and timeline extraction.
+*   **Workflow Orchestration:** **LangGraph** for hierarchical multi-agent state management and red-teaming loops.
+*   **AI Engine:** Google Gemini 2.0 Flash with web search grounding for real-time legal research and reasoning validation.
+*   **Hybrid Search:** **rank_bm25** combined with **ChromaDB** for dual-mode information retrieval.
 *   **Speech-to-Text:** **OpenAI Whisper (base model)** for local audio evidence transcription.
 *   **Security:** **Cryptography (Fernet)** for AES-256 directory encryption of the local vector store.
 *   **Offline Cache:** **SQLite with FTS5** for high-performance local statute indexing.
-*   **Vector Search:** LangChain with Google Generative AI embeddings (**ChromaDB**) for semantic search over case-specific documents.
 
 ## Getting Started
 
@@ -81,15 +80,16 @@ npm run dev
 
 ## How It Works
 
-LawSage uses a **7-Stage High-Reliability Pipeline** to process your request:
+LawSage uses a **Hierarchical Multi-Agent Swarm** to process your request:
 
-1.  **Interrogator (Discovery):** Identifies factual gaps in your input and generates 2-3 targeted questions to clarify the legal situation before research starts.
-2.  **Researcher (Search):** Queries the local SQLite database, Google Search (site:.gov), and performs jurisdictional expansion to find relevant statutes.
-3.  **Procedural Guide (New):** Identifies specific court rules, deadlines, and filing requirements based on your jurisdiction.
-4.  **Reasoner (Strategy):** Analyzes the research results and procedural rules to develop a roadmap. Uses **Map-Reduce** to aggregate context from extremely large documents.
-5.  **Drafter (IRAC):** Drafts a formal legal memo strictly adhering to the **ISSUE, RULE, APPLICATION, CONCLUSION** format, integrating facts from multimodal evidence.
-6.  **Formatter (Templates):** Applies the strategy and draft to structured templates to generate court-admissible documents.
-7.  **Verifier (Citation Check):** Scans citations for validity. Shepardizes laws and verifies citations against the **CourtListener API**.
+1.  **Interrogator (Conversational Loop):** Identifies factual gaps via a multi-turn chat, gathering necessary details before research starts.
+2.  **Researcher (Hybrid Search):** Performs combined semantic and BM25 keyword searches across local databases and the live web.
+3.  **Procedural Guide (Local-Local):** Injects state-specific and county-level court rules (e.g., LASC rules) into the planning phase.
+4.  **Reasoner (Strategy):** Develops a high-level roadmap. Uses **Map-Reduce** for large-scale context aggregation.
+5.  **Drafter (IRAC):** Preparation of the formal memo strictly following the **ISSUE, RULE, APPLICATION, CONCLUSION** framework.
+6.  **Formatter (Templates):** Maps the strategy to jurisdiction-compliant legal templates and 28-line pleadings.
+7.  **Verifier (Reasoning Validation):** Shepardizes citations and performs deep reasoning checks to ensure case law actually supports the arguments.
+8.  **Senior Attorney (Red-Teamer):** The final supervisor. Analyzes the work for logical fallacies and strategy holes, routing back to the Drafter if improvements are needed.
 
 
 ### Evidence Management

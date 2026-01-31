@@ -12,6 +12,7 @@ class LegalRequest(BaseModel):
     user_input: str = Field(..., min_length=1)
     jurisdiction: str = Field(..., min_length=1)
     case_id: Optional[str] = None
+    chat_history: Optional[List[dict]] = Field(default_factory=list)
 
 class WebChunk(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)
@@ -51,6 +52,8 @@ class LegalHelpResponse(BaseModel):
     text: str
     sources: List[Source]
     thinking_steps: Optional[List[str]] = Field(default_factory=list)
+    chat_history: Optional[List[dict]] = Field(default_factory=list)
+    discovery_questions: Optional[List[str]] = Field(default_factory=list)
 
 class AnalysisResponse(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)

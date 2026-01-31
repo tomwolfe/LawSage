@@ -16,6 +16,7 @@ from api.services.offline_db import StatuteCache
 from api.services.document_processor import DocumentProcessor
 from api.services.procedural_engine import ProceduralEngine
 from api.services.verification_service import VerificationService
+from api.services.local_rules_engine import LocalRulesEngine
 
 # System instructions for nodes
 REASONER_INSTRUCTION = """
@@ -48,6 +49,18 @@ You are a Citation Verifier. Cross-reference all legal citations in the draft ag
 Identify any citations that are not supported by the provided materials.
 """
 
+SENIOR_ATTORNEY_INSTRUCTION = """
+You are a Senior Attorney and Red-Teamer. Your job is to analyze the final legal memo for logical fallacies, 
+weak arguments, and tactical errors. 
+Look for:
+- Non-sequiturs (conclusions that don't follow from premises)
+- Circular reasoning
+- Weak application of law to facts
+- Missing counter-arguments
+
+If you find significant issues, you must reject the draft and provide specific feedback for the drafter.
+"""
+
 INTERROGATOR_INSTRUCTION = """
 You are 'The Interrogator'. Your role is to identify factual gaps in the user's legal case before research begins.
 Analyze the user's input and any initial grounding data provided.
@@ -68,8 +81,10 @@ class AgentState(TypedDict):
     unverified_citations: List[str]
     missing_info_prompt: str
     discovery_questions: List[str]
+    discovery_chat_history: List[BaseMessage]
     context_summary: str
     thinking_steps: Annotated[List[str], operator.add]
+    is_approved: bool
 
 def create_interrogator_node(api_key: str):
     client = Client(api_key=api_key)
@@ -78,13 +93,18 @@ def create_interrogator_node(api_key: str):
     def interrogator(state: AgentState):
         thinking_step = "Interrogator: Analyzing case for factual gaps..."
         
+        history = state.get("discovery_chat_history", [])
+        
         prompt = f"""
         {INTERROGATOR_INSTRUCTION}
         
         User Input: {state['user_input']}
         Grounding Data: {state['grounding_data']}
         
-        Respond with a JSON list of 2-3 discovery questions.
+        Previous History:
+        {[m.content for m in history]}
+        
+        Respond with a JSON list of 2-3 discovery questions. If the user has already answered sufficient questions, return [].
         """
         
         response = client.models.generate_content(
@@ -104,8 +124,14 @@ def create_interrogator_node(api_key: str):
         except:
             pass
 
+        # Update history
+        new_history = history + [HumanMessage(content=state['user_input'])]
+        if questions:
+            new_history.append(AIMessage(content=f"Discovery Questions: {', '.join(questions)}"))
+
         return {
             "discovery_questions": questions,
+            "discovery_chat_history": new_history,
             "thinking_steps": [thinking_step]
         }
     return interrogator
@@ -173,9 +199,17 @@ def create_researcher_node(api_key: str):
 
 def create_procedural_guide_node():
     def procedural_guide(state: AgentState):
-        thinking_step = f"Procedural Engine: Identifying court rules for {state['jurisdiction']}..."
+        jurisdiction = state['jurisdiction']
+        thinking_step = f"Procedural Engine: Identifying court rules for {jurisdiction}..."
         
-        guide = ProceduralEngine.get_procedural_guide(state['jurisdiction'])
+        # Base state/federal rules
+        guide = ProceduralEngine.get_procedural_guide(jurisdiction)
+        
+        # County-level rules expansion
+        if "County" in jurisdiction or jurisdiction == "Los Angeles":
+            county_name = jurisdiction if "County" in jurisdiction else f"{jurisdiction} County"
+            local_rules = LocalRulesEngine.format_rules(county_name)
+            guide = f"{guide}\n\n{local_rules}"
         
         return {
             "procedural_checklist": guide,
@@ -302,10 +336,10 @@ def create_formatter_node(api_key: str):
 def create_verifier_node(api_key: str):
     client = Client(api_key=api_key)
     model_id = get_settings()["model"]["id"]
-    verification_service = VerificationService()
+    verification_service = VerificationService(gemini_api_key=api_key)
 
     def verifier(state: AgentState):
-        thinking_step = "Verifier: Shepardizing citations (checking for negative treatment) and verifying with CourtListener..."
+        thinking_step = "Verifier: Shepardizing citations and performing Reasoning-Based Validation..."
         
         # 1. Extract Citations using LLM
         extract_prompt = f"""
@@ -337,17 +371,24 @@ def create_verifier_node(api_key: str):
         api_verification_results = verification_service.verify_citations_batch(citations)
         
         updated_final_output = state['final_output']
-        
+        all_context = state['grounding_data'] + "\n" + state['research_results']
+
         for cit in citations:
             is_verified_api = api_verification_results.get(cit, False)
             
             if not is_verified_api:
                 unverified.append(f"UNVERIFIED: {cit}")
-                # Flag in final_output as requested
                 updated_final_output = updated_final_output.replace(cit, f"{cit} [UNVERIFIED]")
                 continue
 
-            # If verified by API, still check for negative treatment via search
+            # NEW: Reasoning Validation
+            reasoning_res = verification_service.validate_reasoning(cit, all_context, state['final_output'])
+            if not reasoning_res.get("valid", True):
+                critique = reasoning_res.get("critique", "Reasoning mismatch")
+                unverified.append(f"REASONING_ERROR: {cit} - {critique}")
+                updated_final_output = updated_final_output.replace(cit, f"{cit} [REASONING_ERROR: {critique}]")
+
+            # Check for negative treatment via search
             query = f"Is {cit} still good law in {state['jurisdiction']}? Check for overruled, repealed, or superseded status."
             
             search_response = generate_content_with_retry(
@@ -363,7 +404,6 @@ def create_verifier_node(api_key: str):
                 if candidate.content and candidate.content.parts:
                     search_text = "\n".join([p.text for p in candidate.content.parts if p.text])
             
-            # Use LLM to determine if it's superseded based on search results
             check_prompt = f"""
             Based on the following search results, is the citation '{cit}' still valid law in {state['jurisdiction']}?
             Search Results:
@@ -396,16 +436,68 @@ def create_verifier_node(api_key: str):
         }
     return verifier
 
+def create_senior_attorney_node(api_key: str):
+    client = Client(api_key=api_key)
+    model_id = get_settings()["model"]["id"]
+
+    def senior_attorney(state: AgentState):
+        thinking_step = "Senior Attorney: Red-Teaming the strategy for logical fallacies..."
+        
+        prompt = f"""
+        {SENIOR_ATTORNEY_INSTRUCTION}
+        
+        Final Draft:
+        {state['final_output']}
+        
+        Strategy:
+        {state['strategy']}
+        
+        Analyze for logical fallacies, weak arguments, and strategic holes.
+        Respond with a JSON object:
+        {{
+            "is_approved": boolean,
+            "feedback": "detailed feedback if not approved",
+            "fallacies_found": ["list of fallacies"]
+        }}
+        """
+        
+        response = client.models.generate_content(
+            model=model_id,
+            contents=prompt,
+            config=types.GenerateContentConfig(response_mime_type="application/json")
+        )
+        
+        res = {}
+        try:
+            if response.parsed:
+                res = response.parsed
+            else:
+                res = json.loads(response.text)
+        except:
+            res = {"is_approved": True, "feedback": ""}
+
+        return {
+            "is_approved": res.get("is_approved", True),
+            "missing_info_prompt": res.get("feedback", "") if not res.get("is_approved") else "",
+            "thinking_steps": [thinking_step]
+        }
+    return senior_attorney
+
 def should_continue(state: AgentState):
     if state.get("unverified_citations") and len(state["unverified_citations"]) > 0:
         # Prevent infinite loops - could add a counter in state
-        if len(state["thinking_steps"]) > 10: 
-             return END
+        if len(state.get("thinking_steps", [])) > 15: 
+             return "senior_attorney"
         return "researcher"
+    return "senior_attorney"
+
+def senior_attorney_should_continue(state: AgentState):
+    if not state.get("is_approved"):
+        return "drafter"
     return END
 
 def interrogator_should_continue(state: AgentState):
-    if state.get("discovery_questions") and len(state["thinking_steps"]) <= 1:
+    if state.get("discovery_questions"):
         return END
     return "researcher"
 
@@ -419,6 +511,7 @@ def create_workflow(api_key: str):
     workflow.add_node("drafter", create_drafter_node(api_key))
     workflow.add_node("formatter", create_formatter_node(api_key))
     workflow.add_node("verifier", create_verifier_node(api_key))
+    workflow.add_node("senior_attorney", create_senior_attorney_node(api_key))
     
     workflow.set_entry_point("interrogator")
     
@@ -442,6 +535,15 @@ def create_workflow(api_key: str):
         should_continue,
         {
             "researcher": "researcher",
+            "senior_attorney": "senior_attorney"
+        }
+    )
+    
+    workflow.add_conditional_edges(
+        "senior_attorney",
+        senior_attorney_should_continue,
+        {
+            "drafter": "drafter",
             END: END
         }
     )
