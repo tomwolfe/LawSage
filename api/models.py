@@ -1,6 +1,12 @@
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
 
+class StandardErrorResponse(BaseModel):
+    model_config = ConfigDict(extra='ignore')
+    error: bool = True
+    type: str
+    detail: str
+
 class LegalRequest(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)
     user_input: str = Field(..., min_length=1)

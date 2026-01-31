@@ -1,5 +1,5 @@
 import pytest
-from api.index import ResponseValidator
+from api.processor import ResponseValidator
 
 def test_validate_and_fix_missing_both():
     text = "Here is some strategy. No filings."
@@ -72,6 +72,11 @@ def test_validate_and_fix_disclaimer_moved_to_top():
     fixed = ResponseValidator.validate_and_fix(text)
     # The standard disclaimer should be at the very start
     assert fixed.startswith("LEGAL DISCLAIMER")
-    # Check that it removed the middle one (at least partially, depending on regex)
-    assert "initial strategy. More strategy." in fixed or "initial strategy.  More strategy." in fixed
+    # Our new validator strips lines containing keywords. 
+    # "This is legal information, not legal advice." contains "legal information" and "not legal advice".
+    # So it should be removed.
+    assert "initial strategy." in fixed
+    assert "More strategy." in fixed
+    assert "LEGAL DISCLAIMER" in fixed
     assert fixed.count("LEGAL DISCLAIMER") == 1
+    assert "---" in fixed

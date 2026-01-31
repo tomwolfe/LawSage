@@ -7,36 +7,22 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 import os
 from typing import Any, Callable
 from pydantic import BaseModel
-try:
-    from .config_loader import get_settings
-except ImportError:
-    from config_loader import get_settings
-try:
-    from .models import (
-        LegalRequest,
-        WebChunk,
-        GroundingChunk,
-        GroundingMetadata,
-        Part,
-        Content,
-        GeminiCandidate,
-        Source,
-        LegalResult,
-        HealthResponse,
-    )
-except ImportError:
-    from models import (
-        LegalRequest,
-        WebChunk,
-        GroundingChunk,
-        GroundingMetadata,
-        Part,
-        Content,
-        GeminiCandidate,
-        Source,
-        LegalResult,
-        HealthResponse,
-    )
+
+from api.config_loader import get_settings
+from api.models import (
+    LegalRequest,
+    WebChunk,
+    GroundingChunk,
+    GroundingMetadata,
+    Part,
+    Content,
+    GeminiCandidate,
+    Source,
+    LegalResult,
+    HealthResponse,
+)
+from api.processor import ResponseValidator
+from api.exceptions import global_exception_handler, AppException
 
 # System instruction to enforce consistent output structure
 SYSTEM_INSTRUCTION = """
@@ -52,58 +38,6 @@ still include the delimiter and state that no filings are available.
 ALWAYS include a disclaimer that this is legal information, not legal advice,
 and recommend consulting with a qualified attorney for complex matters.
 """
-
-class ResponseValidator:
-    """Utility to verify and fix AI output for legal safety and structure."""
-    
-    @staticmethod
-    def validate_and_fix(text: str) -> str:
-        """
-        Ensures the '---' delimiter and legal disclaimer are present.
-        If missing, performs a one-time fix-up.
-        Enforces disclaimer at the very beginning of the string.
-        """
-        has_delimiter = '---' in text
-        
-        # Check for multiple forms of disclaimer
-        disclaimer_keywords = ["pro se", "legal information", "not legal advice", "not an attorney", "legal disclaimer"]
-        lower_text = text.lower()
-        
-        standard_disclaimer = (
-            "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. "
-            "This is legal information, not legal advice. Always consult with a qualified attorney.\n\n"
-        )
-        
-        # Check if any disclaimer keyword is at the very start
-        is_disclaimer_at_start = any(lower_text.startswith(kw) for kw in disclaimer_keywords)
-        
-        fixed_text = text
-        
-        # If disclaimer keywords exist but not at the start, remove them and prepend standard one
-        has_disclaimer_anywhere = any(keyword in lower_text for keyword in disclaimer_keywords)
-        
-        if has_disclaimer_anywhere and not is_disclaimer_at_start:
-            # Simple approach: remove common disclaimer-like sentences if they exist, 
-            # but to be safe and thorough as per instruction: 
-            # "extracts/removes it from its current position and prepends standard block"
-            # We will use a regex-like approach or just prepend and let the user see the move.
-            # Actually, to "remove" them accurately might be tricky without regex for each keyword.
-            # Let's try to remove sentences containing the keywords if they are not at the start.
-            import re
-            for kw in disclaimer_keywords:
-                # This regex tries to find a sentence-like block containing the keyword
-                pattern = rf'([^.!?\n]*{re.escape(kw)}[^.!?\n]*[.!?\n]*)'
-                fixed_text = re.sub(pattern, '', fixed_text, flags=re.IGNORECASE)
-            
-            fixed_text = standard_disclaimer + fixed_text.strip()
-        elif not has_disclaimer_anywhere:
-            fixed_text = standard_disclaimer + fixed_text.strip()
-        
-        # Fix missing delimiter
-        if '---' not in fixed_text:
-            fixed_text = fixed_text.strip() + "\n\n---\n\nNo filings generated. Please try a more specific request or check the strategy tab."
-            
-        return fixed_text
 
 def is_rate_limit_error(e: Exception) -> bool:
     """Returns True only if it is a genuine quota/rate limit issue."""
@@ -128,6 +62,8 @@ def generate_content_with_retry(client: genai.Client, model: str, contents: Any,
     )
 
 app = FastAPI()
+app.add_exception_handler(Exception, global_exception_handler)
+app.add_exception_handler(HTTPException, global_exception_handler)
 
 @app.middleware("http")
 async def log_requests(request: Any, call_next: Callable[[Any], Any]) -> Any:
@@ -157,141 +93,100 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
     if not x_gemini_api_key:
         raise HTTPException(status_code=401, detail="GEMINI_API_KEY is missing")
 
-    try:
-        client = genai.Client(api_key=x_gemini_api_key)
+    client = genai.Client(api_key=x_gemini_api_key)
 
-        # Enable Grounding with Google Search
-        search_tool = types.Tool(
-            google_search=types.GoogleSearch()
+    # Enable Grounding with Google Search
+    search_tool = types.Tool(
+        google_search=types.GoogleSearch()
+    )
+
+    # Construct the prompt with clear instructions about the delimiter
+    prompt = f"""
+    {SYSTEM_INSTRUCTION}
+
+    User Situation: {request.user_input}
+    Jurisdiction: {request.jurisdiction}
+
+    Act as a Universal Public Defender.
+    1. Search for current statutes and local court procedures relevant to this situation.
+    2. Provide a breakdown of the situation in plain English.
+    3. Generate a procedural roadmap (step-by-step instructions).
+
+    ---
+
+    4. Generate the text for necessary legal filings that are court-admissible in the specified jurisdiction.
+
+    Format the response such that the strategy and roadmap come BEFORE the '---' delimiter, and the actual legal filings come AFTER the '---' delimiter.
+
+    Explicitly state that you are an AI helping the user represent themselves (Pro Se) and that this is legal information, not legal advice.
+    """
+
+    MODEL_ID = get_settings()["model"]["id"]
+
+    response = generate_content_with_retry(
+        client=client,
+        model=MODEL_ID,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            tools=[search_tool],
+            system_instruction=SYSTEM_INSTRUCTION,
+            # Add these to stabilize the preview model
+            max_output_tokens=4096,
+            thinking_config=types.ThinkingConfig(include_thoughts=True)
         )
+    )
+    
+    text_output = ""
+    sources = []
 
-        # Construct the prompt with clear instructions about the delimiter
-        prompt = f"""
-        {SYSTEM_INSTRUCTION}
+    if response.candidates and len(response.candidates) > 0:
+        raw_candidate = response.candidates[0]
+        print(f"Raw response candidate: {raw_candidate}")
 
-        User Situation: {request.user_input}
-        Jurisdiction: {request.jurisdiction}
+        # Use Pydantic to validate the raw candidate object
+        candidate = GeminiCandidate.model_validate(raw_candidate)
 
-        Act as a Universal Public Defender.
-        1. Search for current statutes and local court procedures relevant to this situation.
-        2. Provide a breakdown of the situation in plain English.
-        3. Generate a procedural roadmap (step-by-step instructions).
-
-        ---
-
-        4. Generate the text for necessary legal filings that are court-admissible in the specified jurisdiction.
-
-        Format the response such that the strategy and roadmap come BEFORE the '---' delimiter, and the actual legal filings come AFTER the '---' delimiter.
-
-        Explicitly state that you are an AI helping the user represent themselves (Pro Se) and that this is legal information, not legal advice.
-        """
-
-        MODEL_ID = get_settings()["model"]["id"]
-
-        response = generate_content_with_retry(
-            client=client,
-            model=MODEL_ID,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                tools=[search_tool],
-                system_instruction=SYSTEM_INSTRUCTION,
-                # Add these to stabilize the preview model
-                max_output_tokens=4096,
-                thinking_config=types.ThinkingConfig(include_thoughts=True)
+        # Check for safety or other non-success finish reasons
+        if candidate.finish_reason in ["SAFETY", "RECITATION", "OTHER"]:
+            text_output = f"The AI was unable to complete the request due to safety filters or other constraints (Reason: {candidate.finish_reason}). Please try rephrasing your request to be more specific or focused on legal information."
+            return LegalResult(
+                text=ResponseValidator.validate_and_fix(text_output),
+                sources=[]
             )
-        )
-        
-        text_output = ""
-        sources = []
 
-        if response.candidates and len(response.candidates) > 0:
-            raw_candidate = response.candidates[0]
-            print(f"Raw response candidate: {raw_candidate}")
-
-            try:
-                # Use Pydantic to validate the raw candidate object
-                candidate = GeminiCandidate.model_validate(raw_candidate)
-
-                # Check for safety or other non-success finish reasons
-                if candidate.finish_reason in ["SAFETY", "RECITATION", "OTHER"]:
-                    text_output = f"The AI was unable to complete the request due to safety filters or other constraints (Reason: {candidate.finish_reason}). Please try rephrasing your request to be more specific or focused on legal information.\n\n---\n\nNo filings generated."
-                    return LegalResult(
-                        text=ResponseValidator.validate_and_fix(text_output),
-                        sources=[]
-                    )
-
-                # Join only standard text parts, excluding raw thoughts from the final legal filing
-                if candidate.content and candidate.content.parts:
-                    text_output = "\n".join([p.text for p in candidate.content.parts if p.text and not p.thought])
-                else:
-                    text_output = "No content was generated by the model.\n\n---\n\nNo filings generated."
-
-                # Harden the response with ResponseValidator
-                text_output = ResponseValidator.validate_and_fix(text_output)
-                
-                seen_uris = set()
-                seen_titles = set()
-                if candidate.grounding_metadata and candidate.grounding_metadata.grounding_chunks:
-                    for chunk in candidate.grounding_metadata.grounding_chunks:
-                        if chunk.web:
-                            title = chunk.web.title
-                            uri = chunk.web.uri
-                            
-                            # Add if it has a URI we haven't seen, or if it has a title we haven't seen (even without URI)
-                            if uri and uri not in seen_uris:
-                                sources.append(Source(title=title, uri=uri))
-                                seen_uris.add(uri)
-                                if title: seen_titles.add(title)
-                            elif not uri and title and title not in seen_titles:
-                                sources.append(Source(title=title, uri=None))
-                                seen_titles.add(title)
-            except Exception as e:
-                print(f"Error validating candidate: {e}")
-                # Fallback to manual parsing if Pydantic fails
-                text_output = f"Error processing model response: {str(e)}\n\n---\n\nNo filings generated."
-                text_output = ResponseValidator.validate_and_fix(text_output)
+        # Join only standard text parts, excluding raw thoughts from the final legal filing
+        if candidate.content and candidate.content.parts:
+            text_output = "\n".join([p.text for p in candidate.content.parts if p.text and not p.thought])
         else:
-            text_output = "I'm sorry, I couldn't generate a response for that situation. The model returned no candidates.\n\n---\n\nNo filings generated."
-            text_output = ResponseValidator.validate_and_fix(text_output)
+            text_output = "No content was generated by the model."
 
-        return LegalResult(
-            text=text_output,
-            sources=sources
-        )
-    except errors.ClientError as e:
-        if is_rate_limit_error(e):
-            print(f"RATE LIMIT ERROR: {str(e)}")
-            raise HTTPException(status_code=429, detail="AI service rate limit exceeded. Please try again in a few minutes.")
-        print(f"CLIENT ERROR: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except google_exceptions.ResourceExhausted as e:
-        print(f"RATE LIMIT ERROR (CORE): {str(e)}")
-        raise HTTPException(status_code=429, detail="AI service rate limit exceeded. Please try again in a few minutes.")
-    except Exception as e:
-        print(f"ERROR in generate_legal_help: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        # Harden the response with ResponseValidator
+        text_output = ResponseValidator.validate_and_fix(text_output)
+        
+        seen_uris = set()
+        seen_titles = set()
+        if candidate.grounding_metadata and candidate.grounding_metadata.grounding_chunks:
+            for chunk in candidate.grounding_metadata.grounding_chunks:
+                if chunk.web:
+                    title = chunk.web.title
+                    uri = chunk.web.uri
+                    
+                    # Add if it has a URI we haven't seen, or if it has a title we haven't seen (even without URI)
+                    if uri and uri not in seen_uris:
+                        sources.append(Source(title=title, uri=uri))
+                        seen_uris.add(uri)
+                        if title: seen_titles.add(title)
+                    elif not uri and title and title not in seen_titles:
+                        sources.append(Source(title=title, uri=None))
+                        seen_titles.add(title)
+    else:
+        text_output = "I'm sorry, I couldn't generate a response for that situation. The model returned no candidates."
+        text_output = ResponseValidator.validate_and_fix(text_output)
 
-def parse_legal_output_with_delimiter(text: str) -> dict[str, str]:
-    """
-    Parse legal output ensuring the '---' delimiter exists and separates strategy from filings.
-    If the delimiter is missing, default the entire text to strategy and provide a warning for filings.
-    """
-    if '---' not in text:
-        return {
-            "strategy": text.strip(),
-            "filings": "No filings generated. Please try a more specific request or check the strategy tab."
-        }
-
-    # Use the first occurrence of '---' as the split point, preserve any subsequent '---'
-    parts = text.split('---', 1)
-    strategy = parts[0].strip()
-    filings = parts[1].strip()
-
-    return {
-        "strategy": strategy,
-        "filings": filings if filings else "No filings generated. Please try a more specific request or check the strategy tab."
-    }
-
+    return LegalResult(
+        text=text_output,
+        sources=sources
+    )
 
 if __name__ == "__main__":
     import uvicorn
