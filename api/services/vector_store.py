@@ -4,9 +4,19 @@ import re
 from typing import List, Optional
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_core.documents import Document
-from langchain_community.vectorstores import Chroma
-from api.services.security import VaultService
+from langchain_core.vectorstores import InMemoryVectorStore
 from api.services.hybrid_search import HybridSearchService
+
+# Optional imports for local persistence
+try:
+    from langchain_community.vectorstores import Chroma
+except ImportError:
+    Chroma = None
+
+try:
+    from api.services.security import VaultService
+except ImportError:
+    VaultService = None
 
 class VectorStoreService:
     def __init__(self, api_key: str, encryption_key: Optional[bytes] = None):
@@ -20,19 +30,20 @@ class VectorStoreService:
         self.is_vercel = os.getenv("VERCEL") == "1"
         
         if self.is_vercel:
-            # Use in-memory Chroma for Vercel's read-only filesystem
-            self.vector_store = Chroma(
-                embedding_function=self.embeddings
-            )
+            # Use extremely lightweight in-memory store for Vercel
+            self.vector_store = InMemoryVectorStore(self.embeddings)
             self.persist_directory = None
-            print("Using in-memory Chroma for Vercel deployment.")
+            print("Using InMemoryVectorStore for Vercel deployment.")
         else:
+            if Chroma is None:
+                raise ImportError("Chroma (chromadb) is not installed. It is required for local persistent storage.")
+            
             # Persistent local storage at ./chroma_db
             self.persist_directory = os.path.join(os.getcwd(), "chroma_db")
             self.enc_path = self.persist_directory + ".enc"
             
             # Decrypt if encrypted file exists
-            if self.encryption_key and os.path.exists(self.enc_path):
+            if self.encryption_key and os.path.exists(self.enc_path) and VaultService:
                 VaultService.decrypt_directory(self.enc_path, self.encryption_key)
             
             # Ensure directory exists
@@ -47,12 +58,12 @@ class VectorStoreService:
         self.is_remote = False
         
         # Register encryption on exit if not on Vercel
-        if self.encryption_key and not self.is_vercel:
+        if self.encryption_key and not self.is_vercel and VaultService:
             atexit.register(self.secure_cleanup)
 
     def secure_cleanup(self):
         """Encrypts the directory on termination."""
-        if self.encryption_key and self.persist_directory and os.path.exists(self.persist_directory):
+        if self.encryption_key and self.persist_directory and os.path.exists(self.persist_directory) and VaultService:
             VaultService.encrypt_directory(self.persist_directory, self.encryption_key)
 
     def add_documents(self, texts: List[str], metadatas: Optional[List[dict]] = None):

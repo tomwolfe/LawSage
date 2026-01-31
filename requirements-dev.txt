@@ -3,4 +3,8 @@ pytest-asyncio
 pytest-cov
 black
 isort
-httpx
+chromadb
+langchain-community
+cryptography
+pillow
+uvicorn

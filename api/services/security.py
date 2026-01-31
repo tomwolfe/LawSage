@@ -1,16 +1,24 @@
 import os
 import shutil
-from cryptography.fernet import Fernet
 from pathlib import Path
+
+try:
+    from cryptography.fernet import Fernet
+except ImportError:
+    Fernet = None
 
 class VaultService:
     @staticmethod
     def generate_key():
+        if Fernet is None:
+            raise ImportError("cryptography is not installed. Run 'pip install cryptography' to use VaultService.")
         return Fernet.generate_key()
 
     @staticmethod
     def encrypt_directory(dir_path: str, key: bytes):
         """Zips and encrypts a directory."""
+        if Fernet is None:
+            raise ImportError("cryptography is not installed.")
         if not os.path.exists(dir_path):
             return
 
@@ -35,6 +43,8 @@ class VaultService:
     @staticmethod
     def decrypt_directory(enc_path: str, key: bytes):
         """Decrypts and unzips a directory."""
+        if Fernet is None:
+            raise ImportError("cryptography is not installed.")
         if not os.path.exists(enc_path):
             return
 

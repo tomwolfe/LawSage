@@ -7,7 +7,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from google import genai
 from google.genai import types
 from api.config_loader import get_settings
-import PIL.Image
 
 class DocumentProcessor:
     @staticmethod
@@ -16,8 +15,6 @@ class DocumentProcessor:
         client = genai.Client(api_key=api_key)
         model_id = get_settings()["model"]["id"]
 
-        image = PIL.Image.open(io.BytesIO(file_bytes))
-        
         prompt = """
         Analyze this image as legal evidence. Describe what is shown in detail, 
         including any text, people, objects, and environmental context. 
@@ -26,7 +23,10 @@ class DocumentProcessor:
 
         response = client.models.generate_content(
             model=model_id,
-            contents=[prompt, image]
+            contents=[
+                prompt, 
+                types.Part.from_bytes(data=file_bytes, mime_type="image/jpeg")
+            ]
         )
 
         if response.candidates:

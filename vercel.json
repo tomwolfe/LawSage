@@ -9,7 +9,7 @@
     "api/**/*.py": {
       "memory": 1024,
       "maxDuration": 30,
-      "excludeFiles": "{chroma_db/**,data/**,tests/**,api/tests/**,scripts/**,public/models/**}"
+      "excludeFiles": "{chroma_db/**,data/**,tests/**,api/tests/**,scripts/**,public/models/**,node_modules/**,.next/**}"
     }
   }
 }
