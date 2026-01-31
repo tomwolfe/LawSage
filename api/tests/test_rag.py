@@ -6,7 +6,7 @@ from api.models import LegalHelpResponse
 
 client = TestClient(app)
 
-@patch("api.index.genai.Client")
+@patch("api.workflow.Client")
 @patch("api.index.VectorStoreService")
 def test_generate_with_rag(mock_vector_service, mock_genai_client):
     # Setup mock vector service

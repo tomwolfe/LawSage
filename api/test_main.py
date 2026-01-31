@@ -20,7 +20,7 @@ def test_generate_legal_help_no_api_key() -> None:
     response = client.post("/api/generate", json={"user_input": "test", "jurisdiction": "California"})
     assert response.status_code == 401
 
-@patch("google.genai.Client")
+@patch("api.workflow.Client")
 def test_generate_legal_help_success(mock_genai_client: MagicMock) -> None:
     # Mock the response from Google GenAI
     mock_instance = mock_genai_client.return_value
@@ -67,7 +67,7 @@ def test_generate_legal_help_success(mock_genai_client: MagicMock) -> None:
     assert data["sources"][0]["title"] == "Test Source"
     assert data["sources"][0]["uri"] == "https://example.com"
 
-@patch("google.genai.Client")
+@patch("api.workflow.Client")
 def test_generate_legal_help_source_no_uri(mock_genai_client: MagicMock) -> None:
     # Mock the response with a source that has a title but no URI
     mock_instance = mock_genai_client.return_value
@@ -103,7 +103,7 @@ def test_generate_legal_help_source_no_uri(mock_genai_client: MagicMock) -> None
     assert data["sources"][0]["title"] == "Source Without Link"
     assert data["sources"][0]["uri"] is None
 
-@patch("google.genai.Client")
+@patch("api.workflow.Client")
 def test_generate_legal_help_missing_delimiter(mock_genai_client: MagicMock) -> None:
     # Mock the response from Google GenAI WITHOUT the delimiter
     mock_instance = mock_genai_client.return_value

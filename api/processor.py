@@ -79,6 +79,38 @@ class ResponseValidator:
         return f"{final_strategy}\n\n{cls.DELIMITER}\n\n{filings_part}"
 
     @classmethod
+    def verify_citations(cls, text: str, sources_content: str) -> str:
+        """
+        Verify citations in text against provided sources content.
+        If a citation is found in text but not in sources, appends a warning.
+        """
+        import re
+        # Pattern for common statute citations like 'Civ. Code §', 'U.S.C. §', 'CCP §'
+        # We look for something that looks like a legal citation
+        statute_pattern = re.compile(r'([A-Z][a-z\.]+\s*(?:Code|Stat\.|U\.S\.C\.)\s*(?:§|section)?\s*\d+(?:\.\d+)?)', re.IGNORECASE)
+        
+        found_citations = statute_pattern.findall(text)
+        unverified = []
+        
+        for citation in found_citations:
+            # Clean up the citation for searching
+            clean_citation = citation.strip()
+            # If the specific section isn't in the source content, it might be a hallucination
+            if clean_citation.lower() not in sources_content.lower():
+                unverified.append(clean_citation)
+        
+        if unverified:
+            warning = "\n\nNote: The following statutes were referenced but not found in primary grounding data: " + ", ".join(set(unverified)) + "."
+            # Append warning before the delimiter
+            if cls.DELIMITER in text:
+                parts = text.split(cls.DELIMITER, 1)
+                return f"{parts[0].strip()}{warning}\n\n{cls.DELIMITER}\n\n{parts[1].strip()}"
+            else:
+                return f"{text.strip()}{warning}"
+        
+        return text
+
+    @classmethod
     def parse_to_dict(cls, text: str) -> Dict[str, str]:
         """
         Parses the validated text into strategy and filings.

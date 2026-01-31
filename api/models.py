@@ -49,6 +49,7 @@ class LegalHelpResponse(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)
     text: str
     sources: List[Source]
+    thinking_steps: Optional[List[str]] = Field(default_factory=list)
 
 class AnalysisResponse(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)

@@ -77,6 +77,7 @@ export default function LegalInterface() {
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<string | null>(null);
   const [backendUnreachable, setBackendUnreachable] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [thinkingSteps, setThinkingSteps] = useState<string[]>([]);
 
   useEffect(() => {
     const checkHealth = async (retries = 3, delay = 1000) => {
@@ -183,6 +184,7 @@ export default function LegalInterface() {
 
   const handleSubmit = async () => {
     setError(''); // Ensure error is cleared at start
+    setThinkingSteps([]);
     const apiKey = localStorage.getItem('GEMINI_API_KEY');
     if (!apiKey) {
       setError('Please set your Gemini API Key in Settings first.');
@@ -208,8 +210,9 @@ export default function LegalInterface() {
     }
 
     setLoading(true);
+    setThinkingSteps(['Starting Agentic Workflow...', 'Initializing Researcher...']);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // Increased timeout for multi-agent
 
     try {
       const response = await fetch('/api/generate', {
@@ -250,8 +253,14 @@ export default function LegalInterface() {
         throw new Error(`Expected JSON response but received ${contentType}. Body: ${textBody.slice(0, 100)}...`);
       }
 
-      const data: LegalResult = await response.json();
-      setResult(data);
+      const data = await response.json();
+      setResult({
+        text: data.text,
+        sources: data.sources
+      });
+      if (data.thinking_steps) {
+        setThinkingSteps(data.thinking_steps);
+      }
       // If we don't have analysis yet, default to strategy
       if (!analysisResult) setActiveTab('strategy');
 
@@ -439,6 +448,37 @@ export default function LegalInterface() {
           </div>
         )}
       </div>
+
+      {/* Thinking Process Section */}
+      {(loading || (thinkingSteps.length > 0 && !result)) && (
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600">
+                {loading ? <Loader2 className="animate-spin" size={20} /> : <AlertCircle size={20} />}
+              </div>
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-800">Thinking Process</h3>
+              <p className="text-sm text-slate-500">Multi-agent workflow in progress...</p>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {thinkingSteps.map((step, index) => (
+              <div key={index} className="flex items-center gap-2 text-sm text-slate-600 bg-white p-2 rounded-lg border border-slate-100">
+                <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full" />
+                {step}
+              </div>
+            ))}
+            {loading && (
+              <div className="flex items-center gap-2 text-sm text-slate-400 animate-pulse p-2">
+                <div className="w-1.5 h-1.5 bg-slate-300 rounded-full" />
+                Processing next step...
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Output Section */}
       {(result || analysisResult) && (

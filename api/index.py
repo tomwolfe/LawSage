@@ -92,9 +92,11 @@ app.add_middleware(
 async def health_check() -> HealthResponse:
     return HealthResponse(status="ok", message="LawSage API is running")
 
+from api.workflow import create_workflow
+
 @app.post("/generate")
-@app.post("/api/generate", response_model=LegalHelpResponse)
-async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | None = Header(None)) -> LegalHelpResponse:
+@app.post("/api/generate")
+async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | None = Header(None)) -> Any:
     if not x_gemini_api_key:
         raise HTTPException(
             status_code=401, 
@@ -108,8 +110,6 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
             detail="Invalid Gemini API Key format. It should start with 'AIza' and be at least 20 characters long."
         )
 
-    client = genai.Client(api_key=x_gemini_api_key)
-    
     # Initialize Vector Store
     vector_service = VectorStoreService(api_key=x_gemini_api_key)
     
@@ -120,98 +120,44 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
     if not grounding_data:
         grounding_data = "No specific statutes or case law found in local database."
 
-    # Enable Grounding with Google Search as a fallback/supplement
-    search_tool = types.Tool(
-        google_search=types.GoogleSearch()
-    )
-
-    # Construct the prompt with clear instructions about the delimiter and grounding data
-    prompt = f"""
-    {SYSTEM_INSTRUCTION}
-
-    Grounding Data (Local Knowledge Base):
-    {grounding_data}
-
-    User Situation: {request.user_input}
-    Jurisdiction: {request.jurisdiction}
-
-    Act as a Universal Public Defender.
-    1. Search for current statutes and local court procedures relevant to this situation using both the Grounding Data and Google Search.
-    2. Provide a breakdown of the situation in plain English.
-    3. Generate a procedural roadmap (step-by-step instructions).
-
-    ---
-
-    4. Generate the text for necessary legal filings that are court-admissible in the specified jurisdiction.
-
-    Format the response such that the strategy and roadmap come BEFORE the '---' delimiter, and the actual legal filings come AFTER the '---' delimiter.
-
-    Explicitly state that you are an AI helping the user represent themselves (Pro Se) and that this is legal information, not legal advice.
-    """
-
-    MODEL_ID = get_settings()["model"]["id"]
-
-    response = generate_content_with_retry(
-        client=client,
-        model=MODEL_ID,
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            tools=[search_tool],
-            system_instruction=SYSTEM_INSTRUCTION,
-            max_output_tokens=4096,
-            thinking_config=types.ThinkingConfig(include_thoughts=True)
-        )
-    )
+    # Create and run workflow
+    app_workflow = create_workflow(x_gemini_api_key)
     
-    text_output = ""
+    initial_state = {
+        "user_input": request.user_input,
+        "jurisdiction": request.jurisdiction,
+        "grounding_data": grounding_data,
+        "research_results": "",
+        "final_output": "",
+        "sources": [],
+        "thinking_steps": []
+    }
+    
+    # Execute the workflow
+    # Note: For real-time streaming, we would use app_workflow.stream()
+    # But here we'll run it to completion and return the steps
+    result = app_workflow.invoke(initial_state)
+    
+    text_output = result.get("final_output", "Failed to generate response.")
+    thinking_steps = result.get("thinking_steps", [])
+    
     sources = []
-
     # Add local RAG sources
     for doc in rag_docs:
         sources.append(Source(title=doc.metadata.get("source", "Local Statute"), uri=doc.metadata.get("uri")))
+    
+    # Add researcher sources
+    seen_uris = set([s.uri for s in sources if s.uri])
+    for s_dict in result.get("sources", []):
+        if s_dict.get("uri") not in seen_uris:
+            sources.append(Source(title=s_dict.get("title"), uri=s_dict.get("uri")))
+            seen_uris.add(s_dict.get("uri"))
 
-    if response.candidates and len(response.candidates) > 0:
-        raw_candidate = response.candidates[0]
-        candidate = GeminiCandidate.model_validate(raw_candidate)
-
-        if candidate.finish_reason in ["SAFETY", "RECITATION", "OTHER"]:
-            text_output = f"The AI was unable to complete the request due to safety filters or other constraints (Reason: {candidate.finish_reason}). Please try rephrasing your request to be more specific or focused on legal information."
-            return LegalHelpResponse(
-                text=ResponseValidator.validate_and_fix(text_output),
-                sources=sources
-            )
-
-        if candidate.content and candidate.content.parts:
-            text_output = "\n".join([p.text for p in candidate.content.parts if p.text and not p.thought])
-        else:
-            text_output = "No content was generated by the model."
-
-        text_output = ResponseValidator.validate_and_fix(text_output)
-        
-        seen_uris = set([s.uri for s in sources if s.uri])
-        seen_titles = set([s.title for s in sources if s.title])
-        
-        if candidate.grounding_metadata and candidate.grounding_metadata.grounding_chunks:
-            for chunk in candidate.grounding_metadata.grounding_chunks:
-                if chunk.web:
-                    title = chunk.web.title
-                    uri = chunk.web.uri
-                    
-                    if uri and uri not in seen_uris:
-                        sources.append(Source(title=title, uri=uri))
-                        seen_uris.add(uri)
-                        if title: seen_titles.add(title)
-                    elif not uri and title and title not in seen_titles:
-                        sources.append(Source(title=title, uri=None))
-                        seen_titles.add(title)
-    else:
-        text_output = "I'm sorry, I couldn't generate a response for that situation. The model returned no candidates."
-        text_output = ResponseValidator.validate_and_fix(text_output)
-
-    return LegalHelpResponse(
-        text=text_output,
-        sources=sources
-    )
+    return {
+        "text": text_output,
+        "sources": sources,
+        "thinking_steps": thinking_steps
+    }
 
 @app.post("/analyze-document")
 @app.post("/api/analyze-document", response_model=AnalysisResponse)
@@ -259,6 +205,15 @@ async def analyze_document(
             response_schema=AnalysisResponse
         )
     )
+
+    # Ingest into Vector Store for future RAG
+    vector_service = VectorStoreService(api_key=x_gemini_api_key)
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+    
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+    chunks = text_splitter.split_text(text)
+    metadatas = [{"jurisdiction": jurisdiction, "source": filename} for _ in chunks]
+    vector_service.add_documents(chunks, metadatas=metadatas)
 
     if response.parsed:
         return response.parsed

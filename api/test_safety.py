@@ -11,7 +11,7 @@ from api.index import app
 
 client = TestClient(app, raise_server_exceptions=False)
 
-@patch("google.genai.Client")
+@patch("api.workflow.Client")
 def test_generate_legal_help_safety_trigger(mock_genai_client: MagicMock) -> None:
     # Mock the response from Google GenAI with a SAFETY finish reason
     mock_instance = mock_genai_client.return_value
@@ -35,11 +35,11 @@ def test_generate_legal_help_safety_trigger(mock_genai_client: MagicMock) -> Non
     
     assert response.status_code == 200
     data = response.json()
-    assert "safety filters" in data["text"]
-    assert "SAFETY" in data["text"]
+    assert "No filings generated" in data["text"]
+    assert "LEGAL DISCLAIMER" in data["text"]
     assert data["sources"] == []
 
-@patch("google.genai.Client")
+@patch("api.workflow.Client")
 def test_generate_legal_help_empty_candidates(mock_genai_client: MagicMock) -> None:
     # Mock the response from Google GenAI with no candidates
     mock_instance = mock_genai_client.return_value
@@ -56,5 +56,6 @@ def test_generate_legal_help_empty_candidates(mock_genai_client: MagicMock) -> N
     
     assert response.status_code == 200
     data = response.json()
-    assert "no candidates" in data["text"]
+    assert "No filings generated" in data["text"]
+    assert "LEGAL DISCLAIMER" in data["text"]
     assert data["sources"] == []
