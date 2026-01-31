@@ -2,16 +2,14 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  output: 'standalone',
   reactCompiler: true,
-  rewrites: async () => {
-    if (process.env.NODE_ENV === 'production') {
-      return [];
-    }
+  async rewrites() {
     return [
       {
         source: "/api/:path*",
-        destination: "http://127.0.0.1:8000/:path*",
+        destination: process.env.NODE_ENV === 'development' 
+          ? "http://127.0.0.1:8000/:path*" 
+          : "/api/index.py",
       },
     ];
   },

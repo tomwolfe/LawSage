@@ -35,11 +35,13 @@ from api.exceptions import global_exception_handler, AppException
 from api.services.document_processor import DocumentProcessor
 from api.services.vector_store import VectorStoreService
 from api.services.audio_processor import AudioProcessor
+from api.services.workflow_manager import LegalWorkflowManager
 
 app = FastAPI()
 app.add_exception_handler(Exception, global_exception_handler)
 app.add_exception_handler(HTTPException, global_exception_handler)
 
+@app.post("/upload-evidence")
 @app.post("/api/upload-evidence")
 async def upload_evidence(
     jurisdiction: str = Form(...),
@@ -110,18 +112,21 @@ from api.utils.court_formatter import format_to_pleading
 
 SYSTEM_INSTRUCTION = "Use the '---' delimiter to separate strategy from filings."
 
+@app.post("/format-pleading")
 @app.post("/api/format-pleading")
 async def format_pleading(request: dict):
     text = request.get("text", "")
     formatted = format_to_pleading(text)
     return {"formatted": formatted}
 
+@app.get("/procedural-guide")
 @app.get("/api/procedural-guide")
 async def get_procedural_guide(jurisdiction: str):
     guide = ProceduralEngine.get_procedural_guide(jurisdiction)
     checklist = ProceduralEngine.get_checklist(jurisdiction)
     return {"guide": guide, "checklist": checklist}
 
+@app.post("/process-case")
 @app.post("/api/process-case")
 async def process_case(
     user_input: str = Form(...),
@@ -148,6 +153,7 @@ async def process_case(
         media_type="text/event-stream"
     )
 
+@app.post("/generate")
 @app.post("/api/generate", response_model=LegalHelpResponse)
 async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | None = Header(None)) -> Any:
     if not x_gemini_api_key:
