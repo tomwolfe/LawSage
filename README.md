@@ -43,26 +43,26 @@ LawSage is built on a modern, performant full-stack architecture:
 ### Installation
 
 1.  **Clone the Repository**
-```bash
-git clone https://github.com/tomwolfe/lawsage.git
-cd lawsage
-```
+    ```bash
+    git clone https://github.com/tomwolfe/lawsage.git
+    cd lawsage
+    ```
 
 2.  **Install Frontend Dependencies**
-```bash
-npm install
-```
+    ```bash
+    npm install
+    ```
 
 3.  **Install Backend Dependencies**
-```bash
-pip install -r api/requirements.txt
-```
+    ```bash
+    pip install -r api/requirements.txt
+    ```
 
 4.  **Set Your API Key**
-*   Open the application in your browser (`http://localhost:3000`).
-*   Click the "Settings" button in the top right corner.
-*   Enter your Google Gemini API Key and click "Save Settings".
-*   *Your key is stored securely in your browser's `localStorage` and is never sent to any server except when making requests to Google's API.*
+    *   Open the application in your browser (`http://localhost:3000`).
+    *   Click the "Settings" button in the top right corner.
+    *   Enter your Google Gemini API Key and click "Save Settings".
+    *   *Your key is stored securely in your browser's `localStorage` and is never sent to any server except when making requests to Google's API.*
 
 ### Running the Application
 
