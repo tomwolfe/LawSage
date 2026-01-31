@@ -9,11 +9,11 @@ tenacity
 PyYAML
 langchain-google-genai
 pypdf2
-chromadb
 langchain
 python-docx
 langchain-community
 langchain-text-splitters
+pinecone-client
 pytest
 pytest-cov
 pytest-asyncio
