@@ -1,4 +1,5 @@
 # LawSage: The Universal Public Defender
+
 **Democratizing Legal Access for Everyone**
 
 LawSage is an open-source, AI-powered platform designed to empower individuals representing themselves in court (Pro Se litigants). By leveraging a sophisticated hierarchical agent swarm and real-time legal grounding, LawSage analyzes your unique legal situation and generates a personalized, court-admissible roadmap, structured timelines, and IRAC-compliant legal filings.
@@ -75,7 +76,6 @@ Start both the Next.js frontend and the FastAPI backend simultaneously:
 ```bash
 npm run dev
 ```
-
 The application will be available at `http://localhost:3000`.
 
 ## How It Works
