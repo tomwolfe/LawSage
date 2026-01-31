@@ -189,6 +189,8 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
         "final_output": "",
         "sources": [],
         "unverified_citations": [],
+        "reasoning_mismatches": [],
+        "fallacies_found": [],
         "missing_info_prompt": "",
         "discovery_questions": [],
         "discovery_chat_history": formatted_history,
@@ -202,6 +204,15 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
     text_output = result.get("final_output", "Failed to generate response.")
     thinking_steps = result.get("thinking_steps", [])
     discovery_questions = result.get("discovery_questions", [])
+
+    # Populate Verification Report
+    verification_report = {
+        "unverified_citations": result.get("unverified_citations", []),
+        "reasoning_mismatches": result.get("reasoning_mismatches", []),
+        "fallacies_found": result.get("fallacies_found", []),
+        "senior_attorney_feedback": result.get("missing_info_prompt") if not result.get("is_approved") else None,
+        "is_approved": result.get("is_approved", True)
+    }
 
     # Convert history back to dict
     history_out = []
@@ -226,7 +237,8 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
         "sources": sources,
         "thinking_steps": thinking_steps,
         "discovery_questions": discovery_questions,
-        "chat_history": history_out
+        "chat_history": history_out,
+        "verification_report": verification_report
     }
 
 @app.post("/analyze-document")

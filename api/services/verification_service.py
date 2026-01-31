@@ -1,8 +1,10 @@
 import httpx
 import os
 import logging
+import json
 from typing import List, Dict, Optional
 from google.genai import Client, types
+from api.config_loader import get_settings
 
 class VerificationService:
     """
@@ -15,6 +17,7 @@ class VerificationService:
         self.gemini_api_key = gemini_api_key or os.getenv("GOOGLE_API_KEY")
         self.headers = {"Authorization": f"Token {self.api_key}"} if self.api_key else {}
         self.client = Client(api_key=self.gemini_api_key) if self.gemini_api_key else None
+        self.model_id = get_settings()["model"]["id"]
 
     def validate_reasoning(self, citation: str, context: str, argument: str) -> Dict[str, any]:
         """
@@ -46,24 +49,25 @@ class VerificationService:
         """
         try:
             response = self.client.models.generate_content(
-                model="gemini-2.0-flash", # Using flash for verification as requested (Gemini 2.5 Flash not available yet, using 2.0 Flash)
+                model=self.model_id,
                 contents=prompt,
                 config=types.GenerateContentConfig(response_mime_type="application/json")
             )
-            import json
+            if response.parsed:
+                return response.parsed
             return json.loads(response.text)
         except Exception as e:
-            logging.error(f"Reasoning validation failed: {e}")
-            return {"valid": True, "error": str(e)}
+            logging.error(f"Reasoning validation failed for {citation}: {e}")
+            return {"valid": True, "error": str(e), "critique": "Validation service error"}
 
-    def verify_citation(self, citation: str) -> Dict[str, bool]:
+    def verify_citation(self, citation: str) -> Dict[str, any]:
         """
         Queries CourtListener to see if a citation exists.
-        Returns a dict with 'verified' (bool) and 'details' (optional str).
+        Returns a dict with 'verified' (bool) and 'status' (str).
         """
         if not self.api_key:
             logging.warning("COURTLISTENER_API_KEY not set. Skipping API verification.")
-            return {"verified": False, "error": "API Key missing"}
+            return {"verified": False, "status": "PENDING_MANUAL_VERIFICATION", "error": "API Key missing"}
 
         # Use the search endpoint to find the citation
         search_url = f"{self.BASE_URL}/search/"
@@ -78,21 +82,26 @@ class VerificationService:
                 if response.status_code == 200:
                     data = response.json()
                     if data.get("count", 0) > 0:
-                        return {"verified": True, "count": data["count"]}
-                    return {"verified": False, "count": 0}
+                        return {"verified": True, "status": "VERIFIED", "count": data["count"]}
+                    return {"verified": False, "status": "NOT_FOUND", "count": 0}
+                elif response.status_code >= 500 or response.status_code == 429:
+                    logging.error(f"CourtListener API temporary failure: {response.status_code}")
+                    return {"verified": False, "status": "PENDING_MANUAL_VERIFICATION", "error": f"API status {response.status_code}"}
                 else:
                     logging.error(f"CourtListener API error: {response.status_code} - {response.text}")
-                    return {"verified": False, "error": f"API status {response.status_code}"}
+                    return {"verified": False, "status": "ERROR", "error": f"API status {response.status_code}"}
+            except (httpx.RequestError, httpx.TimeoutException) as e:
+                logging.error(f"Network error querying CourtListener: {e}")
+                return {"verified": False, "status": "PENDING_MANUAL_VERIFICATION", "error": str(e)}
             except Exception as e:
-                logging.error(f"Error querying CourtListener: {e}")
-                return {"verified": False, "error": str(e)}
+                logging.error(f"Unexpected error querying CourtListener: {e}")
+                return {"verified": False, "status": "ERROR", "error": str(e)}
 
-    def verify_citations_batch(self, citations: List[str]) -> Dict[str, bool]:
+    def verify_citations_batch(self, citations: List[str]) -> Dict[str, Dict[str, any]]:
         """
         Verifies a list of citations and returns a mapping.
         """
         results = {}
         for cit in citations:
-            res = self.verify_citation(cit)
-            results[cit] = res.get("verified", False)
+            results[cit] = self.verify_citation(cit)
         return results

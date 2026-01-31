@@ -47,6 +47,14 @@ class Source(BaseModel):
     title: Optional[str] = None
     uri: Optional[str] = None
 
+class VerificationReport(BaseModel):
+    model_config = ConfigDict(extra='ignore', from_attributes=True)
+    unverified_citations: List[str] = Field(default_factory=list)
+    reasoning_mismatches: List[str] = Field(default_factory=list)
+    fallacies_found: List[str] = Field(default_factory=list)
+    senior_attorney_feedback: Optional[str] = None
+    is_approved: bool = True
+
 class LegalHelpResponse(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)
     text: str
@@ -54,6 +62,7 @@ class LegalHelpResponse(BaseModel):
     thinking_steps: Optional[List[str]] = Field(default_factory=list)
     chat_history: Optional[List[dict]] = Field(default_factory=list)
     discovery_questions: Optional[List[str]] = Field(default_factory=list)
+    verification_report: Optional[VerificationReport] = None
 
 class AnalysisResponse(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)

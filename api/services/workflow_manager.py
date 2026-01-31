@@ -66,13 +66,23 @@ class LegalWorkflowManager:
         # 4. Run LangGraph Workflow
         result = self.generate_memo(user_input, jurisdiction, grounding_data, evidence_descriptions, chat_history)
         
+        # Populate Verification Report
+        verification_report = {
+            "unverified_citations": result.get("unverified_citations", []),
+            "reasoning_mismatches": result.get("reasoning_mismatches", []),
+            "fallacies_found": result.get("fallacies_found", []),
+            "senior_attorney_feedback": result.get("missing_info_prompt") if not result.get("is_approved") else None,
+            "is_approved": result.get("is_approved", True)
+        }
+
         return {
             "analysis": result['final_output'],
             "timeline": timeline,
             "transcripts": transcripts,
             "evidence_descriptions": evidence_descriptions,
             "chat_history": result.get("discovery_chat_history", []),
-            "discovery_questions": result.get("discovery_questions", [])
+            "discovery_questions": result.get("discovery_questions", []),
+            "verification_report": verification_report
         }
 
     def generate_memo(self, user_input: str, jurisdiction: str, grounding_data: str, evidence_descriptions: List[str] = None, chat_history: List[dict] = None) -> dict:
@@ -99,6 +109,8 @@ class LegalWorkflowManager:
             "final_output": "",
             "sources": [],
             "unverified_citations": [],
+            "reasoning_mismatches": [],
+            "fallacies_found": [],
             "missing_info_prompt": "",
             "discovery_questions": [],
             "discovery_chat_history": formatted_history,

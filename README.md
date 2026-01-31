@@ -15,7 +15,7 @@ LawSage is an open-source AI-powered platform designed to empower individuals re
 *   **Conversational Discovery Loop:** The Interrogator now supports a multi-turn conversational loop, allowing users to answer discovery questions and clarify facts before research begins.
 *   **Procedural Engine:** Automatically generates jurisdiction-specific court checklists and deadlines (e.g., California CCP rules) to keep your litigation on track.
 *   **Multimodal Evidence Intake:** Upload documents (PDF, DOCX), images (PNG, JPG), or audio recordings. Images are processed using **multimodal OCR** to extract facts for the IRAC 'Application' section.
-*   **API-Backed Citation Verification:** Integrates with the **CourtListener (Free Law Project)** API to validate legal citations and flag unverified rules in real-time.
+*   **API-Backed Citation Verification:** Integrates with the **CourtListener (Free Law Project)** API to validate legal citations and flag unverified rules. Includes a structured **Verification Report** identifying unverified citations and reasoning mismatches.
 *   **Map-Reduce Legal Aggregation:** Autonomously handles massive document sets (100+ pages) by summarizing individual chunks and performing a "reduce" step to create a master **Case Fact Sheet**.
 *   **AES-256 Vault Security:** Local vector data (ChromaDB) is secured with AES-256 encryption using the `cryptography` library.
 *   **Automated Shepardizing:** Integrated "Verification Loop" that performs real-time checks to detect if cited laws have been overruled or superseded.
@@ -27,7 +27,7 @@ LawSage is built on a modern, performant full-stack architecture:
 *   **Frontend:** Next.js 16 (React 19) with Tailwind CSS and Lucide Icons.
 *   **Backend:** FastAPI (Python) for a robust, asynchronous API.
 *   **Workflow Orchestration:** **LangGraph** for hierarchical multi-agent state management and red-teaming loops.
-*   **AI Engine:** Google Gemini 2.0 Flash with web search grounding for real-time legal research and reasoning validation.
+*   **AI Engine:** Google Gemini 2.5 Flash with web search grounding for real-time legal research and reasoning validation.
 *   **Hybrid Search:** **rank_bm25** combined with **ChromaDB** for dual-mode information retrieval.
 *   **Speech-to-Text:** **OpenAI Whisper (base model)** for local audio evidence transcription.
 *   **Security:** **Cryptography (Fernet)** for AES-256 directory encryption of the local vector store.

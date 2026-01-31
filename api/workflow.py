@@ -68,6 +68,13 @@ Generate 2-3 targeted discovery questions that would help clarify the legal situ
 Respond ONLY with a JSON list of questions. If no questions are needed, return [].
 """
 
+from pydantic import BaseModel, Field
+
+class SeniorAttorneyResponse(BaseModel):
+    is_approved: bool = Field(description="Whether the draft is approved or needs revision")
+    fallacies_found: List[str] = Field(default_factory=list, description="List of logical fallacies identified (e.g., Circular Reasoning, Non-sequitur)")
+    feedback: str = Field(description="Detailed feedback for the drafter")
+
 class AgentState(TypedDict):
     user_input: str
     jurisdiction: str
@@ -79,6 +86,8 @@ class AgentState(TypedDict):
     final_output: str
     sources: List[dict]
     unverified_citations: List[str]
+    reasoning_mismatches: List[str]
+    fallacies_found: List[str]
     missing_info_prompt: str
     discovery_questions: List[str]
     discovery_chat_history: List[BaseMessage]
@@ -365,6 +374,7 @@ def create_verifier_node(api_key: str):
             pass
 
         unverified = []
+        reasoning_mismatches = []
         search_tool = types.Tool(google_search=types.GoogleSearch())
         
         # API Verification with CourtListener
@@ -374,18 +384,24 @@ def create_verifier_node(api_key: str):
         all_context = state['grounding_data'] + "\n" + state['research_results']
 
         for cit in citations:
-            is_verified_api = api_verification_results.get(cit, False)
+            res = api_verification_results.get(cit, {"verified": False, "status": "NOT_FOUND"})
+            is_verified_api = res.get("verified", False)
+            status = res.get("status", "NOT_FOUND")
             
             if not is_verified_api:
-                unverified.append(f"UNVERIFIED: {cit}")
-                updated_final_output = updated_final_output.replace(cit, f"{cit} [UNVERIFIED]")
+                if status == "PENDING_MANUAL_VERIFICATION":
+                    unverified.append(f"PENDING_MANUAL: {cit}")
+                    updated_final_output = updated_final_output.replace(cit, f"{cit} [PENDING VERIFICATION]")
+                else:
+                    unverified.append(f"UNVERIFIED: {cit}")
+                    updated_final_output = updated_final_output.replace(cit, f"{cit} [UNVERIFIED]")
                 continue
 
             # NEW: Reasoning Validation
             reasoning_res = verification_service.validate_reasoning(cit, all_context, state['final_output'])
             if not reasoning_res.get("valid", True):
                 critique = reasoning_res.get("critique", "Reasoning mismatch")
-                unverified.append(f"REASONING_ERROR: {cit} - {critique}")
+                reasoning_mismatches.append(f"{cit}: {critique}")
                 updated_final_output = updated_final_output.replace(cit, f"{cit} [REASONING_ERROR: {critique}]")
 
             # Check for negative treatment via search
@@ -425,11 +441,12 @@ def create_verifier_node(api_key: str):
                 unverified.append(f"GROUNDING_MISSING: {t_cit}")
         
         missing_info_prompt = ""
-        if unverified:
-            missing_info_prompt = f"Address the following citation issues: {', '.join(unverified)}"
+        if unverified or reasoning_mismatches:
+            missing_info_prompt = f"Address the following citation and reasoning issues: {', '.join(unverified + reasoning_mismatches)}"
         
         return {
             "unverified_citations": list(set(unverified)),
+            "reasoning_mismatches": list(set(reasoning_mismatches)),
             "missing_info_prompt": missing_info_prompt,
             "final_output": updated_final_output,
             "thinking_steps": [thinking_step]
@@ -452,33 +469,32 @@ def create_senior_attorney_node(api_key: str):
         Strategy:
         {state['strategy']}
         
-        Analyze for logical fallacies, weak arguments, and strategic holes.
-        Respond with a JSON object:
-        {{
-            "is_approved": boolean,
-            "feedback": "detailed feedback if not approved",
-            "fallacies_found": ["list of fallacies"]
-        }}
+        Analyze for logical fallacies (Circular Reasoning, Non-sequiturs), weak arguments, and strategic holes.
         """
         
         response = client.models.generate_content(
             model=model_id,
             contents=prompt,
-            config=types.GenerateContentConfig(response_mime_type="application/json")
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=SeniorAttorneyResponse
+            )
         )
         
-        res = {}
-        try:
-            if response.parsed:
-                res = response.parsed
-            else:
-                res = json.loads(response.text)
-        except:
-            res = {"is_approved": True, "feedback": ""}
+        res = SeniorAttorneyResponse(is_approved=True, feedback="", fallacies_found=[])
+        if response.parsed:
+            res = response.parsed
+        else:
+            try:
+                data = json.loads(response.text)
+                res = SeniorAttorneyResponse(**data)
+            except:
+                pass
 
         return {
-            "is_approved": res.get("is_approved", True),
-            "missing_info_prompt": res.get("feedback", "") if not res.get("is_approved") else "",
+            "is_approved": res.is_approved,
+            "fallacies_found": res.fallacies_found,
+            "missing_info_prompt": res.feedback if not res.is_approved else "",
             "thinking_steps": [thinking_step]
         }
     return senior_attorney
