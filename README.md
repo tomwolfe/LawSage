@@ -2,19 +2,19 @@
 
 **Democratizing Legal Access for Everyone**
 
-LawSage is an open-source AI-powered platform designed to empower individuals representing themselves in court (Pro Se litigants). By leveraging advanced AI models and real-time legal grounding, LawSage analyzes your unique legal situation and generates a personalized, court-admissible roadmap and legal filings.
+LawSage is an open-source AI-powered platform designed to empower individuals representing themselves in court (Pro Se litigants). By leveraging advanced AI models and real-time legal grounding, LawSage analyzes your unique legal situation and generates a personalized, court-admissible roadmap, structured timelines, and IRAC-compliant legal filings.
 
 > **Legal Disclaimer:** I am an AI, not an attorney. This tool provides legal information, not legal advice. Use of this tool does not create an attorney-client relationship.
 
 ## Features
 
-*   **Voice Input:** Describe your situation naturally using your microphone.
-*   **High-Reliability Pipeline:** A 4-stage agentic workflow (Researcher, Reasoner, Formatter, Verifier) powered by LangGraph ensures accuracy and structural integrity.
+*   **Multi-Modal Evidence Processing:** Upload documents (PDF, DOCX) or audio recordings (MP3, WAV, M4A). Audio is automatically transcribed using **OpenAI Whisper**.
+*   **Structured Evidence Extraction:** Automatically identifies dates and factual events to generate a chronological `case_timeline.json` with importance ratings.
+*   **High-Reliability Pipeline:** A 5-stage agentic workflow (Researcher, Reasoner, Drafter, Formatter, Verifier) powered by LangGraph ensures accuracy and structural integrity.
+*   **Strict IRAC Formatting:** Generates legal memos following the professional **Issue, Rule, Application, and Conclusion** framework.
+*   **AES-256 Vault Security:** Local vector data (ChromaDB) is secured with AES-256 encryption using the `cryptography` library, ensuring your sensitive case data remains private and protected at rest.
 *   **Automated Citation Verification:** Integrated "Verification Loop" cross-references every cited statute against grounding data, triggering an automatic re-search if hallucinations are detected.
-*   **Offline-First Grounding:** Local SQLite database with FTS5 (Full-Text Search) provides instant access to common state statutes even without web access.
-*   **Case-Aware RAG:** Segment your research and uploads by `case_id` to maintain strict context between different legal matters.
-*   **Jurisdiction-Specific Analysis:** Tailor your legal strategy and filings to your specific state or federal jurisdiction.
-*   **Structured Legal Templates:** Uses jurisdiction-compliant JSON templates for common filings like Motions to Dismiss, Answers, and Summary Judgments.
+*   **Jurisdiction-Specific Analysis:** Performs secondary 'expansion' searches to suggest related statutes based on metadata cross-referencing.
 *   **Local & Private:** Your data remains private. Your API key and local database stay on your machine.
 
 ## Technology Stack
@@ -24,17 +24,19 @@ LawSage is built on a modern, performant full-stack architecture:
 *   **Frontend:** Next.js 16 (React 19) with Tailwind CSS and Lucide Icons.
 *   **Backend:** FastAPI (Python) for a robust, asynchronous API.
 *   **Workflow Orchestration:** **LangGraph** for complex multi-agent state management and iterative loops.
-*   **AI Engine:** Google Gemini 2.5 Flash with web search grounding for real-time legal research.
+*   **AI Engine:** Google Gemini 2.5 Flash with web search grounding for real-time legal research and timeline extraction.
+*   **Speech-to-Text:** **OpenAI Whisper (base model)** for local audio evidence transcription.
+*   **Security:** **Cryptography (Fernet)** for AES-256 directory encryption of the local vector store.
 *   **Offline Cache:** **SQLite with FTS5** for high-performance local statute indexing.
-*   **Vector Search:** LangChain with Google Generative AI embeddings (ChromaDB) for semantic search over case-specific documents.
-*   **AI Safety & Structure:** Multi-stage validation layer enforces consistent output with mandatory disclaimers and structured filings.
+*   **Vector Search:** LangChain with Google Generative AI embeddings (**ChromaDB**) for semantic search over case-specific documents.
 
 ## Getting Started
 
 ### Prerequisites
 
 *   Node.js (v18+ recommended)
-*   Python (v3.9+ recommended)
+*   Python (v3.11+ recommended)
+*   Rust compiler (required for `setuptools-rust`)
 *   A Google Gemini API Key (Get one from the [Google AI Studio](https://aistudio.google.com/))
 
 ### Installation
@@ -52,7 +54,7 @@ LawSage is built on a modern, performant full-stack architecture:
 
 3.  **Install Backend Dependencies**
     ```bash
-    pip install -r api/requirements.txt
+    pip install -r requirements.txt
     ```
 
 4.  **Seed the Offline Database**
@@ -60,7 +62,8 @@ LawSage is built on a modern, performant full-stack architecture:
     python3 scripts/seed_offline_db.py
     ```
 
-5.  **Set Your API Key**
+5.  **Set Your API Key & Vault Key**
+    *   Set `LAWSAGE_ENCRYPTION_KEY` as an environment variable (optional, for persistent vault security).
     *   Open the application in your browser (`http://localhost:3000`).
     *   Click the "Settings" button in the top right corner.
     *   Enter your Google Gemini API Key and click "Save Settings".
@@ -74,34 +77,21 @@ npm run dev
 
 ## How It Works
 
-LawSage uses a **4-Stage High-Reliability Pipeline** to process your request:
+LawSage uses a **5-Stage High-Reliability Pipeline** to process your request:
 
-1.  **Researcher (Search):** Queries the local SQLite database and Google Search (site:.gov) to find relevant statutes and codes.
+1.  **Researcher (Search):** Queries the local SQLite database, Google Search (site:.gov), and performs jurisdictional expansion to find relevant statutes.
 2.  **Reasoner (Strategy):** Analyzes the research results to develop a procedural roadmap and legal theory.
-3.  **Formatter (Templates):** Applies the strategy to structured JSON templates to generate court-admissible documents.
-4.  **Verifier (Citation Check):** Scans the final draft for legal citations. If it finds a citation not present in the grounding data, it **automatically routes back to the Researcher** to find the missing info and re-draft the document.
+3.  **Drafter (IRAC):** Drafts a formal legal memo strictly adhering to the **ISSUE, RULE, APPLICATION, CONCLUSION** format.
+4.  **Formatter (Templates):** Applies the strategy and draft to structured JSON templates to generate court-admissible documents.
+5.  **Verifier (Citation Check):** Scans the final draft for legal citations. If it finds an unverified citation, it **automatically routes back to the Researcher**.
 
 
-### Document Analysis (Red Team)
+### Evidence Management
 
-1.  **Upload:** Use the "Upload Document for Analysis" button to select a PDF, DOCX, or TXT file.
-2.  **Analyze:** LawSage will automatically analyze the document and display a "Red Team Analysis" tab.
-3.  **Output:** The AI will provide:
-    *   A summary of the document.
-    *   A list of potential legal and procedural weaknesses.
-    *   Strategic recommendations to improve your position.
-
-## Deployment
-
-The easiest way to deploy LawSage is on **Vercel**.
-
-1.  Push your code to a public GitHub repository.
-2.  Go to [https://vercel.com/new](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme).
-3.  Import your repository.
-4.  **Important:** Vercel only deploys the frontend. To use the AI features, you must host the FastAPI backend separately.
-    *   You can deploy the backend to a service like Render, Railway, or a cloud VM.
-    *   Update the `next.config.ts` file's `rewrites` to point to your deployed backend URL.
-5.  Set the `GEMINI_API_KEY` environment variable in your Vercel project settings.
+1.  **Upload Evidence:** Use the `/api/upload-evidence` endpoint to upload audio or document files.
+2.  **Transcription:** Audio files are transcribed locally using Whisper.
+3.  **Timeline Generation:** LawSage identifies key dates and events, assigning importance levels to help you organize your case chronologically.
+4.  **Encryption:** When the application closes, your `chroma_db` is automatically zipped and encrypted with AES-256.
 
 ## Contributing
 
@@ -113,8 +103,6 @@ LawSage is an open-source project dedicated to legal democratization. Contributi
 4.  Push to the branch (`git push origin feature/your-feature-name`).
 5.  Open a pull request.
 
-Please ensure your code adheres to the existing style and includes tests for new features.
-
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
@@ -124,9 +112,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 *   [Next.js](https://nextjs.org/)
 *   [FastAPI](https://fastapi.tiangolo.com/)
 *   [Google AI Studio](https://aistudio.google.com/)
-*   [Tailwind CSS](https://tailwindcss.com/)
-*   [Lucide Icons](https://lucide.dev/)
-*   [Vercel](https://vercel.com/)
-*   [LangChain](https://python.langchain.com/)
-*   [PyPDF2](https://pypi.org/project/PyPDF2/)
-*   [python-docx](https://python-docx.readthedocs.io/)
+*   [LangGraph](https://python.langchain.com/docs/langgraph)
+*   [OpenAI Whisper](https://github.com/openai/whisper)
+*   [Cryptography.io](https://cryptography.io/)
+
