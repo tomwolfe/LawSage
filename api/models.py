@@ -54,6 +54,7 @@ class VerificationReport(BaseModel):
     fallacies_found: List[str] = Field(default_factory=list)
     senior_attorney_feedback: Optional[str] = None
     is_approved: bool = True
+    exhibit_list: List[str] = Field(default_factory=list)
 
 class LegalHelpResponse(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)

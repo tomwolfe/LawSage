@@ -21,7 +21,9 @@ def test_generate_legal_help_safety_trigger(mock_genai_client: MagicMock) -> Non
     
     # Mock finish reason
     mock_candidate.finish_reason = "SAFETY"
-    mock_candidate.content = None
+    mock_response.parsed = None
+    mock_candidate.content = MagicMock()
+    mock_candidate.content.parts = [MagicMock(text="")]
     mock_candidate.grounding_metadata = None
     
     mock_response.candidates = [mock_candidate]
@@ -46,6 +48,7 @@ def test_generate_legal_help_empty_candidates(mock_genai_client: MagicMock) -> N
     
     mock_response = MagicMock()
     mock_response.candidates = []
+    mock_response.parsed = None
     mock_instance.models.generate_content.return_value = mock_response
     
     response = client.post(

@@ -185,6 +185,8 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
         "research_results": "",
         "procedural_checklist": "",
         "evidence_descriptions": [],
+        "evidence_mapping": {},
+        "exhibit_list": [],
         "strategy": "",
         "final_output": "",
         "sources": [],

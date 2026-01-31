@@ -29,11 +29,11 @@ def test_should_continue_logic():
         "unverified_citations": [],
         "thinking_steps": ["step1"]
     }
-    assert should_continue(state_verified) == END
+    assert should_continue(state_verified) == "senior_attorney"
     
     # Case 3: Infinite loop protection
     state_loop = {
         "unverified_citations": ["Fake § 123"],
-        "thinking_steps": ["step"] * 11
+        "thinking_steps": ["step"] * 16
     }
-    assert should_continue(state_loop) == END
+    assert should_continue(state_loop) == "senior_attorney"

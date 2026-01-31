@@ -1,8 +1,9 @@
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 from api.services.document_processor import DocumentProcessor
 from api.services.audio_processor import AudioProcessor
 from api.services.vector_store import VectorStoreService
 from api.workflow import create_workflow
+from api.config_loader import get_settings
 
 class LegalWorkflowManager:
     def __init__(self, api_key: str):
@@ -63,8 +64,39 @@ class LegalWorkflowManager:
         rag_docs = self.vector_service.search(user_input, jurisdiction, case_id=case_id)
         grounding_data = "\n\n".join([doc.page_content for doc in rag_docs])
 
+        # NEW: Multimodal Correlation - Map evidence to facts
+        evidence_mapping = {}
+        if evidence_descriptions:
+            mapping_prompt = f"""
+            Identify which specific facts or claims from the user's input are supported or refuted by the following evidence descriptions.
+            
+            User Input: {user_input}
+            
+            Evidence Descriptions:
+            {chr(10).join(evidence_descriptions)}
+            
+            Respond ONLY with a JSON object mapping 'evidence_description' to 'related_user_fact'.
+            """
+            from google.genai import types as genai_types
+            try:
+                from google.genai import Client
+                client = Client(api_key=self.api_key)
+                model_id = get_settings()["model"]["id"]
+                map_res = client.models.generate_content(
+                    model=model_id,
+                    contents=mapping_prompt,
+                    config=genai_types.GenerateContentConfig(response_mime_type="application/json")
+                )
+                if map_res.parsed:
+                    evidence_mapping = map_res.parsed
+                else:
+                    import json
+                    evidence_mapping = json.loads(map_res.text)
+            except Exception as e:
+                print(f"Evidence mapping failed: {e}")
+
         # 4. Run LangGraph Workflow
-        result = self.generate_memo(user_input, jurisdiction, grounding_data, evidence_descriptions, chat_history)
+        result = self.generate_memo(user_input, jurisdiction, grounding_data, evidence_descriptions, evidence_mapping, chat_history)
         
         # Populate Verification Report
         verification_report = {
@@ -72,7 +104,8 @@ class LegalWorkflowManager:
             "reasoning_mismatches": result.get("reasoning_mismatches", []),
             "fallacies_found": result.get("fallacies_found", []),
             "senior_attorney_feedback": result.get("missing_info_prompt") if not result.get("is_approved") else None,
-            "is_approved": result.get("is_approved", True)
+            "is_approved": result.get("is_approved", True),
+            "exhibit_list": result.get("exhibit_list", [])
         }
 
         return {
@@ -80,12 +113,13 @@ class LegalWorkflowManager:
             "timeline": timeline,
             "transcripts": transcripts,
             "evidence_descriptions": evidence_descriptions,
+            "evidence_mapping": evidence_mapping,
             "chat_history": result.get("discovery_chat_history", []),
             "discovery_questions": result.get("discovery_questions", []),
             "verification_report": verification_report
         }
 
-    def generate_memo(self, user_input: str, jurisdiction: str, grounding_data: str, evidence_descriptions: List[str] = None, chat_history: List[dict] = None) -> dict:
+    def generate_memo(self, user_input: str, jurisdiction: str, grounding_data: str, evidence_descriptions: List[str] = None, evidence_mapping: Dict[str, str] = None, chat_history: List[dict] = None) -> dict:
         """Runs the LangGraph workflow to generate an IRAC memo."""
         from langchain_core.messages import HumanMessage, AIMessage
         
@@ -105,6 +139,8 @@ class LegalWorkflowManager:
             "research_results": "",
             "procedural_checklist": "",
             "evidence_descriptions": evidence_descriptions or [],
+            "evidence_mapping": evidence_mapping or {},
+            "exhibit_list": [],
             "strategy": "",
             "final_output": "",
             "sources": [],

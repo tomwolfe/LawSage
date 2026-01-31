@@ -7,6 +7,7 @@ import { twMerge } from 'tailwind-merge';
 import ResultDisplay from './ResultDisplay';
 import HistoryActions from './HistoryActions';
 import DocumentUpload from './DocumentUpload';
+import { Vault } from '@/utils/crypto';
 
 declare global {
   interface Window {
@@ -103,7 +104,18 @@ export default function LegalInterface() {
     const savedHistory = localStorage.getItem('lawsage_history');
     if (savedHistory) {
       try {
-        const parsedHistory: unknown = JSON.parse(savedHistory);
+        // Try to decrypt first
+        let parsedHistory: unknown = Vault.decrypt(savedHistory);
+        
+        // Fallback for unencrypted legacy data
+        if (!parsedHistory) {
+          try {
+            parsedHistory = JSON.parse(savedHistory);
+          } catch {
+            parsedHistory = null;
+          }
+        }
+
         // Convert timestamp strings back to Date objects
         if (Array.isArray(parsedHistory)) {
           const historyWithDates = parsedHistory.map((item: unknown) => {
@@ -276,7 +288,7 @@ export default function LegalInterface() {
 
       const updatedHistory = [newHistoryItem, ...history];
       setHistory(updatedHistory);
-      localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
+      localStorage.setItem('lawsage_history', Vault.encrypt(updatedHistory));
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         setError('Request timed out. Please try again.');

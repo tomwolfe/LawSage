@@ -22,6 +22,7 @@ def test_generate_with_rag(mock_vector_service, mock_genai_client):
     mock_response = MagicMock()
     mock_candidate = MagicMock()
     mock_candidate.finish_reason = "STOP"
+    mock_response.parsed = None
     mock_candidate.content.parts = [MagicMock(text="Legal advice here\n---\nLegal filing here", thought=False)]
     mock_candidate.grounding_metadata.grounding_chunks = []
     mock_response.candidates = [mock_candidate]

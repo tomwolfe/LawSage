@@ -1,50 +1,49 @@
 from typing import List, Dict, Optional
+from api.services.vector_store import VectorStoreService
+import os
 
 class LocalRulesEngine:
     """
     Service for County-level Superior Court rules.
+    Refactored to query ChromaDB for pluggable rules.
     """
-    RULES = {
-        "Los Angeles County": [
-            {
-                "id": "LASC 3.10",
-                "title": "Mandatory Settlement Conference",
-                "content": "A mandatory settlement conference shall be held in every civil action, unless otherwise ordered by the court."
-            },
-            {
-                "id": "LASC 3.26",
-                "title": "Case Management Statement",
-                "content": "Each party must file a Case Management Statement at least 15 days before the scheduled Case Management Conference."
-            },
-            {
-                "id": "LASC 3.4",
-                "title": "Ex Parte Applications",
-                "content": "Ex parte applications must be filed by 10:00 a.m. the court day before the hearing, with notice provided by 10:00 a.m."
-            },
-            {
-                "id": "LASC 9.0",
-                "title": "Tentative Rulings",
-                "content": "Tentative rulings are generally available by 3:00 p.m. on the court day before the scheduled hearing."
-            },
-            {
-                "id": "LASC 3.5",
-                "title": "Remote Appearances",
-                "content": "Remote appearances are governed by CRC 3.670 and LASC local rules. Use of LACourtConnect is mandatory for most civil departments."
-            }
-        ]
-    }
+    
+    def __init__(self, api_key: Optional[str] = None):
+        self.api_key = api_key or os.getenv("GOOGLE_API_KEY")
+        self.vector_service = VectorStoreService(api_key=self.api_key) if self.api_key else None
 
-    @staticmethod
-    def get_rules(county: str) -> List[Dict[str, str]]:
-        return LocalRulesEngine.RULES.get(county, [])
-
-    @staticmethod
-    def format_rules(county: str) -> str:
-        rules = LocalRulesEngine.get_rules(county)
-        if not rules:
-            return f"No specific local rules found for {county}."
+    def get_rules(self, county: str, query: str = "general rules") -> List[Dict[str, str]]:
+        if not self.vector_service:
+            return []
         
-        formatted = f"LOCAL RULES FOR {county.upper()}:\n"
+        filter_dict = {
+            "type": "local_rule",
+            "county": county
+        }
+        
+        try:
+            results = self.vector_service.vector_store.similarity_search(
+                query, 
+                k=5, 
+                filter=filter_dict
+            )
+            return [
+                {
+                    "id": doc.metadata.get("source", "N/A"),
+                    "title": f"Rule from {doc.metadata.get('county', 'Unknown')}",
+                    "content": doc.page_content
+                }
+                for doc in results
+            ]
+        except Exception:
+            return []
+
+    def format_rules(self, county: str) -> str:
+        rules = self.get_rules(county)
+        if not rules:
+            return f"No specific local rules found for {county} in the database."
+        
+        formatted = f"LOCAL RULES FOR {county.upper()} (Retrieved from Database):\n"
         for rule in rules:
             formatted += f"- {rule['id']}: {rule['title']}\n  {rule['content']}\n"
         return formatted

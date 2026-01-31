@@ -8,26 +8,27 @@ LawSage is an open-source AI-powered platform designed to empower individuals re
 
 ## Features
 
-*   **Hierarchical Agent Swarm:** Transitioned from a linear pipeline to a multi-agent swarm featuring a **Senior Attorney** node that red-teams final drafts for logical fallacies (non-sequiturs, circular reasoning) and tactical errors.
+*   **Hierarchical Agent Swarm:** Transitioned from a linear pipeline to a multi-agent swarm featuring a **Senior Attorney** node that acts as 'Opposing Counsel' to red-team final drafts for logical fallacies, **strategy holes**, and missing **rebuttals/anticipatory defenses**.
 *   **Hybrid Search (Semantic + BM25):** Combines vector-based semantic retrieval with **BM25 keyword ranking** and Reciprocal Rank Fusion (RRF) for ultra-precise legal citation discovery.
-*   **Reasoning-Based Verification:** Upgraded verification service that uses Gemini to validate if the 'holding' of a cited case law actually supports the specific legal argument being made in the memo.
-*   **Local-Local Rules Engine:** Deep intelligence for county-specific superior court rules (starting with **Los Angeles County**), covering specific filing requirements like Mandatory Settlement Conferences and Ex Parte procedures.
+*   **Deep Shepardizing & Reasoning Verification:** Upgraded verification service that uses Gemini Search Grounding to detect **Negative Treatment** (overruled, superseded, or questioned) and validates if the 'holding' of a cited case law actually supports the specific 'Application' facts in the memo.
+*   **Pluggable Local Rules Engine:** Deep intelligence for county-specific superior court rules. Features a **LocalRulesIngestor** pipeline for indexing PDF/text court rules into ChromaDB, enabling jurisdiction-specific compliance for any US county.
 *   **Conversational Discovery Loop:** The Interrogator now supports a multi-turn conversational loop, allowing users to answer discovery questions and clarify facts before research begins.
 *   **Procedural Engine:** Automatically generates jurisdiction-specific court checklists and deadlines (e.g., California CCP rules) to keep your litigation on track.
-*   **Multimodal Evidence Intake:** Upload documents (PDF, DOCX), images (PNG, JPG), or audio recordings. Images are processed using **multimodal OCR** to extract facts for the IRAC 'Application' section.
+*   **Multimodal Fact Correlation:** Upload documents (PDF, DOCX), images (PNG, JPG), or audio recordings. LawSage automatically maps evidence descriptions to specific case facts and generates a structured **Exhibit List** in the final output.
 *   **API-Backed Citation Verification:** Integrates with the **CourtListener (Free Law Project)** API to validate legal citations and flag unverified rules. Includes a structured **Verification Report** identifying unverified citations and reasoning mismatches.
 *   **Map-Reduce Legal Aggregation:** Autonomously handles massive document sets (100+ pages) by summarizing individual chunks and performing a "reduce" step to create a master **Case Fact Sheet**.
-*   **AES-256 Vault Security:** Local vector data (ChromaDB) is secured with AES-256 encryption using the `cryptography` library.
-*   **Automated Shepardizing:** Integrated "Verification Loop" that performs real-time checks to detect if cited laws have been overruled or superseded.
+*   **Full-Stack AES-256 Security:**
+    *   **Backend:** Local vector data (ChromaDB) is secured with AES-256 encryption.
+    *   **Frontend:** Case history is encrypted with **AES-256 (crypto-js)** before being stored in `localStorage` or exported, ensuring sensitive legal data remains private.
 
 ## Technology Stack
 
 LawSage is built on a modern, performant full-stack architecture:
 
-*   **Frontend:** Next.js 16 (React 19) with Tailwind CSS and Lucide Icons.
+*   **Frontend:** Next.js 16 (React 19) with Tailwind CSS, Lucide Icons, and **Crypto-JS** for client-side vault security.
 *   **Backend:** FastAPI (Python) for a robust, asynchronous API.
 *   **Workflow Orchestration:** **LangGraph** for hierarchical multi-agent state management and red-teaming loops.
-*   **AI Engine:** Google Gemini 2.5 Flash with web search grounding for real-time legal research and reasoning validation.
+*   **AI Engine:** Google Gemini 2.5 Flash with web search grounding for real-time legal research, **Shepardizing**, and reasoning validation.
 *   **Hybrid Search:** **rank_bm25** combined with **ChromaDB** for dual-mode information retrieval.
 *   **Speech-to-Text:** **OpenAI Whisper (base model)** for local audio evidence transcription.
 *   **Security:** **Cryptography (Fernet)** for AES-256 directory encryption of the local vector store.
@@ -86,10 +87,10 @@ LawSage uses a **Hierarchical Multi-Agent Swarm** to process your request:
 2.  **Researcher (Hybrid Search):** Performs combined semantic and BM25 keyword searches across local databases and the live web.
 3.  **Procedural Guide (Local-Local):** Injects state-specific and county-level court rules (e.g., LASC rules) into the planning phase.
 4.  **Reasoner (Strategy):** Develops a high-level roadmap. Uses **Map-Reduce** for large-scale context aggregation.
-5.  **Drafter (IRAC):** Preparation of the formal memo strictly following the **ISSUE, RULE, APPLICATION, CONCLUSION** framework.
+5.  **Drafter (IRAC):** Preparation of the formal memo strictly following the **ISSUE, RULE, APPLICATION, CONCLUSION** framework. Integrates evidence-to-fact correlations and generates an **Exhibit List**.
 6.  **Formatter (Templates):** Maps the strategy to jurisdiction-compliant legal templates and 28-line pleadings.
-7.  **Verifier (Reasoning Validation):** Shepardizes citations and performs deep reasoning checks to ensure case law actually supports the arguments.
-8.  **Senior Attorney (Red-Teamer):** The final supervisor. Analyzes the work for logical fallacies and strategy holes, routing back to the Drafter if improvements are needed.
+7.  **Verifier (Deep Shepardizing):** Checks citations for negative treatment (overruled/superseded) via real-time search and performs deep reasoning checks to ensure case law actually supports the arguments.
+8.  **Senior Attorney (Red-Teamer):** The final supervisor. Acts as opposing counsel to find **strategy holes** and ensures the inclusion of **Anticipatory Defenses and Rebuttals**, routing back to the Drafter if improvements are needed.
 
 
 ### Evidence Management

@@ -28,9 +28,22 @@ def test_researcher_node(mock_genai_client, mock_api_key):
         "jurisdiction": "California",
         "grounding_data": "local data",
         "research_results": "",
+        "procedural_checklist": "",
+        "evidence_descriptions": [],
+        "evidence_mapping": {},
+        "exhibit_list": [],
+        "strategy": "",
         "final_output": "",
         "sources": [],
-        "thinking_steps": []
+        "unverified_citations": [],
+        "reasoning_mismatches": [],
+        "fallacies_found": [],
+        "missing_info_prompt": "",
+        "discovery_questions": [],
+        "discovery_chat_history": [],
+        "context_summary": "",
+        "thinking_steps": [],
+        "is_approved": True
     }
     
     result = researcher(state)
@@ -50,17 +63,30 @@ def test_clerk_node_delimiter_enforcement(mock_genai_client, mock_api_key):
     mock_response.candidates = [mock_candidate]
     mock_instance.models.generate_content.return_value = mock_response
 
-    from api.workflow import create_clerk_node
-    clerk = create_clerk_node(mock_api_key)
+    from api.workflow import create_formatter_node
+    clerk = create_formatter_node(mock_api_key)
     
     state: AgentState = {
         "user_input": "test",
         "jurisdiction": "California",
         "grounding_data": "local data",
         "research_results": "research data",
+        "procedural_checklist": "",
+        "evidence_descriptions": [],
+        "evidence_mapping": {},
+        "exhibit_list": [],
+        "strategy": "Mock strategy",
         "final_output": "",
         "sources": [],
-        "thinking_steps": []
+        "unverified_citations": [],
+        "reasoning_mismatches": [],
+        "fallacies_found": [],
+        "missing_info_prompt": "",
+        "discovery_questions": [],
+        "discovery_chat_history": [],
+        "context_summary": "",
+        "thinking_steps": [],
+        "is_approved": True
     }
     
     result = clerk(state)
@@ -71,34 +97,42 @@ def test_clerk_node_delimiter_enforcement(mock_genai_client, mock_api_key):
 def test_workflow_integration(mock_genai_client, mock_api_key):
     mock_instance = mock_genai_client.return_value
     
-    # Mock for researcher
-    mock_res_res = MagicMock()
-    mock_res_can = MagicMock()
-    mock_res_can.content.parts = [MagicMock(text="Research findings")]
-    mock_res_can.grounding_metadata.grounding_chunks = []
-    mock_res_res.candidates = [mock_res_can]
+    # Mock for workflow nodes
+    mock_res = MagicMock()
+    mock_can = MagicMock()
+    mock_can.content.parts = [MagicMock(text="Strategy\n---\nFilings")]
+    mock_can.grounding_metadata.grounding_chunks = []
+    mock_res.candidates = [mock_can]
+    mock_res.parsed = None
     
-    # Mock for clerk
-    mock_clk_res = MagicMock()
-    mock_clk_can = MagicMock()
-    mock_clk_can.content.parts = [MagicMock(text="Strategy\n---\nFilings")]
-    mock_clk_res.candidates = [mock_clk_can]
-    
-    mock_instance.models.generate_content.side_effect = [mock_res_res, mock_clk_res]
+    mock_instance.models.generate_content.return_value = mock_res
 
     workflow = create_workflow(mock_api_key)
     
-    initial_state = {
+    initial_state: AgentState = {
         "user_input": "test",
         "jurisdiction": "California",
         "grounding_data": "local data",
         "research_results": "",
+        "procedural_checklist": "",
+        "evidence_descriptions": [],
+        "evidence_mapping": {},
+        "exhibit_list": [],
+        "strategy": "",
         "final_output": "",
         "sources": [],
-        "thinking_steps": []
+        "unverified_citations": [],
+        "reasoning_mismatches": [],
+        "fallacies_found": [],
+        "missing_info_prompt": "",
+        "discovery_questions": [],
+        "discovery_chat_history": [],
+        "context_summary": "",
+        "thinking_steps": [],
+        "is_approved": True
     }
     
     result = workflow.invoke(initial_state)
     assert "final_output" in result
     assert "---" in result["final_output"]
-    assert len(result["thinking_steps"]) == 2
+    assert len(result["thinking_steps"]) == 8

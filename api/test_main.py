@@ -30,6 +30,7 @@ def test_generate_legal_help_success(mock_genai_client: MagicMock) -> None:
     
     # Mock finish reason
     mock_candidate.finish_reason = "STOP"
+    mock_response.parsed = None
     
     # Mock parts
     mock_part = MagicMock()
@@ -75,6 +76,7 @@ def test_generate_legal_help_source_no_uri(mock_genai_client: MagicMock) -> None
     mock_response = MagicMock()
     mock_candidate = MagicMock()
     mock_candidate.finish_reason = "STOP"
+    mock_response.parsed = None
     mock_part = MagicMock()
     mock_part.text = "Strategy --- Filings"
     mock_part.thought = False
@@ -113,6 +115,7 @@ def test_generate_legal_help_missing_delimiter(mock_genai_client: MagicMock) -> 
     
     # Mock finish reason
     mock_candidate.finish_reason = "STOP"
+    mock_response.parsed = None
     
     # Mock parts
     mock_part = MagicMock()

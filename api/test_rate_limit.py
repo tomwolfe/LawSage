@@ -12,8 +12,12 @@ from api.index import app
 
 client = TestClient(app, raise_server_exceptions=False)
 
+@patch("api.workflow.Client")
 @patch("api.workflow.generate_content_with_retry")
-def test_generate_legal_help_rate_limit(mock_generate: MagicMock) -> None:
+def test_generate_legal_help_rate_limit(mock_generate: MagicMock, mock_client: MagicMock) -> None:
+    # Ensure interrogator doesn't stop workflow
+    mock_client.return_value.models.generate_content.return_value.parsed = None
+    
     # Mock to raise ClientError with 429
     mock_generate.side_effect = errors.ClientError("429 Quota exceeded", response_json={})
     
@@ -26,9 +30,13 @@ def test_generate_legal_help_rate_limit(mock_generate: MagicMock) -> None:
     assert response.status_code == 429
     assert "rate limit exceeded" in response.json()["detail"].lower()
 
+@patch("api.workflow.Client")
 @patch("api.workflow.generate_content_with_retry")
 @patch("tenacity.nap.time.sleep", side_effect=lambda x: None) # Skip sleep in tests
-def test_retry_mechanism(mock_sleep: MagicMock, mock_generate: MagicMock) -> None:
+def test_retry_mechanism(mock_sleep: MagicMock, mock_generate: MagicMock, mock_client: MagicMock) -> None:
+    # Ensure interrogator doesn't stop workflow
+    mock_client.return_value.models.generate_content.return_value.parsed = None
+    
     # First call fails with 429 quota, second succeeds
     mock_response = MagicMock()
     mock_candidate = MagicMock()

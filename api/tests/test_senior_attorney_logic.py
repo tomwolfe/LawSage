@@ -5,10 +5,11 @@ from pydantic import BaseModel
 from typing import List
 
 class MockParsedResponse:
-    def __init__(self, is_approved, fallacies_found, feedback):
+    def __init__(self, is_approved, fallacies_found, feedback, missing_rebuttals=None):
         self.is_approved = is_approved
         self.fallacies_found = fallacies_found
         self.feedback = feedback
+        self.missing_rebuttals = missing_rebuttals or []
 
 @pytest.fixture
 def mock_client():

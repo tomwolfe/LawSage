@@ -20,10 +20,11 @@ def test_irac_memo_structure(mock_api_key):
         manager = LegalWorkflowManager(api_key=mock_api_key)
         output = manager.generate_memo("Test input", "California", "Some laws")
         
-        assert "ISSUE:" in output
-        assert "RULE:" in output
-        assert "APPLICATION:" in output
-        assert "CONCLUSION:" in output
+        final_output = output["final_output"]
+        assert "ISSUE:" in final_output
+        assert "RULE:" in final_output
+        assert "APPLICATION:" in final_output
+        assert "CONCLUSION:" in final_output
 
 
 def test_extract_timeline_schema(mock_api_key):

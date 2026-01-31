@@ -1,6 +1,6 @@
 import operator
 import json
-from typing import Annotated, List, TypedDict, Union, Optional
+from typing import Annotated, List, TypedDict, Union, Optional, Dict
 import re
 
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -32,7 +32,7 @@ You MUST follow the IRAC (Issue, Rule, Application, Conclusion) format strictly.
 Use the following headers:
 ISSUE: [Describe the legal question]
 RULE: [Cite the relevant statutes and case law]
-APPLICATION: [Apply the rules to the specific facts of the case]
+APPLICATION: [Apply the rules to the specific facts of the case. Include 'Anticipatory Defenses' and 'Rebuttals' here to address potential counter-arguments.]
 CONCLUSION: [State the final legal conclusion or recommendation]
 
 DO NOT use any other format. Failure to use IRAC will result in a system error.
@@ -73,6 +73,7 @@ from pydantic import BaseModel, Field
 class SeniorAttorneyResponse(BaseModel):
     is_approved: bool = Field(description="Whether the draft is approved or needs revision")
     fallacies_found: List[str] = Field(default_factory=list, description="List of logical fallacies identified (e.g., Circular Reasoning, Non-sequitur)")
+    missing_rebuttals: List[str] = Field(default_factory=list, description="List of counter-arguments or defenses that are missing")
     feedback: str = Field(description="Detailed feedback for the drafter")
 
 class AgentState(TypedDict):
@@ -82,6 +83,8 @@ class AgentState(TypedDict):
     research_results: str
     procedural_checklist: str
     evidence_descriptions: List[str]
+    evidence_mapping: Dict[str, str]
+    exhibit_list: List[str]
     strategy: str
     final_output: str
     sources: List[dict]
@@ -206,7 +209,9 @@ def create_researcher_node(api_key: str):
         }
     return researcher
 
-def create_procedural_guide_node():
+def create_procedural_guide_node(api_key: str):
+    local_rules_engine = LocalRulesEngine(api_key=api_key)
+    
     def procedural_guide(state: AgentState):
         jurisdiction = state['jurisdiction']
         thinking_step = f"Procedural Engine: Identifying court rules for {jurisdiction}..."
@@ -217,7 +222,7 @@ def create_procedural_guide_node():
         # County-level rules expansion
         if "County" in jurisdiction or jurisdiction == "Los Angeles":
             county_name = jurisdiction if "County" in jurisdiction else f"{jurisdiction} County"
-            local_rules = LocalRulesEngine.format_rules(county_name)
+            local_rules = local_rules_engine.format_rules(county_name)
             guide = f"{guide}\n\n{local_rules}"
         
         return {
@@ -270,11 +275,15 @@ def create_drafter_node(api_key: str):
     model_id = get_settings()["model"]["id"]
 
     def drafter(state: AgentState):
-        thinking_step = "Drafter: Preparing IRAC memo..."
+        thinking_step = "Drafter: Preparing IRAC memo and Exhibit List..."
         
         evidence_context = ""
         if state.get('evidence_descriptions'):
             evidence_context = "\nEXTRACTED EVIDENCE DESCRIPTIONS:\n" + "\n".join(state['evidence_descriptions'])
+        
+        mapping_context = ""
+        if state.get('evidence_mapping'):
+            mapping_context = "\nEVIDENCE-TO-FACT MAPPING:\n" + json.dumps(state['evidence_mapping'], indent=2)
 
         prompt = f"""
         {DRAFTER_INSTRUCTION}
@@ -286,17 +295,28 @@ def create_drafter_node(api_key: str):
         {state['research_results']}
         
         {evidence_context}
+        {mapping_context}
         
         User Input: {state['user_input']}
         
         In the 'APPLICATION' section, make sure to integrate the extracted evidence descriptions where relevant.
+        
+        Additionally, generate an 'EXHIBIT LIST' at the end of the memo. 
+        Each exhibit should be numbered and describe how it supports the case based on the mapping.
         """
         
         response = generate_content_with_retry(client, model_id, prompt, None)
         memo = response.candidates[0].content.parts[0].text if response.candidates else ""
         
+        # Extract Exhibit List for state
+        exhibits = []
+        if "EXHIBIT LIST" in memo.upper():
+            exhibit_section = memo.upper().split("EXHIBIT LIST")[-1]
+            exhibits = [line.strip() for line in exhibit_section.split("\n") if line.strip() and (line.strip()[0].isdigit() or line.strip().startswith("-"))]
+
         return {
             "final_output": memo,
+            "exhibit_list": exhibits,
             "thinking_steps": [thinking_step]
         }
     return drafter
@@ -398,40 +418,23 @@ def create_verifier_node(api_key: str):
                 continue
 
             # NEW: Reasoning Validation
-            reasoning_res = verification_service.validate_reasoning(cit, all_context, state['final_output'])
+            # Extract only the APPLICATION section for logic matching
+            app_match = re.search(r"APPLICATION:(.*?)CONCLUSION:", state['final_output'], re.DOTALL | re.IGNORECASE)
+            application_context = app_match.group(1) if app_match else state['final_output']
+            
+            reasoning_res = verification_service.validate_reasoning(cit, all_context, application_context)
             if not reasoning_res.get("valid", True):
                 critique = reasoning_res.get("critique", "Reasoning mismatch")
                 reasoning_mismatches.append(f"{cit}: {critique}")
                 updated_final_output = updated_final_output.replace(cit, f"{cit} [REASONING_ERROR: {critique}]")
 
-            # Check for negative treatment via search
-            query = f"Is {cit} still good law in {state['jurisdiction']}? Check for overruled, repealed, or superseded status."
-            
-            search_response = generate_content_with_retry(
-                client=client,
-                model=model_id,
-                contents=query,
-                config=types.GenerateContentConfig(tools=[search_tool])
-            )
-            
-            search_text = ""
-            if search_response.candidates:
-                candidate = search_response.candidates[0]
-                if candidate.content and candidate.content.parts:
-                    search_text = "\n".join([p.text for p in candidate.content.parts if p.text])
-            
-            check_prompt = f"""
-            Based on the following search results, is the citation '{cit}' still valid law in {state['jurisdiction']}?
-            Search Results:
-            {search_text}
-            
-            If it has been overruled, repealed, superseded, or has negative treatment, respond with 'INVALID'.
-            Otherwise, respond with 'VALID'.
-            """
-            check_res = client.models.generate_content(model=model_id, contents=check_prompt)
-            if check_res.candidates and "INVALID" in check_res.candidates[0].content.parts[0].text.upper():
-                unverified.append(f"WARNING: SUPERSEDED - {cit}")
-                updated_final_output = updated_final_output.replace(cit, f"{cit} [SUPERSEDED]")
+            # Check for negative treatment via service
+            neg_res = verification_service.check_negative_treatment(cit, state['jurisdiction'])
+            if not neg_res.get("is_valid", True):
+                status = neg_res.get("status", "INVALID")
+                explanation = neg_res.get("explanation", "Negative treatment detected")
+                unverified.append(f"WARNING: {status} - {cit} ({explanation})")
+                updated_final_output = updated_final_output.replace(cit, f"{cit} [{status}: {explanation}]")
 
         # Also do the traditional verification
         all_sources = state['grounding_data'] + "\n" + state['research_results']
@@ -458,10 +461,13 @@ def create_senior_attorney_node(api_key: str):
     model_id = get_settings()["model"]["id"]
 
     def senior_attorney(state: AgentState):
-        thinking_step = "Senior Attorney: Red-Teaming the strategy for logical fallacies..."
+        thinking_step = "Senior Attorney: Red-Teaming for strategic holes and missing rebuttals..."
         
         prompt = f"""
         {SENIOR_ATTORNEY_INSTRUCTION}
+        
+        MISSION: First, act as 'Opposing Counsel'. Try to find every possible way to defeat this argument. 
+        Then, switch back to Senior Attorney and identify what 'Anticipatory Defenses' and 'Rebuttals' are missing from the draft.
         
         Final Draft:
         {state['final_output']}
@@ -469,7 +475,10 @@ def create_senior_attorney_node(api_key: str):
         Strategy:
         {state['strategy']}
         
-        Analyze for logical fallacies (Circular Reasoning, Non-sequiturs), weak arguments, and strategic holes.
+        Analyze for:
+        1. Logical fallacies (Circular Reasoning, Non-sequiturs).
+        2. 'Strategy Holes': What arguments will the opposition use that we haven't addressed?
+        3. Missing Rebuttals: We need to preemptively strike their best points.
         """
         
         response = client.models.generate_content(
@@ -481,7 +490,7 @@ def create_senior_attorney_node(api_key: str):
             )
         )
         
-        res = SeniorAttorneyResponse(is_approved=True, feedback="", fallacies_found=[])
+        res = SeniorAttorneyResponse(is_approved=True, feedback="", fallacies_found=[], missing_rebuttals=[])
         if response.parsed:
             res = response.parsed
         else:
@@ -491,10 +500,14 @@ def create_senior_attorney_node(api_key: str):
             except:
                 pass
 
+        feedback = res.feedback
+        if res.missing_rebuttals:
+            feedback += "\n\nMISSING REBUTTALS/ANTICIPATORY DEFENSES:\n" + "\n".join([f"- {r}" for r in res.missing_rebuttals])
+
         return {
             "is_approved": res.is_approved,
             "fallacies_found": res.fallacies_found,
-            "missing_info_prompt": res.feedback if not res.is_approved else "",
+            "missing_info_prompt": feedback if not res.is_approved else "",
             "thinking_steps": [thinking_step]
         }
     return senior_attorney
@@ -522,7 +535,7 @@ def create_workflow(api_key: str):
     
     workflow.add_node("interrogator", create_interrogator_node(api_key))
     workflow.add_node("researcher", create_researcher_node(api_key))
-    workflow.add_node("procedural_guide", create_procedural_guide_node())
+    workflow.add_node("procedural_guide", create_procedural_guide_node(api_key))
     workflow.add_node("reasoner", create_reasoner_node(api_key))
     workflow.add_node("drafter", create_drafter_node(api_key))
     workflow.add_node("formatter", create_formatter_node(api_key))

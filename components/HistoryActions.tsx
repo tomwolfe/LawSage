@@ -2,6 +2,7 @@
 
 import React, { useRef } from 'react';
 import { Download, Upload } from 'lucide-react';
+import { Vault } from '@/utils/crypto';
 
 interface Source {
   title: string | null;
@@ -61,7 +62,16 @@ export default function HistoryActions({ onImport }: Omit<HistoryActionsProps, '
     reader.onload = (e) => {
       try {
         const content = e.target?.result as string;
-        const importedData = JSON.parse(content);
+        
+        // Try to decrypt imported content
+        let importedData: any = Vault.decrypt(content);
+        if (!importedData) {
+          try {
+            importedData = JSON.parse(content);
+          } catch {
+            throw new Error('Imported data is neither a valid encrypted vault nor valid JSON.');
+          }
+        }
 
         if (!Array.isArray(importedData)) {
           throw new Error('Imported data must be an array of case history items.');
@@ -92,7 +102,10 @@ export default function HistoryActions({ onImport }: Omit<HistoryActionsProps, '
         let existingHistory: CaseHistoryItem[] = [];
         if (existingHistoryStr) {
           try {
-            existingHistory = JSON.parse(existingHistoryStr).map((item: CaseHistoryItem) => ({
+            let parsed: any = Vault.decrypt(existingHistoryStr);
+            if (!parsed) parsed = JSON.parse(existingHistoryStr);
+            
+            existingHistory = parsed.map((item: CaseHistoryItem) => ({
               ...item,
               timestamp: new Date(item.timestamp)
             }));
@@ -111,7 +124,7 @@ export default function HistoryActions({ onImport }: Omit<HistoryActionsProps, '
         // Sort by timestamp descending (newest first)
         mergedHistory.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-        localStorage.setItem('lawsage_history', JSON.stringify(mergedHistory));
+        localStorage.setItem('lawsage_history', Vault.encrypt(mergedHistory));
         onImport(mergedHistory);
         
         if (fileInputRef.current) {

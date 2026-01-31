@@ -27,24 +27,26 @@ class VerificationService:
             return {"valid": True, "reason": "Gemini API key missing, skipping reasoning validation"}
 
         prompt = f"""
-        Act as a Senior Appellate Attorney. Verify if the following legal citation supports the specific argument made.
+        Act as a Senior Appellate Attorney. Verify if the following legal citation supports the specific 'Application' of law to facts made in the memo.
         
         Citation: {citation}
-        Context (Source Text):
+        Source Text/Context:
         {context}
         
-        Proposed Argument:
+        Proposed 'Application' Facts & Argument:
         {argument}
         
         Analysis Task:
-        1. Does the 'holding' or 'reasoning' in the source text actually support the proposed argument?
-        2. Is there a mismatch (e.g., the case is about procedural standing but used for substantive liability)?
+        1. Identify the 'Holding' or core legal rule from the source text.
+        2. Determine if that holding logically applies to the specific facts in the 'Application' section.
+        3. Check for 'Fact Mismatch': Is the rule being applied to a fundamentally different set of circumstances (e.g., criminal rule applied to a civil contract)?
         
         Respond ONLY with a JSON object:
         {{
             "valid": boolean,
             "confidence": float (0.0 to 1.0),
-            "critique": "short explanation if invalid or weak"
+            "critique": "short explanation if invalid or weak, specifically addressing why the holding doesn't fit the facts",
+            "holding_identified": "string summarizing the case's holding"
         }}
         """
         try:
@@ -59,6 +61,61 @@ class VerificationService:
         except Exception as e:
             logging.error(f"Reasoning validation failed for {citation}: {e}")
             return {"valid": True, "error": str(e), "critique": "Validation service error"}
+
+    def check_negative_treatment(self, citation: str, jurisdiction: str) -> Dict[str, any]:
+        """
+        Uses Gemini Search Grounding to detect if a case has been overruled, superseded, 
+        or otherwise has negative treatment.
+        """
+        if not self.client:
+            return {"valid": True, "status": "UNKNOWN", "reason": "Gemini API key missing"}
+
+        search_tool = types.Tool(google_search=types.GoogleSearch())
+        query = f"Is {citation} still good law in {jurisdiction}? Check for overruled, repealed, or superseded status via CourtListener, Casetext, or official reporters."
+        
+        try:
+            response = self.client.models.generate_content(
+                model=self.model_id,
+                contents=query,
+                config=types.GenerateContentConfig(tools=[search_tool])
+            )
+            
+            search_text = ""
+            if response.candidates:
+                candidate = response.candidates[0]
+                if candidate.content and candidate.content.parts:
+                    search_text = "\n".join([p.text for p in candidate.content.parts if p.text])
+            
+            prompt = f"""
+            Analyze these search results for the legal validity of '{citation}' in {jurisdiction}:
+            
+            Search Results:
+            {search_text}
+            
+            Does this case have 'Negative Treatment' (Overruled, Superseded, Abrogated, or Questioned)?
+            
+            Respond ONLY with a JSON object:
+            {{
+                "is_valid": boolean,
+                "status": "GOOD_LAW" | "OVERRULED" | "SUPERSEDED" | "ABROGATED" | "QUESTIONED" | "REPEALED",
+                "explanation": "brief description of the negative treatment if any",
+                "replacement_citation": "if superseded, what is the new case or statute?"
+            }}
+            """
+            
+            check_res = self.client.models.generate_content(
+                model=self.model_id, 
+                contents=prompt,
+                config=types.GenerateContentConfig(response_mime_type="application/json")
+            )
+            
+            if check_res.parsed:
+                return check_res.parsed
+            return json.loads(check_res.text)
+            
+        except Exception as e:
+            logging.error(f"Negative treatment check failed for {citation}: {e}")
+            return {"is_valid": True, "status": "UNKNOWN", "error": str(e)}
 
     def verify_citation(self, citation: str) -> Dict[str, any]:
         """
