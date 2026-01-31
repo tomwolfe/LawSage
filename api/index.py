@@ -1,11 +1,18 @@
+import os
+import sys
+
+# Add project root to sys.path for Vercel
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from fastapi import FastAPI, Header, HTTPException, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from google import genai
 from google.genai import types, errors
 from google.api_core import exceptions as google_exceptions
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 import os
-from typing import Any, Callable, List
+from typing import Any, Callable, List, Optional
 from pydantic import BaseModel
 
 from api.config_loader import get_settings
@@ -22,53 +29,60 @@ from api.models import (
     AnalysisResponse,
     HealthResponse,
 )
+from api.utils import generate_content_with_retry
 from api.processor import ResponseValidator
 from api.exceptions import global_exception_handler, AppException
 from api.services.document_processor import DocumentProcessor
 from api.services.vector_store import VectorStoreService
-
-# System instruction to enforce consistent output structure
-SYSTEM_INSTRUCTION = """
-You are a legal assistant helping pro se litigants (people representing themselves).
-Always format your response with a clear delimiter '---' separating strategy/advice from legal filings.
-
-BEFORE the '---': Provide legal strategy, analysis, and step-by-step procedural roadmap.
-AFTER the '---': Provide actual legal filing templates and documents.
-
-CRITICAL: The '---' delimiter MUST appear in your response. If you cannot provide filings,
-still include the delimiter and state that no filings are available.
-
-ALWAYS include a disclaimer that this is legal information, not legal advice,
-and recommend consulting with a qualified attorney for complex matters.
-
-STRICT GROUNDING: Use ONLY the provided 'Grounding Data' to answer. If the 'Grounding Data' does not contain enough information to answer a specific legal question or identify a statute, you MUST state: "I cannot find a specific statute for this". Do NOT hallucinate legal facts.
-"""
-
-def is_rate_limit_error(e: Exception) -> bool:
-    """Returns True only if it is a genuine quota/rate limit issue."""
-    msg = str(e).lower()
-    # Check for the specific 429 status code or explicit quota messages
-    if "429" in msg or "quota exceeded" in msg or "rate limit" in msg:
-        return True
-    return False
-
-@retry(
-    stop=stop_after_attempt(2), # Only retry once
-    wait=wait_exponential(multiplier=1, min=2, max=4),
-    retry=retry_if_exception(is_rate_limit_error),
-    reraise=True
-)
-def generate_content_with_retry(client: genai.Client, model: str, contents: Any, config: Any) -> Any:
-    """Wraps Gemini content generation with exponential backoff retries."""
-    return client.models.generate_content(
-        model=model,
-        contents=contents,
-        config=config
-    )
+from api.services.audio_processor import AudioProcessor
+from api.services.workflow_manager import LegalWorkflowManager
 
 app = FastAPI()
 app.add_exception_handler(Exception, global_exception_handler)
 app.add_exception_handler(HTTPException, global_exception_handler)
+
+@app.post("/upload-evidence")
+@app.post("/api/upload-evidence")
+async def upload_evidence(
+    jurisdiction: str = Form(...),
+    case_id: Optional[str] = Form(None),
+    file: UploadFile = File(...),
+    x_gemini_api_key: str | None = Header(None)
+) -> Any:
+    if not x_gemini_api_key:
+        raise HTTPException(status_code=401, detail="Gemini API Key is missing.")
+
+    filename = file.filename or "unknown"
+    content = await file.read()
+    
+    if filename.lower().endswith(('.mp3', '.wav', '.m4a')):
+        text = AudioProcessor.transcribe(content, x_gemini_api_key)
+        metadata_type = "evidence_transcript"
+    else:
+        if filename.endswith(".pdf"):
+            text = DocumentProcessor.extract_text_from_pdf(content)
+        elif filename.endswith(".docx"):
+            text = DocumentProcessor.extract_text_from_docx(content)
+        else:
+            text = content.decode("utf-8", errors="ignore")
+        metadata_type = "document"
+
+    # Ingest into Vector Store
+    vector_service = VectorStoreService(api_key=x_gemini_api_key)
+    
+    if metadata_type == "evidence_transcript":
+        vector_service.add_documents([text], metadatas=[{"jurisdiction": jurisdiction, "source": filename, "type": metadata_type, "case_id": case_id}])
+    else:
+        chunks = DocumentProcessor.chunk_text(text)
+        metadatas = [{"jurisdiction": jurisdiction, "source": filename, "type": metadata_type, "case_id": case_id} for _ in chunks]
+        vector_service.add_documents(chunks, metadatas=metadatas)
+
+    return {
+        "status": "success",
+        "filename": filename,
+        "transcript": text if metadata_type == "evidence_transcript" else None,
+        "message": "Evidence uploaded and processed."
+    }
 
 @app.middleware("http")
 async def log_requests(request: Any, call_next: Callable[[Any], Any]) -> Any:
@@ -86,16 +100,60 @@ app.add_middleware(
 )
 
 @app.get("/")
-@app.get("/api")
 @app.get("/health")
 @app.get("/api/health")
 async def health_check() -> HealthResponse:
     return HealthResponse(status="ok", message="LawSage API is running")
 
 from api.workflow import create_workflow
+from api.services.procedural_engine import ProceduralEngine
+from api.utils.court_formatter import format_to_pleading
+
+SYSTEM_INSTRUCTION = "Use the '---' delimiter to separate strategy from filings."
+
+@app.post("/format-pleading")
+@app.post("/api/format-pleading")
+async def format_pleading(request: dict):
+    text = request.get("text", "")
+    formatted = format_to_pleading(text)
+    return {"formatted": formatted}
+
+@app.get("/procedural-guide")
+@app.get("/api/procedural-guide")
+async def get_procedural_guide(jurisdiction: str):
+    guide = ProceduralEngine.get_procedural_guide(jurisdiction)
+    checklist = ProceduralEngine.get_checklist(jurisdiction)
+    return {"guide": guide, "checklist": checklist}
+
+@app.post("/process-case")
+@app.post("/api/process-case")
+async def process_case(
+    user_input: str = Form(...),
+    jurisdiction: str = Form(...),
+    case_id: Optional[str] = Form(None),
+    chat_history: Optional[str] = Form(None), # JSON string
+    files: List[UploadFile] = File([]),
+    x_gemini_api_key: str | None = Header(None)
+) -> Any:
+    if not x_gemini_api_key:
+        raise HTTPException(status_code=401, detail="Gemini API Key is missing.")
+
+    import json
+    history = []
+    if chat_history:
+        try:
+            history = json.loads(chat_history)
+        except:
+            pass
+
+    manager = LegalWorkflowManager(api_key=x_gemini_api_key)
+    return StreamingResponse(
+        manager.process_case_stream(user_input, jurisdiction, files, case_id, history),
+        media_type="text/event-stream"
+    )
 
 @app.post("/generate")
-@app.post("/api/generate")
+@app.post("/api/generate", response_model=LegalHelpResponse)
 async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | None = Header(None)) -> Any:
     if not x_gemini_api_key:
         raise HTTPException(
@@ -103,22 +161,31 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
             detail="Gemini API Key is missing. Please provide it in the X-Gemini-API-Key header."
         )
     
-    # Basic validation: Gemini keys usually start with AIza and are about 39 chars long
+    # Basic validation
     if not x_gemini_api_key.startswith("AIza") or len(x_gemini_api_key) < 20:
         raise HTTPException(
             status_code=400,
-            detail="Invalid Gemini API Key format. It should start with 'AIza' and be at least 20 characters long."
+            detail="Invalid Gemini API Key format."
         )
 
     # Initialize Vector Store
     vector_service = VectorStoreService(api_key=x_gemini_api_key)
     
     # RAG Search
-    rag_docs = vector_service.search(request.user_input, request.jurisdiction)
+    rag_docs = vector_service.search(request.user_input, request.jurisdiction, case_id=request.case_id)
     grounding_data = "\n\n".join([doc.page_content for doc in rag_docs])
     
     if not grounding_data:
         grounding_data = "No specific statutes or case law found in local database."
+
+    from langchain_core.messages import HumanMessage, AIMessage
+    formatted_history = []
+    if request.chat_history:
+        for m in request.chat_history:
+            if m['role'] == 'user':
+                formatted_history.append(HumanMessage(content=m['content']))
+            else:
+                formatted_history.append(AIMessage(content=m['content']))
 
     # Create and run workflow
     app_workflow = create_workflow(x_gemini_api_key)
@@ -128,18 +195,47 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
         "jurisdiction": request.jurisdiction,
         "grounding_data": grounding_data,
         "research_results": "",
+        "procedural_checklist": "",
+        "evidence_descriptions": [],
+        "evidence_mapping": {},
+        "exhibit_list": [],
+        "strategy": "",
         "final_output": "",
         "sources": [],
-        "thinking_steps": []
+        "unverified_citations": [],
+        "reasoning_mismatches": [],
+        "fallacies_found": [],
+        "missing_info_prompt": "",
+        "discovery_questions": [],
+        "discovery_chat_history": formatted_history,
+        "context_summary": "",
+        "thinking_steps": [],
+        "grounding_audit_log": [],
+        "is_approved": True
     }
     
-    # Execute the workflow
-    # Note: For real-time streaming, we would use app_workflow.stream()
-    # But here we'll run it to completion and return the steps
     result = app_workflow.invoke(initial_state)
     
     text_output = result.get("final_output", "Failed to generate response.")
     thinking_steps = result.get("thinking_steps", [])
+    discovery_questions = result.get("discovery_questions", [])
+    grounding_audit_log = result.get("grounding_audit_log", [])
+
+    # Populate Verification Report
+    verification_report = {
+        "unverified_citations": result.get("unverified_citations", []),
+        "reasoning_mismatches": result.get("reasoning_mismatches", []),
+        "fallacies_found": result.get("fallacies_found", []),
+        "senior_attorney_feedback": result.get("missing_info_prompt") if not result.get("is_approved") else None,
+        "is_approved": result.get("is_approved", True),
+        "grounding_audit_log": grounding_audit_log
+    }
+
+    # Convert history back to dict
+    history_out = []
+    for m in result.get("discovery_chat_history", []):
+        role = "user" if isinstance(m, HumanMessage) else "assistant"
+        history_out.append({"role": role, "content": m.content})
     
     sources = []
     # Add local RAG sources
@@ -156,13 +252,18 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
     return {
         "text": text_output,
         "sources": sources,
-        "thinking_steps": thinking_steps
+        "thinking_steps": thinking_steps,
+        "discovery_questions": discovery_questions,
+        "chat_history": history_out,
+        "verification_report": verification_report,
+        "grounding_audit_log": grounding_audit_log
     }
 
 @app.post("/analyze-document")
 @app.post("/api/analyze-document", response_model=AnalysisResponse)
 async def analyze_document(
     jurisdiction: str = Form(...),
+    case_id: Optional[str] = Form(None),
     file: UploadFile = File(...),
     x_gemini_api_key: str | None = Header(None)
 ) -> AnalysisResponse:
@@ -212,7 +313,7 @@ async def analyze_document(
     
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
     chunks = text_splitter.split_text(text)
-    metadatas = [{"jurisdiction": jurisdiction, "source": filename} for _ in chunks]
+    metadatas = [{"jurisdiction": jurisdiction, "source": filename, "case_id": case_id} for _ in chunks]
     vector_service.add_documents(chunks, metadatas=metadatas)
 
     if response.parsed:

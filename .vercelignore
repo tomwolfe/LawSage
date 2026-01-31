@@ -1,0 +1,26 @@
+# Vercel Ignore
+.git/
+.env
+.DS_Store
+.venv/
+env/
+venv/
+__pycache__/
+**/__pycache__/
+chroma_db/
+data/
+.pytest_cache/
+.next/
+node_modules/
+*.log
+.coverage
+tests/
+api/tests/
+scripts/
+public/models/
+*.pyc
+*.pyo
+*.pyd
+.python-version
+.vscode/
+.idea/

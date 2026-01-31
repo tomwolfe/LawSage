@@ -7,6 +7,7 @@ import { twMerge } from 'tailwind-merge';
 import ResultDisplay from './ResultDisplay';
 import HistoryActions from './HistoryActions';
 import DocumentUpload from './DocumentUpload';
+import { Vault } from '@/utils/crypto';
 
 declare global {
   interface Window {
@@ -35,9 +36,17 @@ interface Source {
   uri: string | null;
 }
 
+interface AuditEntry {
+  node: string;
+  query: string;
+  raw_results: string[];
+  timestamp: string;
+}
+
 interface LegalResult {
   text: string;
   sources: Source[];
+  grounding_audit_log?: AuditEntry[];
 }
 
 interface AnalysisResult {
@@ -71,7 +80,7 @@ export default function LegalInterface() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<LegalResult | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
-  const [activeTab, setActiveTab] = useState<'strategy' | 'filings' | 'sources' | 'analysis'>('strategy');
+  const [activeTab, setActiveTab] = useState<'strategy' | 'filings' | 'sources' | 'analysis' | 'audit'>('strategy');
   const [error, setError] = useState('');
   const [history, setHistory] = useState<CaseHistoryItem[]>([]);
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<string | null>(null);
@@ -103,7 +112,18 @@ export default function LegalInterface() {
     const savedHistory = localStorage.getItem('lawsage_history');
     if (savedHistory) {
       try {
-        const parsedHistory: unknown = JSON.parse(savedHistory);
+        // Try to decrypt first
+        let parsedHistory: unknown = Vault.decrypt(savedHistory);
+        
+        // Fallback for unencrypted legacy data
+        if (!parsedHistory) {
+          try {
+            parsedHistory = JSON.parse(savedHistory);
+          } catch {
+            parsedHistory = null;
+          }
+        }
+
         // Convert timestamp strings back to Date objects
         if (Array.isArray(parsedHistory)) {
           const historyWithDates = parsedHistory.map((item: unknown) => {
@@ -256,7 +276,8 @@ export default function LegalInterface() {
       const data = await response.json();
       setResult({
         text: data.text,
-        sources: data.sources
+        sources: data.sources,
+        grounding_audit_log: data.grounding_audit_log
       });
       if (data.thinking_steps) {
         setThinkingSteps(data.thinking_steps);
@@ -276,7 +297,7 @@ export default function LegalInterface() {
 
       const updatedHistory = [newHistoryItem, ...history];
       setHistory(updatedHistory);
-      localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
+      localStorage.setItem('lawsage_history', Vault.encrypt(updatedHistory));
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         setError('Request timed out. Please try again.');

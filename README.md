@@ -2,35 +2,36 @@
 
 **Democratizing Legal Access for Everyone**
 
-LawSage is an open-source AI-powered platform designed to empower individuals representing themselves in court (Pro Se litigants). By leveraging advanced AI models and real-time legal grounding, LawSage analyzes your unique legal situation and generates a personalized, court-admissible roadmap and legal filings.
+LawSage is an open-source AI-powered platform designed to empower individuals representing themselves in court (Pro Se litigants). By leveraging a hierarchical multi-agent swarm and real-time legal grounding, LawSage analyzes your unique legal situation to generate personalized, court-admissible roadmaps and legal filings.
 
 > **Legal Disclaimer:** I am an AI, not an attorney. This tool provides legal information, not legal advice. Use of this tool does not create an attorney-client relationship.
 
 ## Features
 
-*   **Voice Input:** Describe your situation naturally using your microphone.
-*   **Jurisdiction-Specific Analysis:** Tailor your legal strategy and filings to your specific state or federal jurisdiction.
-*   **AI-Powered Strategy:** Receive clear, plain-language analysis and a step-by-step procedural roadmap.
-*   **Court-Admissible Filings:** Generate draft legal documents (motions, answers, etc.) formatted for court submission.
-*   **Real-Time Grounding:** All responses are grounded in current statutes and legal resources, with direct links to sources.
-*   **Local & Private:** Your data never leaves your browser. Your API key is stored locally in `localStorage`.
-*   **Comprehensive History:** Save and revisit your past cases with a full audit trail.
-*   **Document Upload:** Analyze PDF, DOCX, or TXT files to receive a "Red Team" analysis identifying weaknesses and recommendations.
-*   **Export & Share:** Copy all content to your clipboard or download your filings as a Markdown file.
-*   **Import/Export History:** Backup your case history to a JSON file or restore it on another device.
+*   **Hierarchical Agent Swarm (LangGraph):** A multi-agent workflow featuring specialized nodes:
+    *   **The Interrogator:** Identifies factual gaps via targeted discovery questions.
+    *   **Researcher:** Performs deep legal research using Google Search Grounding.
+    *   **Senior Attorney (Red Team):** Analyzes drafts for logical fallacies, weak arguments, and strategic holes.
+    *   **Verifier:** Shepardizes citations via CourtListener API and performs circular validity checks.
+*   **Advanced Legal Reasoning:** Integration of IRAC-formatted memos, "Shadow Briefs" (adversarial rebuttals), and Fact-Law matrices mapping evidence to legal elements.
+*   **Machine-Verifiable Audit Trail:** A complete transparency log of every agent's queries, retrieved data snippets, and reasoning steps.
+*   **Security & Encryption:** Client-side AES-256 encryption using `crypto-js` to ensure your case data remains private in `localStorage`.
+*   **Vercel Optimized:** Fully compatible with Vercel's ephemeral filesystem using high-performance in-memory vector storage and API-centric multimodal processing.
+*   **Multimodal Input:** Support for voice (Gemini Multimodal), image evidence analysis, and document uploads (PDF, DOCX).
+*   **Jurisdiction-Specific Analysis:** Tailored procedural roadmaps including local county-level court rules and standing orders.
 
 ## Technology Stack
 
 LawSage is built on a modern, performant full-stack architecture:
 
-*   **Frontend:** Next.js 16 (React 19) with Tailwind CSS and Lucide Icons.
-*   **Backend:** FastAPI (Python) for a robust, asynchronous API.
-*   **AI Engine:** Google Gemini 2.5 Flash (via the Google AI Python SDK) with web search grounding for real-time legal research.
-*   **AI Safety & Structure:** Custom Python validation layer ensures consistent, safe output with mandatory disclaimers and structure.
-*   **State Management:** Local browser storage (`localStorage`) for user preferences and case history.
-*   **Document Processing:** PyPDF2 and python-docx for extracting text from uploaded documents.
-*   **Vector Search:** LangChain with Google Generative AI embeddings for semantic search over local legal documents.
-*   **Deployment:** Optimized for Vercel (frontend) and local/Python hosting (backend).
+*   **Frontend:** Next.js 16 (React 19) with Tailwind CSS, Lucide Icons, and Framer Motion.
+*   **Backend:** FastAPI (Python) for robust, asynchronous API management.
+*   **Orchestration:** LangGraph for complex, stateful multi-agent workflows.
+*   **AI Engine:** Google Gemini 2.0 Flash with Search Grounding and Multimodal capabilities.
+*   **Search Engine:** Hybrid Search (Vector + BM25) using Reciprocal Rank Fusion (RRF).
+*   **Security:** `crypto-js` for AES-256 client-side encryption; `cryptography` for server-side vaulting (local mode).
+*   **Verification:** CourtListener API integration for real-time citation validation.
+*   **Deployment:** Optimized for Vercel (Frontend/Serverless) and containerized local environments.
 
 ## Getting Started
 
@@ -38,7 +39,8 @@ LawSage is built on a modern, performant full-stack architecture:
 
 *   Node.js (v18+ recommended)
 *   Python (v3.9+ recommended)
-*   A Google Gemini API Key (Get one from the [Google AI Studio](https://aistudio.google.com/))
+*   A Google Gemini API Key ([Google AI Studio](https://aistudio.google.com/))
+*   (Optional) CourtListener API Key for enhanced citation verification.
 
 ### Installation
 
@@ -55,83 +57,51 @@ npm install
 
 3.  **Install Backend Dependencies**
 ```bash
-pip install -r api/requirements.txt
+pip install -r requirements.txt
 ```
 
 4.  **Set Your API Key**
 *   Open the application in your browser (`http://localhost:3000`).
 *   Click the "Settings" button in the top right corner.
-*   Enter your Google Gemini API Key and click "Save Settings".
-*   *Your key is stored securely in your browser's `localStorage` and is never sent to any server except when making requests to Google's API.*
+*   Enter your Google Gemini API Key.
+*   *Your key is stored securely in your browser's `localStorage` using AES-256 encryption.*
 
 ### Running the Application
 
-Start both the Next.js frontend and the FastAPI backend simultaneously:
+Start both the Next.js frontend and the FastAPI backend:
 ```bash
 npm run dev
 ```
-
-This command runs `next dev` and `uvicorn api.index:app --host 127.0.0.1 --port 8000 --reload` in parallel.
 
 Open your browser and navigate to [http://localhost:3000](http://localhost:3000) to begin.
 
 ## How It Works
 
-1.  **Input:** Describe your legal issue in plain language (e.g., "I was evicted from my apartment without notice").
-2.  **Jurisdiction:** Select your relevant state or "Federal" from the dropdown.
-3.  **Analyze:** Click "Analyze Case" or use the voice input button.
-4.  **Output:** LawSage's AI:
-    *   Searches the web for the latest statutes and court rules.
-    *   Generates a clear, step-by-step legal strategy and procedural roadmap.
-    *   Creates a draft, court-admissible legal filing (e.g., an Answer or Motion).
-    *   Provides direct links to the legal sources used for grounding.
-5.  **Action:** Review, edit, and copy the generated content to use in your case. You can also download it as a `.md` file.
-
-### Document Analysis (Red Team)
-
-1.  **Upload:** Use the "Upload Document for Analysis" button to select a PDF, DOCX, or TXT file.
-2.  **Analyze:** LawSage will automatically analyze the document and display a "Red Team Analysis" tab.
-3.  **Output:** The AI will provide:
-    *   A summary of the document.
-    *   A list of potential legal and procedural weaknesses.
-    *   Strategic recommendations to improve your position.
+1.  **Discovery:** Describe your situation. "The Interrogator" agent will ask 2-3 targeted questions to bridge any factual gaps.
+2.  **Research:** The "Researcher" performs a deep dive into statutes and case law, combining local knowledge bases with real-time web grounding.
+3.  **Strategy:** The "Reasoner" develops a procedural roadmap and legal theory.
+4.  **Drafting:** The "Drafter" generates an IRAC-formatted memo and Exhibit List.
+5.  **Verification:** Citations are cross-referenced against the CourtListener database.
+6.  **Red-Teaming:** A "Senior Attorney" agent attempts to defeat your argument with a "Shadow Brief" to identify weaknesses before you file.
 
 ## Deployment
 
-The easiest way to deploy LawSage is on **Vercel**.
+LawSage is Pareto-optimized for **Vercel**.
 
-1.  Push your code to a public GitHub repository.
-2.  Go to [https://vercel.com/new](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme).
-3.  Import your repository.
-4.  **Important:** Vercel only deploys the frontend. To use the AI features, you must host the FastAPI backend separately.
-    *   You can deploy the backend to a service like Render, Railway, or a cloud VM.
-    *   Update the `next.config.ts` file's `rewrites` to point to your deployed backend URL.
-5.  Set the `GEMINI_API_KEY` environment variable in your Vercel project settings.
+1.  Push your code to GitHub.
+2.  Import the project into Vercel.
+3.  Configure the `X-Gemini-API-Key` as a header or allow users to provide their own in the UI.
+4.  The backend is designed to run as Vercel Serverless Functions (Next.js API routes) or a standalone FastAPI service.
 
 ## Contributing
 
 LawSage is an open-source project dedicated to legal democratization. Contributions are welcome!
 
 1.  Fork the repository.
-2.  Create a feature branch (`git checkout -b feature/your-feature-name`).
-3.  Commit your changes (`git commit -m 'Add some feature'`).
-4.  Push to the branch (`git push origin feature/your-feature-name`).
-5.  Open a pull request.
-
-Please ensure your code adheres to the existing style and includes tests for new features.
+2.  Create a feature branch.
+3.  Commit your changes.
+4.  Open a pull request.
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-*   [Next.js](https://nextjs.org/)
-*   [FastAPI](https://fastapi.tiangolo.com/)
-*   [Google AI Studio](https://aistudio.google.com/)
-*   [Tailwind CSS](https://tailwindcss.com/)
-*   [Lucide Icons](https://lucide.dev/)
-*   [Vercel](https://vercel.com/)
-*   [LangChain](https://python.langchain.com/)
-*   [PyPDF2](https://pypi.org/project/PyPDF2/)
-*   [python-docx](https://python-docx.readthedocs.io/)
