@@ -5,6 +5,7 @@ python-multipart
 httpx
 tenacity
 PyYAML
+langchain-core
 langchain-google-genai
 langchain-text-splitters
 langgraph

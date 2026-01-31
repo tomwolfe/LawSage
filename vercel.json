@@ -2,14 +2,14 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "api/index.py"
+      "destination": "/api/index.py"
     }
   ],
   "functions": {
-    "api/**/*.py": {
+    "api/index.py": {
+      "runtime": "vercel-python@0.14.0",
       "memory": 1024,
-      "maxDuration": 30,
-      "excludeFiles": "{chroma_db/**,data/**,tests/**,api/tests/**,scripts/**,public/models/**,node_modules/**,.next/**}"
+      "maxDuration": 30
     }
   }
 }
