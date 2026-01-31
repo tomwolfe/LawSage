@@ -6,7 +6,9 @@
     "dev": "concurrently \"next dev\" \"PYTHONPATH=. uvicorn api.index:app --host 127.0.0.1 --port 8000 --reload\"",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:api": "pytest api/",
+    "test:all": "npm run test:api && npm run lint"
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.19",

@@ -36,19 +36,33 @@ function parseLegalOutput(text: string): { strategy: string; filings: string } {
     };
   }
 
-  const delimiter = '---';
-  const lowerText = text.toLowerCase();
-  const delimiterIndex = lowerText.indexOf(delimiter);
+  // Regex to match ---, ***, or ___ with optional spaces, on their own line if possible
+  const delimiterRegex = /\n\s*([-*_]{3,})\s*\n/;
+  const match = text.match(delimiterRegex);
 
-  if (delimiterIndex === -1) {
+  if (!match) {
+    // Fallback to simple index check if regex doesn't match a dedicated line
+    const fallbackDelimiter = '---';
+    const index = text.indexOf(fallbackDelimiter);
+    
+    if (index === -1) {
+      return {
+        strategy: text.trim(),
+        filings: 'No filings generated.'
+      };
+    }
+
     return {
-      strategy: text.trim(),
-      filings: 'No filings generated.'
+      strategy: text.substring(0, index).trim() || 'No strategy provided.',
+      filings: text.substring(index + fallbackDelimiter.length).trim() || 'No filings generated.'
     };
   }
 
+  const delimiterIndex = match.index!;
+  const delimiterLength = match[0].length;
+
   const strategy = text.substring(0, delimiterIndex).trim();
-  const filings = text.substring(delimiterIndex + delimiter.length).trim();
+  const filings = text.substring(delimiterIndex + delimiterLength).trim();
 
   return {
     strategy: strategy || 'No strategy provided.',

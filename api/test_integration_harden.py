@@ -1,71 +1,70 @@
 import pytest
-from api.index import ResponseValidator, parse_legal_output_with_delimiter
+from api.processor import ResponseValidator
 
-def test_validate_and_fix_no_delimiter():
-    text = "This is some strategy without a delimiter."
+def test_response_validator_disclaimer_deduplication():
+    messy_output = (
+        "I am an AI and this is not legal advice. "
+        "Here is your strategy. I am an AI helping you represent yourself Pro Se. "
+        "You should talk to a lawyer.\n\n"
+        "---\n\n"
+        "FILING CONTENT"
+    )
+    
+    fixed = ResponseValidator.validate_and_fix(messy_output)
+    
+    # Check that standard disclaimer is there
+    assert ResponseValidator.STANDARD_DISCLAIMER in fixed
+    
+    # Check that "I am an AI" and other disclaimer-like phrases are removed from the middle
+    strategy_part = fixed.split("---")[0]
+    # The first line is the STANDARD_DISCLAIMER, the rest should be cleaned
+    cleaned_content = strategy_part.replace(ResponseValidator.STANDARD_DISCLAIMER, "").strip()
+    
+    assert "I am an AI" not in cleaned_content
+    assert "not legal advice" not in cleaned_content
+    assert "Pro Se" not in cleaned_content
+    assert "Here is your strategy." in cleaned_content
+    assert "You should talk to a lawyer." in cleaned_content
+
+def test_response_validator_different_delimiters():
+    delimiters = ["---", "***", "___", "  ---", "\n***\n"]
+    for d in delimiters:
+        text = f"Strategy\n{d}\nFilings"
+        fixed = ResponseValidator.validate_and_fix(text)
+        assert "Strategy" in fixed
+        assert "Filings" in fixed
+        assert "---" in fixed # Should normalize to ---
+
+def test_response_validator_missing_delimiter():
+    text = "Only strategy here"
     fixed = ResponseValidator.validate_and_fix(text)
+    assert ResponseValidator.STANDARD_DISCLAIMER in fixed
+    assert "Only strategy here" in fixed
     assert "---" in fixed
-    assert "No filings generated" in fixed
-    assert "LEGAL DISCLAIMER" in fixed
+    assert ResponseValidator.NO_FILINGS_MSG in fixed
 
-def test_validate_and_fix_multiple_delimiters():
-    text = "Strategy\n---\nFiling 1\n---\nFiling 2"
+def test_response_validator_empty_filings():
+    text = "Strategy\n---\n"
     fixed = ResponseValidator.validate_and_fix(text)
-    # Should not add another delimiter if one exists
-    assert fixed.count("---") == 2
-    assert "LEGAL DISCLAIMER" in fixed
-
-def test_validate_and_fix_delimiter_at_start():
-    text = "---\nOnly filings"
-    fixed = ResponseValidator.validate_and_fix(text)
-    assert fixed.startswith("LEGAL DISCLAIMER")
+    assert "Strategy" in fixed
     assert "---" in fixed
-    assert fixed.count("---") == 1
+    assert ResponseValidator.NO_FILINGS_MSG in fixed
 
-def test_validate_and_fix_delimiter_at_end():
-    text = "Only strategy\n---"
+def test_response_validator_preserves_valid_analysis():
+    text = "This is a valid legal analysis. It mentions a court. --- Filings"
     fixed = ResponseValidator.validate_and_fix(text)
+    assert "This is a valid legal analysis." in fixed
+    assert "It mentions a court." in fixed
     assert "---" in fixed
-    assert fixed.count("---") == 1
-    assert "LEGAL DISCLAIMER" in fixed
+    assert "Filings" in fixed
 
-def test_validate_and_fix_existing_disclaimer_casing():
-    # Test with existing disclaimer in different casing
-    text = "i am an ai helping you represent yourself pro se. strategy\n---\nfilings"
+def test_response_validator_multiline_disclaimer():
+    text = (
+        "Line 1 of strategy.\n"
+        "Note: I am an AI.\n"
+        "Line 2 of strategy."
+    )
     fixed = ResponseValidator.validate_and_fix(text)
-    # Should prepend LEGAL DISCLAIMER because it didn't start with it
-    assert fixed.startswith("LEGAL DISCLAIMER")
-    assert fixed.count("LEGAL DISCLAIMER") == 1
-
-def test_validate_and_fix_existing_disclaimer_variation():
-    text = "This is legal information, not legal advice. strategy\n---\nfilings"
-    fixed = ResponseValidator.validate_and_fix(text)
-    assert fixed.startswith("LEGAL DISCLAIMER")
-    assert fixed.count("LEGAL DISCLAIMER") == 1
-
-def test_parse_legal_output_multi_delimiter_split():
-    text = "Strategy part 1\n--- inside strategy ---\nStrategy part 2\n---\nFiling 1\n--- inside filing ---\nFiling 2"
-    parsed = parse_legal_output_with_delimiter(text)
-    # It should split on the FIRST '---'
-    assert "Strategy part 1" in parsed["strategy"]
-    assert "Filing 1" in parsed["filings"]
-    assert "--- inside filing ---" in parsed["filings"]
-
-def test_parse_legal_output_empty_strategy():
-    text = "---\nFilings only"
-    parsed = parse_legal_output_with_delimiter(text)
-    assert parsed["strategy"] == ""
-    assert parsed["filings"] == "Filings only"
-
-def test_parse_legal_output_empty_filings():
-    text = "Strategy only\n---"
-    parsed = parse_legal_output_with_delimiter(text)
-    assert parsed["strategy"] == "Strategy only"
-    assert "No filings generated" in parsed["filings"]
-
-def test_parse_legal_output_whitespace_only_filings():
-    text = "Strategy\n---\n   \n"
-    parsed = parse_legal_output_with_delimiter(text)
-    assert parsed["strategy"] == "Strategy"
-    assert "No filings generated" in parsed["filings"]
-
+    assert "Line 1 of strategy." in fixed
+    assert "Line 2 of strategy." in fixed
+    assert "Note: I am an AI." not in fixed

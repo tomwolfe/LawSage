@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from api.index import app
 
-client = TestClient(app)
+client = TestClient(app, raise_server_exceptions=False)
 
 def test_health_check() -> None:
     response = client.get("/health")
@@ -52,7 +52,7 @@ def test_generate_legal_help_success(mock_genai_client: MagicMock) -> None:
     response = client.post(
         "/api/generate",
         json={"user_input": "I need help with a traffic ticket", "jurisdiction": "California"},
-        headers={"X-Gemini-API-Key": "test-key"}
+        headers={"X-Gemini-API-Key": "AIza-test-key-with-enough-length"}
     )
     
     assert response.status_code == 200
@@ -94,7 +94,7 @@ def test_generate_legal_help_source_no_uri(mock_genai_client: MagicMock) -> None
     response = client.post(
         "/api/generate",
         json={"user_input": "test", "jurisdiction": "California"},
-        headers={"X-Gemini-API-Key": "test-key"}
+        headers={"X-Gemini-API-Key": "AIza-test-key-with-enough-length"}
     )
     
     assert response.status_code == 200
@@ -129,7 +129,7 @@ def test_generate_legal_help_missing_delimiter(mock_genai_client: MagicMock) -> 
     response = client.post(
         "/api/generate",
         json={"user_input": "test", "jurisdiction": "California"},
-        headers={"X-Gemini-API-Key": "test-key"}
+        headers={"X-Gemini-API-Key": "AIza-test-key-with-enough-length"}
     )
     
     assert response.status_code == 200

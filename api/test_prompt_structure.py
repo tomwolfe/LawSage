@@ -1,23 +1,24 @@
 """Test suite for prompt structure validation and delimiter handling."""
 import pytest
-from api.index import parse_legal_output_with_delimiter, ResponseValidator
+from api.processor import ResponseValidator
 
 
 def test_parse_legal_output_with_delimiter_exists():
     """Test parsing when delimiter exists."""
     text = "Strategy content\n---\nFilings content"
-    result = parse_legal_output_with_delimiter(text)
+    # Using ResponseValidator.parse_to_dict which encapsulates this logic
+    result = ResponseValidator.parse_to_dict(text)
 
-    assert result["strategy"] == "Strategy content"
+    assert "Strategy content" in result["strategy"]
     assert result["filings"] == "Filings content"
 
 
 def test_parse_legal_output_without_delimiter():
     """Test parsing when delimiter is missing."""
     text = "Only strategy content without delimiter"
-    result = parse_legal_output_with_delimiter(text)
+    result = ResponseValidator.parse_to_dict(text)
 
-    assert result["strategy"] == "Only strategy content without delimiter"
+    assert "Only strategy content without delimiter" in result["strategy"]
     assert result["filings"] == "No filings generated. Please try a more specific request or check the strategy tab."
 
 

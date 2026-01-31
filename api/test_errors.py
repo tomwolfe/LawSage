@@ -18,7 +18,7 @@ def test_global_handler_internal_error():
         response = client.post(
             "/api/generate",
             json={"user_input": "test", "jurisdiction": "California"},
-            headers={"X-Gemini-API-Key": "test-key"}
+            headers={"X-Gemini-API-Key": "AIza-test-key-with-enough-length"}
         )
         
         assert response.status_code == 500
@@ -36,7 +36,7 @@ def test_global_handler_app_exception():
         response = client.post(
             "/api/generate",
             json={"user_input": "test", "jurisdiction": "California"},
-            headers={"X-Gemini-API-Key": "test-key"}
+            headers={"X-Gemini-API-Key": "AIza-test-key-with-enough-length"}
         )
         
         assert response.status_code == 418
@@ -54,7 +54,7 @@ def test_global_handler_rate_limit_error():
         response = client.post(
             "/api/generate",
             json={"user_input": "test", "jurisdiction": "California"},
-            headers={"X-Gemini-API-Key": "test-key"}
+            headers={"X-Gemini-API-Key": "AIza-test-key-with-enough-length"}
         )
         
         assert response.status_code == 429
@@ -82,7 +82,7 @@ def test_global_handler_client_error():
         response = client.post(
             "/api/generate",
             json={"user_input": "test", "jurisdiction": "California"},
-            headers={"X-Gemini-API-Key": "test-key"}
+            headers={"X-Gemini-API-Key": "AIza-test-key-with-enough-length"}
         )
         
         assert response.status_code == 400

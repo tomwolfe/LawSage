@@ -10,7 +10,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from api.index import app
 
-client = TestClient(app)
+client = TestClient(app, raise_server_exceptions=False)
 
 @patch("api.index.generate_content_with_retry")
 def test_generate_legal_help_rate_limit(mock_generate: MagicMock) -> None:
@@ -20,7 +20,7 @@ def test_generate_legal_help_rate_limit(mock_generate: MagicMock) -> None:
     response = client.post(
         "/api/generate",
         json={"user_input": "test", "jurisdiction": "California"},
-        headers={"X-Gemini-API-Key": "test-key"}
+        headers={"X-Gemini-API-Key": "AIza-test-key-with-enough-length"}
     )
     
     assert response.status_code == 429
@@ -52,7 +52,7 @@ def test_retry_mechanism(mock_sleep: MagicMock, mock_genai_client: MagicMock) ->
     response = client.post(
         "/api/generate",
         json={"user_input": "test", "jurisdiction": "California"},
-        headers={"X-Gemini-API-Key": "test-key"}
+        headers={"X-Gemini-API-Key": "AIza-test-key-with-enough-length"}
     )
     
     assert response.status_code == 200

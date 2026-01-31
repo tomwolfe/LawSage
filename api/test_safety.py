@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from api.index import app
 
-client = TestClient(app)
+client = TestClient(app, raise_server_exceptions=False)
 
 @patch("google.genai.Client")
 def test_generate_legal_help_safety_trigger(mock_genai_client: MagicMock) -> None:
@@ -30,7 +30,7 @@ def test_generate_legal_help_safety_trigger(mock_genai_client: MagicMock) -> Non
     response = client.post(
         "/api/generate",
         json={"user_input": "dangerous request", "jurisdiction": "California"},
-        headers={"X-Gemini-API-Key": "test-key"}
+        headers={"X-Gemini-API-Key": "AIza-test-key-with-enough-length"}
     )
     
     assert response.status_code == 200
@@ -51,7 +51,7 @@ def test_generate_legal_help_empty_candidates(mock_genai_client: MagicMock) -> N
     response = client.post(
         "/api/generate",
         json={"user_input": "test", "jurisdiction": "California"},
-        headers={"X-Gemini-API-Key": "test-key"}
+        headers={"X-Gemini-API-Key": "AIza-test-key-with-enough-length"}
     )
     
     assert response.status_code == 200

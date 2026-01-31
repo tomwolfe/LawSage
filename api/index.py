@@ -91,7 +91,17 @@ async def health_check() -> HealthResponse:
 @app.post("/api/generate", response_model=LegalResult)
 async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | None = Header(None)) -> LegalResult:
     if not x_gemini_api_key:
-        raise HTTPException(status_code=401, detail="GEMINI_API_KEY is missing")
+        raise HTTPException(
+            status_code=401, 
+            detail="Gemini API Key is missing. Please provide it in the X-Gemini-API-Key header."
+        )
+    
+    # Basic validation: Gemini keys usually start with AIza and are about 39 chars long
+    if not x_gemini_api_key.startswith("AIza") or len(x_gemini_api_key) < 20:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid Gemini API Key format. It should start with 'AIza' and be at least 20 characters long."
+        )
 
     client = genai.Client(api_key=x_gemini_api_key)
 
