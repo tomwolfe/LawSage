@@ -73,6 +73,8 @@ class LegalWorkflowManager:
             "sources": [],
             "unverified_citations": [],
             "missing_info_prompt": "",
+            "discovery_questions": [],
+            "context_summary": "",
             "thinking_steps": []
         }
         

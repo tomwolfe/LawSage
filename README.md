@@ -8,12 +8,13 @@ LawSage is an open-source AI-powered platform designed to empower individuals re
 
 ## Features
 
+*   **The Interrogator (Discovery Phase):** An intelligent entry-point node that analyzes your case for factual gaps and generates 2-3 targeted discovery questions to ensure a complete legal record before research begins.
 *   **Multi-Modal Evidence Processing:** Upload documents (PDF, DOCX) or audio recordings (MP3, WAV, M4A). Audio is automatically transcribed using **OpenAI Whisper**.
-*   **Structured Evidence Extraction:** Automatically identifies dates and factual events to generate a chronological `case_timeline.json` with importance ratings.
-*   **High-Reliability Pipeline:** A 5-stage agentic workflow (Researcher, Reasoner, Drafter, Formatter, Verifier) powered by LangGraph ensures accuracy and structural integrity.
+*   **Map-Reduce Legal Aggregation:** Autonomously handles massive document sets (100+ pages) by summarizing individual chunks and performing a "reduce" step to create a master **Case Fact Sheet**, preventing context window overflow.
+*   **High-Reliability Pipeline:** A 6-stage agentic workflow (Interrogator, Researcher, Reasoner, Drafter, Formatter, Verifier) powered by LangGraph ensures accuracy and structural integrity.
 *   **Strict IRAC Formatting:** Generates legal memos following the professional **Issue, Rule, Application, and Conclusion** framework.
 *   **AES-256 Vault Security:** Local vector data (ChromaDB) is secured with AES-256 encryption using the `cryptography` library, ensuring your sensitive case data remains private and protected at rest.
-*   **Automated Citation Verification:** Integrated "Verification Loop" cross-references every cited statute against grounding data, triggering an automatic re-search if hallucinations are detected.
+*   **Automated Shepardizing:** Integrated "Verification Loop" that now performs real-time **Shepard's Signal** checks via Google Search grounding to detect if cited statutes or cases have been overruled, repealed, or superseded.
 *   **Jurisdiction-Specific Analysis:** Performs secondary 'expansion' searches to suggest related statutes based on metadata cross-referencing.
 *   **Local & Private:** Your data remains private. Your API key and local database stay on your machine.
 
@@ -77,13 +78,14 @@ npm run dev
 
 ## How It Works
 
-LawSage uses a **5-Stage High-Reliability Pipeline** to process your request:
+LawSage uses a **6-Stage High-Reliability Pipeline** to process your request:
 
-1.  **Researcher (Search):** Queries the local SQLite database, Google Search (site:.gov), and performs jurisdictional expansion to find relevant statutes.
-2.  **Reasoner (Strategy):** Analyzes the research results to develop a procedural roadmap and legal theory.
-3.  **Drafter (IRAC):** Drafts a formal legal memo strictly adhering to the **ISSUE, RULE, APPLICATION, CONCLUSION** format.
-4.  **Formatter (Templates):** Applies the strategy and draft to structured JSON templates to generate court-admissible documents.
-5.  **Verifier (Citation Check):** Scans the final draft for legal citations. If it finds an unverified citation, it **automatically routes back to the Researcher**.
+1.  **Interrogator (Discovery):** Identifies factual gaps in your input and generates 2-3 targeted questions to clarify the legal situation before research starts.
+2.  **Researcher (Search):** Queries the local SQLite database, Google Search (site:.gov), and performs jurisdictional expansion to find relevant statutes.
+3.  **Reasoner (Strategy):** Analyzes the research results to develop a procedural roadmap. Uses **Map-Reduce** to aggregate context from extremely large documents into a Case Fact Sheet.
+4.  **Drafter (IRAC):** Drafts a formal legal memo strictly adhering to the **ISSUE, RULE, APPLICATION, CONCLUSION** format.
+5.  **Formatter (Templates):** Applies the strategy and draft to structured JSON templates to generate court-admissible documents.
+6.  **Verifier (Citation Check & Shepardizing):** Scans citations for validity. Uses Google Search to "Shepardize" laws—checking for negative treatment or superseded status.
 
 
 ### Evidence Management

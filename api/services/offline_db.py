@@ -31,15 +31,16 @@ class StatuteCache:
             conn.commit()
 
     def search_statutes(self, query: str, jurisdiction: Optional[str] = None, limit: int = 5) -> List[Dict]:
+        import re
+        # Basic sanitization: replace non-alphanumeric characters with spaces to avoid FTS5 syntax errors
+        clean_query = re.sub(r'[^\w\s]', ' ', query)
+        
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             if jurisdiction:
-                # FTS5 supports filtering by column in the MATCH expression
-                # or we can use a subquery if we had a regular table.
-                # Here we use the MATCH syntax for jurisdiction if we want it to be strict.
-                search_query = f"jurisdiction : {jurisdiction} AND {query}"
+                search_query = f"jurisdiction : {jurisdiction} AND {clean_query}"
             else:
-                search_query = query
+                search_query = clean_query
 
             cursor = conn.execute(
                 "SELECT * FROM statutes_fts WHERE statutes_fts MATCH ? ORDER BY rank LIMIT ?",

@@ -13,6 +13,7 @@ from api.processor import ResponseValidator
 from api.config_loader import get_settings
 from api.utils import generate_content_with_retry
 from api.services.offline_db import StatuteCache
+from api.services.document_processor import DocumentProcessor
 
 # System instructions for nodes
 REASONER_INSTRUCTION = """
@@ -44,6 +45,13 @@ You are a Citation Verifier. Cross-reference all legal citations in the draft ag
 Identify any citations that are not supported by the provided materials.
 """
 
+INTERROGATOR_INSTRUCTION = """
+You are 'The Interrogator'. Your role is to identify factual gaps in the user's legal case before research begins.
+Analyze the user's input and any initial grounding data provided.
+Generate 2-3 targeted discovery questions that would help clarify the legal situation or strengthen their case.
+Respond ONLY with a JSON list of questions. If no questions are needed, return [].
+"""
+
 class AgentState(TypedDict):
     user_input: str
     jurisdiction: str
@@ -54,7 +62,48 @@ class AgentState(TypedDict):
     sources: List[dict]
     unverified_citations: List[str]
     missing_info_prompt: str
+    discovery_questions: List[str]
+    context_summary: str
     thinking_steps: Annotated[List[str], operator.add]
+
+def create_interrogator_node(api_key: str):
+    client = Client(api_key=api_key)
+    model_id = get_settings()["model"]["id"]
+
+    def interrogator(state: AgentState):
+        thinking_step = "Interrogator: Analyzing case for factual gaps..."
+        
+        prompt = f"""
+        {INTERROGATOR_INSTRUCTION}
+        
+        User Input: {state['user_input']}
+        Grounding Data: {state['grounding_data']}
+        
+        Respond with a JSON list of 2-3 discovery questions.
+        """
+        
+        response = client.models.generate_content(
+            model=model_id,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json"
+            )
+        )
+        
+        questions = []
+        try:
+            if response.parsed:
+                questions = response.parsed
+            else:
+                questions = json.loads(response.text)
+        except:
+            pass
+
+        return {
+            "discovery_questions": questions,
+            "thinking_steps": [thinking_step]
+        }
+    return interrogator
 
 def create_researcher_node(api_key: str):
     client = Client(api_key=api_key)
@@ -124,14 +173,21 @@ def create_reasoner_node(api_key: str):
     def reasoner(state: AgentState):
         thinking_step = "Reasoner: Developing legal strategy..."
         
+        chunks = state['grounding_data'].split("\n\n")
+        context_summary = state.get("context_summary", "")
+        
+        if len(chunks) > 20 and not context_summary:
+            thinking_step = "Reasoner: Large context detected. Performing Map-Reduce aggregation..."
+            context_summary = DocumentProcessor.map_reduce_reasoning(chunks, api_key)
+        
         prompt = f"""
         {REASONER_INSTRUCTION}
         
         User Input: {state['user_input']}
         Jurisdiction: {state['jurisdiction']}
         Research & Grounding:
-        {state['grounding_data']}
         {state['research_results']}
+        {context_summary if context_summary else state['grounding_data']}
         
         Provide a detailed legal strategy and roadmap.
         """
@@ -141,6 +197,7 @@ def create_reasoner_node(api_key: str):
         
         return {
             "strategy": strategy,
+            "context_summary": context_summary,
             "thinking_steps": [thinking_step]
         }
     return reasoner
@@ -215,18 +272,78 @@ def create_formatter_node(api_key: str):
 
 
 def create_verifier_node(api_key: str):
+    client = Client(api_key=api_key)
+    model_id = get_settings()["model"]["id"]
+
     def verifier(state: AgentState):
-        thinking_step = "Verifier: Auditing citations..."
+        thinking_step = "Verifier: Shepardizing citations (checking for negative treatment)..."
         
+        # 1. Extract Citations using LLM
+        extract_prompt = f"""
+        Extract all legal citations (statutes, case law, rules) from the following text.
+        Text:
+        {state['final_output']}
+        
+        Respond ONLY with a JSON list of citation strings.
+        """
+        extract_response = client.models.generate_content(
+            model=model_id,
+            contents=extract_prompt,
+            config=types.GenerateContentConfig(response_mime_type="application/json")
+        )
+        
+        citations = []
+        try:
+            if extract_response.parsed:
+                citations = extract_response.parsed
+            else:
+                citations = json.loads(extract_response.text)
+        except:
+            pass
+
+        unverified = []
+        search_tool = types.Tool(google_search=types.GoogleSearch())
+        
+        for cit in citations:
+            query = f"Is {cit} still good law in {state['jurisdiction']}? Check for overruled, repealed, or superseded status."
+            
+            search_response = generate_content_with_retry(
+                client=client,
+                model=model_id,
+                contents=query,
+                config=types.GenerateContentConfig(tools=[search_tool])
+            )
+            
+            search_text = ""
+            if search_response.candidates:
+                candidate = search_response.candidates[0]
+                if candidate.content and candidate.content.parts:
+                    search_text = "\n".join([p.text for p in candidate.content.parts if p.text])
+            
+            # Use LLM to determine if it's superseded based on search results
+            check_prompt = f"""
+            Based on the following search results, is the citation '{cit}' still valid law in {state['jurisdiction']}?
+            Search Results:
+            {search_text}
+            
+            If it has been overruled, repealed, superseded, or has negative treatment, respond with 'INVALID'.
+            Otherwise, respond with 'VALID'.
+            """
+            check_res = client.models.generate_content(model=model_id, contents=check_prompt)
+            if check_res.candidates and "INVALID" in check_res.candidates[0].content.parts[0].text.upper():
+                unverified.append(f"WARNING: SUPERSEDED - {cit}")
+
+        # Also do the traditional verification
         all_sources = state['grounding_data'] + "\n" + state['research_results']
-        unverified = ResponseValidator.verify_citations_strict(state['final_output'], all_sources)
+        traditional_unverified = ResponseValidator.verify_citations_strict(state['final_output'], all_sources)
+        unverified.extend(traditional_unverified)
         
         missing_info_prompt = ""
         if unverified:
-            missing_info_prompt = f"Verify the following citations and find the correct sections/text for them: {', '.join(unverified)}"
+            missing_info_prompt = f"Address the following citation issues: {', '.join(unverified)}"
         
         return {
-            "unverified_citations": unverified,
+            "unverified_citations": list(set(unverified)),
             "missing_info_prompt": missing_info_prompt,
             "thinking_steps": [thinking_step]
         }
@@ -235,21 +352,37 @@ def create_verifier_node(api_key: str):
 def should_continue(state: AgentState):
     if state.get("unverified_citations") and len(state["unverified_citations"]) > 0:
         # Prevent infinite loops - could add a counter in state
-        if len(state["thinking_steps"]) > 10:
+        if len(state["thinking_steps"]) > 15: # Increased slightly
              return END
         return "researcher"
     return END
 
+def interrogator_should_continue(state: AgentState):
+    if state.get("discovery_questions") and len(state["thinking_steps"]) <= 1:
+        return END
+    return "researcher"
+
 def create_workflow(api_key: str):
     workflow = StateGraph(AgentState)
     
+    workflow.add_node("interrogator", create_interrogator_node(api_key))
     workflow.add_node("researcher", create_researcher_node(api_key))
     workflow.add_node("reasoner", create_reasoner_node(api_key))
     workflow.add_node("drafter", create_drafter_node(api_key))
     workflow.add_node("formatter", create_formatter_node(api_key))
     workflow.add_node("verifier", create_verifier_node(api_key))
     
-    workflow.set_entry_point("researcher")
+    workflow.set_entry_point("interrogator")
+    
+    workflow.add_conditional_edges(
+        "interrogator",
+        interrogator_should_continue,
+        {
+            END: END,
+            "researcher": "researcher"
+        }
+    )
+    
     workflow.add_edge("researcher", "reasoner")
     workflow.add_edge("reasoner", "drafter")
     workflow.add_edge("drafter", "formatter")

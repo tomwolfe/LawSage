@@ -138,6 +138,8 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
         "sources": [],
         "unverified_citations": [],
         "missing_info_prompt": "",
+        "discovery_questions": [],
+        "context_summary": "",
         "thinking_steps": []
     }
     
@@ -148,6 +150,7 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
     
     text_output = result.get("final_output", "Failed to generate response.")
     thinking_steps = result.get("thinking_steps", [])
+    discovery_questions = result.get("discovery_questions", [])
     
     sources = []
     # Add local RAG sources
@@ -164,7 +167,8 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
     return {
         "text": text_output,
         "sources": sources,
-        "thinking_steps": thinking_steps
+        "thinking_steps": thinking_steps,
+        "discovery_questions": discovery_questions
     }
 
 @app.post("/analyze-document")

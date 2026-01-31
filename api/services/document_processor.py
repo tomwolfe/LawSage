@@ -74,3 +74,36 @@ class DocumentProcessor:
         except:
             return []
 
+    @staticmethod
+    def map_reduce_reasoning(chunks: List[str], api_key: str) -> str:
+        client = genai.Client(api_key=api_key)
+        model_id = get_settings()["model"]["id"]
+
+        # 1. Map Stage: Summarize individual chunks
+        summaries = []
+        for chunk in chunks:
+            prompt = f"""
+            Summarize the following legal document chunk for legal relevance. 
+            Extract key facts, dates, and parties involved.
+            
+            Chunk:
+            {chunk}
+            """
+            response = client.models.generate_content(model=model_id, contents=prompt)
+            if response.candidates:
+                summaries.append(response.candidates[0].content.parts[0].text)
+
+        # 2. Reduce Stage: Create master Case Fact Sheet
+        joined_summaries = "\n\n---\n\n".join(summaries)
+        reduce_prompt = f"""
+        Combine the following legal document summaries into a single, comprehensive 'Case Fact Sheet'.
+        Ensure all key dates, evidence, and legal arguments are preserved and organized logically.
+        
+        Summaries:
+        {joined_summaries}
+        """
+        response = client.models.generate_content(model=model_id, contents=reduce_prompt)
+        if response.candidates:
+            return response.candidates[0].content.parts[0].text
+        return "Failed to generate Case Fact Sheet."
+
