@@ -37,12 +37,11 @@ from api.services.vector_store import VectorStoreService
 from api.services.audio_processor import AudioProcessor
 from api.services.workflow_manager import LegalWorkflowManager
 
-app = FastAPI()
+app = FastAPI(root_path="/api")
 app.add_exception_handler(Exception, global_exception_handler)
 app.add_exception_handler(HTTPException, global_exception_handler)
 
 @app.post("/upload-evidence")
-@app.post("/api/upload-evidence")
 async def upload_evidence(
     jurisdiction: str = Form(...),
     case_id: Optional[str] = Form(None),
@@ -100,9 +99,7 @@ app.add_middleware(
 )
 
 @app.get("/")
-@app.get("/api")
 @app.get("/health")
-@app.get("/api/health")
 async def health_check() -> HealthResponse:
     return HealthResponse(status="ok", message="LawSage API is running")
 
@@ -113,21 +110,18 @@ from api.utils.court_formatter import format_to_pleading
 SYSTEM_INSTRUCTION = "Use the '---' delimiter to separate strategy from filings."
 
 @app.post("/format-pleading")
-@app.post("/api/format-pleading")
 async def format_pleading(request: dict):
     text = request.get("text", "")
     formatted = format_to_pleading(text)
     return {"formatted": formatted}
 
 @app.get("/procedural-guide")
-@app.get("/api/procedural-guide")
 async def get_procedural_guide(jurisdiction: str):
     guide = ProceduralEngine.get_procedural_guide(jurisdiction)
     checklist = ProceduralEngine.get_checklist(jurisdiction)
     return {"guide": guide, "checklist": checklist}
 
 @app.post("/process-case")
-@app.post("/api/process-case")
 async def process_case(
     user_input: str = Form(...),
     jurisdiction: str = Form(...),
@@ -153,8 +147,7 @@ async def process_case(
         media_type="text/event-stream"
     )
 
-@app.post("/generate")
-@app.post("/api/generate", response_model=LegalHelpResponse)
+@app.post("/generate", response_model=LegalHelpResponse)
 async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | None = Header(None)) -> Any:
     if not x_gemini_api_key:
         raise HTTPException(
@@ -260,8 +253,7 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
         "grounding_audit_log": grounding_audit_log
     }
 
-@app.post("/analyze-document")
-@app.post("/api/analyze-document", response_model=AnalysisResponse)
+@app.post("/analyze-document", response_model=AnalysisResponse)
 async def analyze_document(
     jurisdiction: str = Form(...),
     case_id: Optional[str] = Form(None),
