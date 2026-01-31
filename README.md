@@ -13,9 +13,11 @@ LawSage is an open-source AI-powered platform designed to empower individuals re
 *   **AI-Powered Strategy:** Receive clear, plain-language analysis and a step-by-step procedural roadmap.
 *   **Court-Admissible Filings:** Generate draft legal documents (motions, answers, etc.) formatted for court submission.
 *   **Real-Time Grounding:** All responses are grounded in current statutes and legal resources, with direct links to sources.
-*   **Local & Private:** Your data never leaves your browser. Your API key is stored locally.
+*   **Local & Private:** Your data never leaves your browser. Your API key is stored locally in `localStorage`.
 *   **Comprehensive History:** Save and revisit your past cases with a full audit trail.
+*   **Document Upload:** Analyze PDF, DOCX, or TXT files to receive a "Red Team" analysis identifying weaknesses and recommendations.
 *   **Export & Share:** Copy all content to your clipboard or download your filings as a Markdown file.
+*   **Import/Export History:** Backup your case history to a JSON file or restore it on another device.
 
 ## Technology Stack
 
@@ -25,7 +27,9 @@ LawSage is built on a modern, performant full-stack architecture:
 *   **Backend:** FastAPI (Python) for a robust, asynchronous API.
 *   **AI Engine:** Google Gemini 2.5 Flash (via the Google AI Python SDK) with web search grounding for real-time legal research.
 *   **AI Safety & Structure:** Custom Python validation layer ensures consistent, safe output with mandatory disclaimers and structure.
-*   **State Management:** Local browser storage (localStorage) for user preferences and case history.
+*   **State Management:** Local browser storage (`localStorage`) for user preferences and case history.
+*   **Document Processing:** PyPDF2 and python-docx for extracting text from uploaded documents.
+*   **Vector Search:** LangChain with Google Generative AI embeddings for semantic search over local legal documents.
 *   **Deployment:** Optimized for Vercel (frontend) and local/Python hosting (backend).
 
 ## Getting Started
@@ -39,31 +43,30 @@ LawSage is built on a modern, performant full-stack architecture:
 ### Installation
 
 1.  **Clone the Repository**
-    ```bash
-    git clone https://github.com/tomwolfe/lawsage.git
-    cd lawsage
-    ```
+```bash
+git clone https://github.com/tomwolfe/lawsage.git
+cd lawsage
+```
 
 2.  **Install Frontend Dependencies**
-    ```bash
-    npm install
-    ```
+```bash
+npm install
+```
 
 3.  **Install Backend Dependencies**
-    ```bash
-    pip install -r api/requirements.txt
-    ```
+```bash
+pip install -r api/requirements.txt
+```
 
 4.  **Set Your API Key**
-    *   Open the application in your browser (`http://localhost:3000`).
-    *   Click the "Settings" button in the top right corner.
-    *   Enter your Google Gemini API Key and click "Save Settings".
-    *   *Your key is stored securely in your browser's localStorage and is never sent to any server except when making requests to Google's API.*
+*   Open the application in your browser (`http://localhost:3000`).
+*   Click the "Settings" button in the top right corner.
+*   Enter your Google Gemini API Key and click "Save Settings".
+*   *Your key is stored securely in your browser's `localStorage` and is never sent to any server except when making requests to Google's API.*
 
 ### Running the Application
 
 Start both the Next.js frontend and the FastAPI backend simultaneously:
-
 ```bash
 npm run dev
 ```
@@ -83,6 +86,15 @@ Open your browser and navigate to [http://localhost:3000](http://localhost:3000)
     *   Creates a draft, court-admissible legal filing (e.g., an Answer or Motion).
     *   Provides direct links to the legal sources used for grounding.
 5.  **Action:** Review, edit, and copy the generated content to use in your case. You can also download it as a `.md` file.
+
+### Document Analysis (Red Team)
+
+1.  **Upload:** Use the "Upload Document for Analysis" button to select a PDF, DOCX, or TXT file.
+2.  **Analyze:** LawSage will automatically analyze the document and display a "Red Team Analysis" tab.
+3.  **Output:** The AI will provide:
+    *   A summary of the document.
+    *   A list of potential legal and procedural weaknesses.
+    *   Strategic recommendations to improve your position.
 
 ## Deployment
 
@@ -120,3 +132,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 *   [Tailwind CSS](https://tailwindcss.com/)
 *   [Lucide Icons](https://lucide.dev/)
 *   [Vercel](https://vercel.com/)
+*   [LangChain](https://python.langchain.com/)
+*   [PyPDF2](https://pypi.org/project/PyPDF2/)
+*   [python-docx](https://python-docx.readthedocs.io/)
