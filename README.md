@@ -1,5 +1,4 @@
 # LawSage: The Universal Public Defender
-
 **Democratizing Legal Access for Everyone**
 
 LawSage is an open-source, AI-powered platform designed to empower individuals representing themselves in court (Pro Se litigants). By leveraging a sophisticated hierarchical agent swarm and real-time legal grounding, LawSage analyzes your unique legal situation and generates a personalized, court-admissible roadmap, structured timelines, and IRAC-compliant legal filings.
@@ -21,11 +20,11 @@ LawSage is an open-source, AI-powered platform designed to empower individuals r
     *   **Backend:** Local vector data (ChromaDB) is secured with AES-256 encryption.
     *   **Frontend:** Case history is encrypted with **AES-256 (crypto-js)** before being stored in `localStorage` or exported, ensuring sensitive legal data remains private.
 *   **Pleading Format Export:** Export final filings in a standard **28-line numbered pleading format** ready for U.S. courts.
+*   **Transparency & Audit Trail:** Every legal claim is backed by a machine-verifiable audit log, showing the exact queries and sources used by each agent in the workflow.
 
 ## Technology Stack
 
 LawSage is built on a modern, performant full-stack architecture:
-
 *   **Frontend:** Next.js 16 (React 19) with Tailwind CSS, Lucide Icons, and **Crypto-JS** for client-side vault security.
 *   **Backend:** FastAPI (Python) for a robust, asynchronous API.
 *   **Workflow Orchestration:** **LangGraph** for hierarchical multi-agent state management and red-teaming loops.
@@ -45,7 +44,6 @@ LawSage is built on a modern, performant full-stack architecture:
 *   *(Optional)* A CourtListener API Key for enhanced citation verification (Get one from [Free Law Project](https://free.law/courtlister/))
 
 ### Installation
-
 1.  **Clone the Repository**
 ```bash
 git clone https://github.com/tomwolfe/lawsage.git
@@ -68,12 +66,11 @@ python3 scripts/seed_offline_db.py
 ```
 
 5.  **Set Your API Keys & Vault Key**
-    *   **Gemini API Key:** Open the application in your browser (`http://localhost:3000`). Click the "Settings" button in the top right corner. Enter your Google Gemini API Key and click "Save Settings".
-    *   **(Optional) CourtListener API Key:** Set the `COURTLISTENER_API_KEY` environment variable.
-    *   **(Optional) Encryption Key:** Set `LAWSAGE_ENCRYPTION_KEY` as an environment variable for persistent vault security. If not set, a default key is used (not recommended for production).
+*   **Gemini API Key:** Open the application in your browser (`http://localhost:3000`). Click the "Settings" button in the top right corner. Enter your Google Gemini API Key and click "Save Settings".
+*   **(Optional) CourtListener API Key:** Set the `COURTLISTENER_API_KEY` environment variable.
+*   **(Optional) Encryption Key:** Set `LAWSAGE_ENCRYPTION_KEY` as an environment variable for persistent vault security. If not set, a default key is used (not recommended for production).
 
 ### Running the Application
-
 Start both the Next.js frontend and the FastAPI backend simultaneously:
 ```bash
 npm run dev
