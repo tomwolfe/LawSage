@@ -8,3 +8,8 @@ node_modules/
 tests/
 api/tests/
 scripts/
+public/models/
+**/__pycache__/
+.git/
+.env
+.DS_Store
