@@ -1,5 +1,5 @@
 import SettingsModal from '@/components/SettingsModal';
-import LegalInterface from '@/components/LegalInterface';
+import GuidedInterview from '@/components/GuidedInterview';
 import { ShieldCheck, Scale, FileSearch } from 'lucide-react';
 import ClientPortal from '@/components/ClientPortal';
 
@@ -11,8 +11,8 @@ export default function Home() {
           The Universal <span className="text-indigo-600">Public Defender</span>
         </h1>
         <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-          Democratizing legal access. Input your situation, and our AI will analyze statutes, 
-          provide a roadmap, and generate court-admissible filings.
+          Democratizing legal access through a guided, step-by-step litigation suite. 
+          Analyze statutes, meet court deadlines, and generate professional filings.
         </p>
         
         <div className="flex flex-wrap justify-center gap-6 pt-6">
@@ -31,7 +31,7 @@ export default function Home() {
         </div>
       </div>
 
-      <LegalInterface />
+      <GuidedInterview />
 
       <ClientPortal selector="#settings-portal">
         <SettingsModal />

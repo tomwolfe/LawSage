@@ -7,8 +7,32 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from google import genai
 from google.genai import types
 from api.config_loader import get_settings
+import PIL.Image
 
 class DocumentProcessor:
+    @staticmethod
+    def process_image(file_bytes: bytes, api_key: str) -> str:
+        """Uses Gemini Flash to describe evidence in an image."""
+        client = genai.Client(api_key=api_key)
+        model_id = get_settings()["model"]["id"]
+
+        image = PIL.Image.open(io.BytesIO(file_bytes))
+        
+        prompt = """
+        Analyze this image as legal evidence. Describe what is shown in detail, 
+        including any text, people, objects, and environmental context. 
+        Focus on facts that would be relevant in a court of law.
+        """
+
+        response = client.models.generate_content(
+            model=model_id,
+            contents=[prompt, image]
+        )
+
+        if response.candidates:
+            return response.candidates[0].content.parts[0].text
+        return "Failed to process image evidence."
+
     @staticmethod
     def extract_text_from_pdf(file_bytes: bytes) -> str:
         pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_bytes))

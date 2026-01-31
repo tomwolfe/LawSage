@@ -8,14 +8,17 @@ LawSage is an open-source AI-powered platform designed to empower individuals re
 
 ## Features
 
-*   **The Interrogator (Discovery Phase):** An intelligent entry-point node that analyzes your case for factual gaps and generates 2-3 targeted discovery questions to ensure a complete legal record before research begins.
-*   **Multi-Modal Evidence Processing:** Upload documents (PDF, DOCX) or audio recordings (MP3, WAV, M4A). Audio is automatically transcribed using **OpenAI Whisper**.
-*   **Map-Reduce Legal Aggregation:** Autonomously handles massive document sets (100+ pages) by summarizing individual chunks and performing a "reduce" step to create a master **Case Fact Sheet**, preventing context window overflow.
-*   **High-Reliability Pipeline:** A 6-stage agentic workflow (Interrogator, Researcher, Reasoner, Drafter, Formatter, Verifier) powered by LangGraph ensures accuracy and structural integrity.
+*   **Guided Interview UI:** A step-by-step discovery flow that leads users through Jurisdiction Selection, Fact Gathering, Procedural Review, and Final Export.
+*   **Procedural Engine:** Automatically generates jurisdiction-specific court checklists and deadlines (e.g., California CCP rules) to keep your litigation on track.
+*   **The Interrogator (Discovery Phase):** An intelligent entry-point node that analyzes your case for factual gaps and generates targeted discovery questions.
+*   **Multimodal Evidence Intake:** Upload documents (PDF, DOCX), images (PNG, JPG), or audio recordings. Images are processed using **multimodal OCR** to extract facts for the IRAC 'Application' section.
+*   **API-Backed Citation Verification:** Integrates with the **CourtListener (Free Law Project)** API to validate legal citations and flag unverified rules in real-time.
+*   **Map-Reduce Legal Aggregation:** Autonomously handles massive document sets (100+ pages) by summarizing individual chunks and performing a "reduce" step to create a master **Case Fact Sheet**.
+*   **High-Reliability Pipeline:** A 7-stage agentic workflow (Interrogator, Researcher, Procedural Guide, Reasoner, Drafter, Formatter, Verifier) powered by LangGraph.
+*   **Court Export Utility:** Automatically formats final filings into standard **U.S. District Court 28-line numbered pleading templates** for professional submission.
 *   **Strict IRAC Formatting:** Generates legal memos following the professional **Issue, Rule, Application, and Conclusion** framework.
-*   **AES-256 Vault Security:** Local vector data (ChromaDB) is secured with AES-256 encryption using the `cryptography` library, ensuring your sensitive case data remains private and protected at rest.
-*   **Automated Shepardizing:** Integrated "Verification Loop" that now performs real-time **Shepard's Signal** checks via Google Search grounding to detect if cited statutes or cases have been overruled, repealed, or superseded.
-*   **Jurisdiction-Specific Analysis:** Performs secondary 'expansion' searches to suggest related statutes based on metadata cross-referencing.
+*   **AES-256 Vault Security:** Local vector data (ChromaDB) is secured with AES-256 encryption using the `cryptography` library.
+*   **Automated Shepardizing:** Integrated "Verification Loop" that performs real-time checks to detect if cited laws have been overruled or superseded.
 *   **Local & Private:** Your data remains private. Your API key and local database stay on your machine.
 
 ## Technology Stack
@@ -78,22 +81,24 @@ npm run dev
 
 ## How It Works
 
-LawSage uses a **6-Stage High-Reliability Pipeline** to process your request:
+LawSage uses a **7-Stage High-Reliability Pipeline** to process your request:
 
 1.  **Interrogator (Discovery):** Identifies factual gaps in your input and generates 2-3 targeted questions to clarify the legal situation before research starts.
 2.  **Researcher (Search):** Queries the local SQLite database, Google Search (site:.gov), and performs jurisdictional expansion to find relevant statutes.
-3.  **Reasoner (Strategy):** Analyzes the research results to develop a procedural roadmap. Uses **Map-Reduce** to aggregate context from extremely large documents into a Case Fact Sheet.
-4.  **Drafter (IRAC):** Drafts a formal legal memo strictly adhering to the **ISSUE, RULE, APPLICATION, CONCLUSION** format.
-5.  **Formatter (Templates):** Applies the strategy and draft to structured JSON templates to generate court-admissible documents.
-6.  **Verifier (Citation Check & Shepardizing):** Scans citations for validity. Uses Google Search to "Shepardize" laws—checking for negative treatment or superseded status.
+3.  **Procedural Guide (New):** Identifies specific court rules, deadlines, and filing requirements based on your jurisdiction.
+4.  **Reasoner (Strategy):** Analyzes the research results and procedural rules to develop a roadmap. Uses **Map-Reduce** to aggregate context from extremely large documents.
+5.  **Drafter (IRAC):** Drafts a formal legal memo strictly adhering to the **ISSUE, RULE, APPLICATION, CONCLUSION** format, integrating facts from multimodal evidence.
+6.  **Formatter (Templates):** Applies the strategy and draft to structured templates to generate court-admissible documents.
+7.  **Verifier (Citation Check):** Scans citations for validity. Shepardizes laws and verifies citations against the **CourtListener API**.
 
 
 ### Evidence Management
 
-1.  **Upload Evidence:** Use the `/api/upload-evidence` endpoint to upload audio or document files.
-2.  **Transcription:** Audio files are transcribed locally using Whisper.
-3.  **Timeline Generation:** LawSage identifies key dates and events, assigning importance levels to help you organize your case chronologically.
-4.  **Encryption:** When the application closes, your `chroma_db` is automatically zipped and encrypted with AES-256.
+1.  **Upload Evidence:** Upload audio, documents, or **images (PNG/JPG)**.
+2.  **OCR & Transcription:** Audio is transcribed via Whisper; images are analyzed via Gemini multimodal vision to extract legal facts.
+3.  **Timeline Generation:** LawSage identifies key dates and events, assigning importance levels.
+4.  **Pleading Export:** Export final filings in a standard **28-line numbered pleading format** ready for U.S. courts.
+5.  **Encryption:** When the application closes, your `chroma_db` is automatically secured with AES-256.
 
 ## Contributing
 

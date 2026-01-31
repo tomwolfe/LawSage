@@ -105,6 +105,29 @@ export default function ResultDisplay({ result, analysisResult, activeTab, setAc
     URL.revokeObjectURL(url);
   };
 
+  const downloadPleading = async () => {
+    if (!result) return;
+    const { filings } = parseLegalOutput(result.text);
+    
+    try {
+      const response = await fetch('/api/format-pleading', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: filings }),
+      });
+      const data = await response.json();
+      const blob = new Blob([data.formatted], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `pleading_${jurisdiction.toLowerCase()}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to format pleading', err);
+    }
+  };
+
   const { strategy: strategyText, filings: filingsText } = result 
     ? parseLegalOutput(result.text) 
     : { strategy: '', filings: '' };
@@ -268,6 +291,13 @@ export default function ResultDisplay({ result, analysisResult, activeTab, setAc
                   >
                     <Download size={16} />
                     Download .md
+                  </button>
+                  <button
+                    onClick={downloadPleading}
+                    className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors"
+                  >
+                    <Download size={16} />
+                    Pleading Format
                   </button>
                   <button
                     onClick={() => window.print()}

@@ -14,11 +14,14 @@ from api.config_loader import get_settings
 from api.utils import generate_content_with_retry
 from api.services.offline_db import StatuteCache
 from api.services.document_processor import DocumentProcessor
+from api.services.procedural_engine import ProceduralEngine
+from api.services.verification_service import VerificationService
 
 # System instructions for nodes
 REASONER_INSTRUCTION = """
 You are a Legal Strategist. Based on research and grounding data, develop a comprehensive legal strategy for the user's situation.
 Focus on procedural steps, applicable legal theories, and specific statutes that support their case.
+Include any relevant deadlines or procedural requirements identified.
 Do NOT format the final documents; focus only on the logic and strategy.
 """
 
@@ -57,6 +60,8 @@ class AgentState(TypedDict):
     jurisdiction: str
     grounding_data: str
     research_results: str
+    procedural_checklist: str
+    evidence_descriptions: List[str]
     strategy: str
     final_output: str
     sources: List[dict]
@@ -114,7 +119,7 @@ def create_researcher_node(api_key: str):
         query = state.get("missing_info_prompt") or state['user_input']
         full_query = f"{query} in {state['jurisdiction']}"
         
-        thinking_step = f"Researcher: Investigating {state['jurisdiction']} law..."
+        thinking_step = "Researcher: Searching legal databases..."
         
         # 1. Offline Search
         offline_results = statute_cache.search_statutes(query, jurisdiction=state['jurisdiction'])
@@ -159,12 +164,24 @@ def create_researcher_node(api_key: str):
                         sources.append({"title": chunk.web.title, "uri": chunk.web.uri})
 
         return {
-            "research_results": state.get("research_results", "") + "\n" + research_output + "\n" + offline_text,
+            "research_results": (state.get("research_results", "") + research_output + offline_text).strip(),
             "sources": sources,
             "thinking_steps": [thinking_step],
             "missing_info_prompt": "" # Clear it after use
         }
     return researcher
+
+def create_procedural_guide_node():
+    def procedural_guide(state: AgentState):
+        thinking_step = f"Procedural Engine: Identifying court rules for {state['jurisdiction']}..."
+        
+        guide = ProceduralEngine.get_procedural_guide(state['jurisdiction'])
+        
+        return {
+            "procedural_checklist": guide,
+            "thinking_steps": [thinking_step]
+        }
+    return procedural_guide
 
 def create_reasoner_node(api_key: str):
     client = Client(api_key=api_key)
@@ -189,6 +206,9 @@ def create_reasoner_node(api_key: str):
         {state['research_results']}
         {context_summary if context_summary else state['grounding_data']}
         
+        Procedural Guidance:
+        {state.get('procedural_checklist', 'No specific procedural rules found.')}
+        
         Provide a detailed legal strategy and roadmap.
         """
         
@@ -209,6 +229,10 @@ def create_drafter_node(api_key: str):
     def drafter(state: AgentState):
         thinking_step = "Drafter: Preparing IRAC memo..."
         
+        evidence_context = ""
+        if state.get('evidence_descriptions'):
+            evidence_context = "\nEXTRACTED EVIDENCE DESCRIPTIONS:\n" + "\n".join(state['evidence_descriptions'])
+
         prompt = f"""
         {DRAFTER_INSTRUCTION}
         
@@ -218,7 +242,11 @@ def create_drafter_node(api_key: str):
         Research:
         {state['research_results']}
         
+        {evidence_context}
+        
         User Input: {state['user_input']}
+        
+        In the 'APPLICATION' section, make sure to integrate the extracted evidence descriptions where relevant.
         """
         
         response = generate_content_with_retry(client, model_id, prompt, None)
@@ -274,9 +302,10 @@ def create_formatter_node(api_key: str):
 def create_verifier_node(api_key: str):
     client = Client(api_key=api_key)
     model_id = get_settings()["model"]["id"]
+    verification_service = VerificationService()
 
     def verifier(state: AgentState):
-        thinking_step = "Verifier: Shepardizing citations (checking for negative treatment)..."
+        thinking_step = "Verifier: Shepardizing citations (checking for negative treatment) and verifying with CourtListener..."
         
         # 1. Extract Citations using LLM
         extract_prompt = f"""
@@ -304,7 +333,21 @@ def create_verifier_node(api_key: str):
         unverified = []
         search_tool = types.Tool(google_search=types.GoogleSearch())
         
+        # API Verification with CourtListener
+        api_verification_results = verification_service.verify_citations_batch(citations)
+        
+        updated_final_output = state['final_output']
+        
         for cit in citations:
+            is_verified_api = api_verification_results.get(cit, False)
+            
+            if not is_verified_api:
+                unverified.append(f"UNVERIFIED: {cit}")
+                # Flag in final_output as requested
+                updated_final_output = updated_final_output.replace(cit, f"{cit} [UNVERIFIED]")
+                continue
+
+            # If verified by API, still check for negative treatment via search
             query = f"Is {cit} still good law in {state['jurisdiction']}? Check for overruled, repealed, or superseded status."
             
             search_response = generate_content_with_retry(
@@ -332,11 +375,14 @@ def create_verifier_node(api_key: str):
             check_res = client.models.generate_content(model=model_id, contents=check_prompt)
             if check_res.candidates and "INVALID" in check_res.candidates[0].content.parts[0].text.upper():
                 unverified.append(f"WARNING: SUPERSEDED - {cit}")
+                updated_final_output = updated_final_output.replace(cit, f"{cit} [SUPERSEDED]")
 
         # Also do the traditional verification
         all_sources = state['grounding_data'] + "\n" + state['research_results']
         traditional_unverified = ResponseValidator.verify_citations_strict(state['final_output'], all_sources)
-        unverified.extend(traditional_unverified)
+        for t_cit in traditional_unverified:
+            if t_cit not in [u.split(": ")[-1] for u in unverified]:
+                unverified.append(f"GROUNDING_MISSING: {t_cit}")
         
         missing_info_prompt = ""
         if unverified:
@@ -345,6 +391,7 @@ def create_verifier_node(api_key: str):
         return {
             "unverified_citations": list(set(unverified)),
             "missing_info_prompt": missing_info_prompt,
+            "final_output": updated_final_output,
             "thinking_steps": [thinking_step]
         }
     return verifier
@@ -352,7 +399,7 @@ def create_verifier_node(api_key: str):
 def should_continue(state: AgentState):
     if state.get("unverified_citations") and len(state["unverified_citations"]) > 0:
         # Prevent infinite loops - could add a counter in state
-        if len(state["thinking_steps"]) > 15: # Increased slightly
+        if len(state["thinking_steps"]) > 10: 
              return END
         return "researcher"
     return END
@@ -367,6 +414,7 @@ def create_workflow(api_key: str):
     
     workflow.add_node("interrogator", create_interrogator_node(api_key))
     workflow.add_node("researcher", create_researcher_node(api_key))
+    workflow.add_node("procedural_guide", create_procedural_guide_node())
     workflow.add_node("reasoner", create_reasoner_node(api_key))
     workflow.add_node("drafter", create_drafter_node(api_key))
     workflow.add_node("formatter", create_formatter_node(api_key))
@@ -383,7 +431,8 @@ def create_workflow(api_key: str):
         }
     )
     
-    workflow.add_edge("researcher", "reasoner")
+    workflow.add_edge("researcher", "procedural_guide")
+    workflow.add_edge("procedural_guide", "reasoner")
     workflow.add_edge("reasoner", "drafter")
     workflow.add_edge("drafter", "formatter")
     workflow.add_edge("formatter", "verifier")

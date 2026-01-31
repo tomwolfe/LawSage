@@ -14,6 +14,7 @@ class LegalWorkflowManager:
         """Orchestrates the full legal workflow for a case."""
         timeline = []
         transcripts = []
+        evidence_descriptions = []
         
         for file in files:
             content = await file.read()
@@ -29,6 +30,15 @@ class LegalWorkflowManager:
                     metadatas=[{"jurisdiction": jurisdiction, "source": filename, "type": "evidence_transcript", "case_id": case_id}]
                 )
                 text_to_process = transcript
+            elif filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+                description = DocumentProcessor.process_image(content, self.api_key)
+                evidence_descriptions.append(description)
+                # Add description to vector store for later RAG
+                self.vector_service.add_documents(
+                    [description],
+                    metadatas=[{"jurisdiction": jurisdiction, "source": filename, "type": "image_evidence", "case_id": case_id}]
+                )
+                text_to_process = description
             elif filename.lower().endswith('.pdf'):
                 text_to_process = DocumentProcessor.extract_text_from_pdf(content)
             elif filename.lower().endswith('.docx'):
@@ -41,7 +51,7 @@ class LegalWorkflowManager:
             timeline.extend(file_timeline)
             
             # Ingest other docs if not already handled
-            if not filename.lower().endswith(('.mp3', '.wav', '.m4a')):
+            if not filename.lower().endswith(('.mp3', '.wav', '.m4a', '.png', '.jpg', '.jpeg')):
                 chunks = DocumentProcessor.chunk_text(text_to_process)
                 self.vector_service.add_documents(
                     chunks,
@@ -53,21 +63,24 @@ class LegalWorkflowManager:
         grounding_data = "\n\n".join([doc.page_content for doc in rag_docs])
 
         # 4. Run LangGraph Workflow
-        result = self.generate_memo(user_input, jurisdiction, grounding_data)
+        result = self.generate_memo(user_input, jurisdiction, grounding_data, evidence_descriptions)
         
         return {
             "analysis": result,
             "timeline": timeline,
-            "transcripts": transcripts
+            "transcripts": transcripts,
+            "evidence_descriptions": evidence_descriptions
         }
 
-    def generate_memo(self, user_input: str, jurisdiction: str, grounding_data: str) -> str:
+    def generate_memo(self, user_input: str, jurisdiction: str, grounding_data: str, evidence_descriptions: List[str] = None) -> str:
         """Runs the LangGraph workflow to generate an IRAC memo."""
         initial_state = {
             "user_input": user_input,
             "jurisdiction": jurisdiction,
             "grounding_data": grounding_data,
             "research_results": "",
+            "procedural_checklist": "",
+            "evidence_descriptions": evidence_descriptions or [],
             "strategy": "",
             "final_output": "",
             "sources": [],

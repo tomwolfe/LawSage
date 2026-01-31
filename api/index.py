@@ -98,9 +98,41 @@ async def health_check() -> HealthResponse:
     return HealthResponse(status="ok", message="LawSage API is running")
 
 from api.workflow import create_workflow
+from api.services.procedural_engine import ProceduralEngine
+from api.utils.court_formatter import format_to_pleading
 
-@app.post("/generate")
-@app.post("/api/generate")
+SYSTEM_INSTRUCTION = "Use the '---' delimiter to separate strategy from filings."
+
+@app.post("/api/format-pleading")
+async def format_pleading(request: dict):
+    text = request.get("text", "")
+    formatted = format_to_pleading(text)
+    return {"formatted": formatted}
+
+@app.get("/api/procedural-guide")
+async def get_procedural_guide(jurisdiction: str):
+    guide = ProceduralEngine.get_procedural_guide(jurisdiction)
+    checklist = ProceduralEngine.get_checklist(jurisdiction)
+    return {"guide": guide, "checklist": checklist}
+
+from api.services.workflow_manager import LegalWorkflowManager
+
+@app.post("/api/process-case")
+async def process_case(
+    user_input: str = Form(...),
+    jurisdiction: str = Form(...),
+    case_id: Optional[str] = Form(None),
+    files: List[UploadFile] = File([]),
+    x_gemini_api_key: str | None = Header(None)
+) -> Any:
+    if not x_gemini_api_key:
+        raise HTTPException(status_code=401, detail="Gemini API Key is missing.")
+
+    manager = LegalWorkflowManager(api_key=x_gemini_api_key)
+    result = await manager.process_case(user_input, jurisdiction, files, case_id)
+    return result
+
+@app.post("/api/generate", response_model=LegalHelpResponse)
 async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | None = Header(None)) -> Any:
     if not x_gemini_api_key:
         raise HTTPException(
