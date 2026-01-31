@@ -13,6 +13,12 @@ try:
 except ImportError:
     HAS_PINECONE = False
 
+try:
+    from langchain_community.vectorstores import Chroma
+    HAS_CHROMA = True
+except ImportError:
+    HAS_CHROMA = False
+
 from langchain_core.vectorstores import InMemoryVectorStore
 
 class VectorStoreService:
@@ -31,6 +37,14 @@ class VectorStoreService:
                 embedding=self.embeddings
             )
             self.is_remote = True
+        elif HAS_CHROMA:
+            # Persistent local storage
+            persist_directory = os.path.join(os.getcwd(), "chroma_db")
+            self.vector_store = Chroma(
+                persist_directory=persist_directory,
+                embedding_function=self.embeddings
+            )
+            self.is_remote = False
         else:
             # Fallback to in-memory for serverless if remote is not available
             # Note: This won't persist across requests on Vercel, but stays under 250MB.

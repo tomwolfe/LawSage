@@ -6,6 +6,7 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ResultDisplay from './ResultDisplay';
 import HistoryActions from './HistoryActions';
+import DocumentUpload from './DocumentUpload';
 
 declare global {
   interface Window {
@@ -39,12 +40,19 @@ interface LegalResult {
   sources: Source[];
 }
 
+interface AnalysisResult {
+  analysis: string;
+  weaknesses: string[];
+  recommendations: string[];
+}
+
 interface CaseHistoryItem {
   id: string;
   timestamp: Date;
   jurisdiction: string;
   userInput: string;
   result: LegalResult;
+  analysisResult?: AnalysisResult;
 }
 
 const US_STATES = [
@@ -62,11 +70,13 @@ export default function LegalInterface() {
   const [isListening, setIsListening] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<LegalResult | null>(null);
-  const [activeTab, setActiveTab] = useState<'strategy' | 'filings' | 'sources'>('strategy');
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [activeTab, setActiveTab] = useState<'strategy' | 'filings' | 'sources' | 'analysis'>('strategy');
   const [error, setError] = useState('');
   const [history, setHistory] = useState<CaseHistoryItem[]>([]);
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<string | null>(null);
   const [backendUnreachable, setBackendUnreachable] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   useEffect(() => {
     const checkHealth = async (retries = 3, delay = 1000) => {
@@ -134,6 +144,43 @@ export default function LegalInterface() {
     recognition.start();
   };
 
+  const handleDocumentUpload = async (file: File) => {
+    setError('');
+    const apiKey = localStorage.getItem('GEMINI_API_KEY');
+    if (!apiKey) {
+      setError('Please set your Gemini API Key in Settings first.');
+      return;
+    }
+
+    setLoading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('jurisdiction', jurisdiction);
+
+    try {
+      const response = await fetch('/api/analyze-document', {
+        method: 'POST',
+        headers: {
+          'X-Gemini-API-Key': apiKey,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.detail || 'Failed to analyze document');
+      }
+
+      const data: AnalysisResult = await response.json();
+      setAnalysisResult(data);
+      setActiveTab('analysis');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred during document analysis');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async () => {
     setError(''); // Ensure error is cleared at start
     const apiKey = localStorage.getItem('GEMINI_API_KEY');
@@ -141,7 +188,21 @@ export default function LegalInterface() {
       setError('Please set your Gemini API Key in Settings first.');
       return;
     }
+
+    // If a file is selected but not yet analyzed, analyze it too if the user hits Submit
+    // Actually, let's keep it separate or combine? 
+    // The mission says: "Implement handleDocumentUpload to call POST /api/analyze-document using FormData."
+    // and "Update components/LegalInterface.tsx to include the DocumentUpload component near the 'Your Situation' text area."
+    
+    if (selectedFile && !analysisResult) {
+      await handleDocumentUpload(selectedFile);
+    }
+
     if (!userInput.trim()) {
+      if (selectedFile) {
+        // Just analysis is fine
+        return;
+      }
       setError('Please describe your legal situation.');
       return;
     }
@@ -191,7 +252,8 @@ export default function LegalInterface() {
 
       const data: LegalResult = await response.json();
       setResult(data);
-      setActiveTab('strategy');
+      // If we don't have analysis yet, default to strategy
+      if (!analysisResult) setActiveTab('strategy');
 
       // Add to history
       const newHistoryItem: CaseHistoryItem = {
@@ -199,7 +261,8 @@ export default function LegalInterface() {
         timestamp: new Date(),
         jurisdiction,
         userInput,
-        result: data
+        result: data,
+        analysisResult: analysisResult || undefined
       };
 
       const updatedHistory = [newHistoryItem, ...history];
@@ -220,10 +283,11 @@ export default function LegalInterface() {
     const item = history.find(h => h.id === itemId);
     if (item) {
       setResult(item.result);
+      setAnalysisResult(item.analysisResult || null);
       setUserInput(item.userInput);
       setJurisdiction(item.jurisdiction);
       setSelectedHistoryItem(itemId);
-      setActiveTab('strategy');
+      setActiveTab(item.analysisResult ? 'analysis' : 'strategy');
     }
   };
 
@@ -307,6 +371,19 @@ export default function LegalInterface() {
               placeholder="Tell your story. Describe what happened and what you need help with..."
               className="w-full h-40 p-4 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
             />
+            
+            <DocumentUpload 
+              onFileSelect={(file) => {
+                setSelectedFile(file);
+                handleDocumentUpload(file);
+              }}
+              selectedFile={selectedFile}
+              onClear={() => {
+                setSelectedFile(null);
+                setAnalysisResult(null);
+              }}
+              isUploading={loading}
+            />
           </div>
           <div className="md:w-64">
             <label className="block text-sm font-semibold text-slate-700 mb-2">Jurisdiction</label>
@@ -364,9 +441,10 @@ export default function LegalInterface() {
       </div>
 
       {/* Output Section */}
-      {result && (
+      {(result || analysisResult) && (
         <ResultDisplay
           result={result}
+          analysisResult={analysisResult}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           jurisdiction={jurisdiction}
