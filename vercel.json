@@ -7,7 +7,7 @@
   ],
   "functions": {
     "api/index.py": {
-      "runtime": "vercel-python@0.14.0",
+      "runtime": "@vercel/python",
       "memory": 1024,
       "maxDuration": 30
     }
