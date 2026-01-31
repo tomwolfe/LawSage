@@ -45,10 +45,16 @@ class Source(BaseModel):
     title: Optional[str] = None
     uri: Optional[str] = None
 
-class LegalResult(BaseModel):
+class LegalHelpResponse(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)
     text: str
     sources: List[Source]
+
+class AnalysisResponse(BaseModel):
+    model_config = ConfigDict(extra='ignore', from_attributes=True)
+    analysis: str
+    weaknesses: List[str]
+    recommendations: List[str]
 
 class HealthResponse(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)

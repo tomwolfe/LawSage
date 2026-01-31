@@ -1,11 +1,11 @@
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
 from google import genai
 from google.genai import types, errors
 from google.api_core import exceptions as google_exceptions
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 import os
-from typing import Any, Callable
+from typing import Any, Callable, List
 from pydantic import BaseModel
 
 from api.config_loader import get_settings
@@ -18,11 +18,14 @@ from api.models import (
     Content,
     GeminiCandidate,
     Source,
-    LegalResult,
+    LegalHelpResponse,
+    AnalysisResponse,
     HealthResponse,
 )
 from api.processor import ResponseValidator
 from api.exceptions import global_exception_handler, AppException
+from api.services.document_processor import DocumentProcessor
+from api.services.vector_store import VectorStoreService
 
 # System instruction to enforce consistent output structure
 SYSTEM_INSTRUCTION = """
@@ -37,6 +40,8 @@ still include the delimiter and state that no filings are available.
 
 ALWAYS include a disclaimer that this is legal information, not legal advice,
 and recommend consulting with a qualified attorney for complex matters.
+
+STRICT GROUNDING: Use ONLY the provided 'Grounding Data' to answer. If the 'Grounding Data' does not contain enough information to answer a specific legal question or identify a statute, you MUST state: "I cannot find a specific statute for this". Do NOT hallucinate legal facts.
 """
 
 def is_rate_limit_error(e: Exception) -> bool:
@@ -88,8 +93,8 @@ async def health_check() -> HealthResponse:
     return HealthResponse(status="ok", message="LawSage API is running")
 
 @app.post("/generate")
-@app.post("/api/generate", response_model=LegalResult)
-async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | None = Header(None)) -> LegalResult:
+@app.post("/api/generate", response_model=LegalHelpResponse)
+async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | None = Header(None)) -> LegalHelpResponse:
     if not x_gemini_api_key:
         raise HTTPException(
             status_code=401, 
@@ -104,21 +109,34 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
         )
 
     client = genai.Client(api_key=x_gemini_api_key)
+    
+    # Initialize Vector Store
+    vector_service = VectorStoreService(api_key=x_gemini_api_key)
+    
+    # RAG Search
+    rag_docs = vector_service.search(request.user_input, request.jurisdiction)
+    grounding_data = "\n\n".join([doc.page_content for doc in rag_docs])
+    
+    if not grounding_data:
+        grounding_data = "No specific statutes or case law found in local database."
 
-    # Enable Grounding with Google Search
+    # Enable Grounding with Google Search as a fallback/supplement
     search_tool = types.Tool(
         google_search=types.GoogleSearch()
     )
 
-    # Construct the prompt with clear instructions about the delimiter
+    # Construct the prompt with clear instructions about the delimiter and grounding data
     prompt = f"""
     {SYSTEM_INSTRUCTION}
+
+    Grounding Data (Local Knowledge Base):
+    {grounding_data}
 
     User Situation: {request.user_input}
     Jurisdiction: {request.jurisdiction}
 
     Act as a Universal Public Defender.
-    1. Search for current statutes and local court procedures relevant to this situation.
+    1. Search for current statutes and local court procedures relevant to this situation using both the Grounding Data and Google Search.
     2. Provide a breakdown of the situation in plain English.
     3. Generate a procedural roadmap (step-by-step instructions).
 
@@ -140,7 +158,6 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
         config=types.GenerateContentConfig(
             tools=[search_tool],
             system_instruction=SYSTEM_INSTRUCTION,
-            # Add these to stabilize the preview model
             max_output_tokens=4096,
             thinking_config=types.ThinkingConfig(include_thoughts=True)
         )
@@ -149,39 +166,37 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
     text_output = ""
     sources = []
 
+    # Add local RAG sources
+    for doc in rag_docs:
+        sources.append(Source(title=doc.metadata.get("source", "Local Statute"), uri=doc.metadata.get("uri")))
+
     if response.candidates and len(response.candidates) > 0:
         raw_candidate = response.candidates[0]
-        print(f"Raw response candidate: {raw_candidate}")
-
-        # Use Pydantic to validate the raw candidate object
         candidate = GeminiCandidate.model_validate(raw_candidate)
 
-        # Check for safety or other non-success finish reasons
         if candidate.finish_reason in ["SAFETY", "RECITATION", "OTHER"]:
             text_output = f"The AI was unable to complete the request due to safety filters or other constraints (Reason: {candidate.finish_reason}). Please try rephrasing your request to be more specific or focused on legal information."
-            return LegalResult(
+            return LegalHelpResponse(
                 text=ResponseValidator.validate_and_fix(text_output),
-                sources=[]
+                sources=sources
             )
 
-        # Join only standard text parts, excluding raw thoughts from the final legal filing
         if candidate.content and candidate.content.parts:
             text_output = "\n".join([p.text for p in candidate.content.parts if p.text and not p.thought])
         else:
             text_output = "No content was generated by the model."
 
-        # Harden the response with ResponseValidator
         text_output = ResponseValidator.validate_and_fix(text_output)
         
-        seen_uris = set()
-        seen_titles = set()
+        seen_uris = set([s.uri for s in sources if s.uri])
+        seen_titles = set([s.title for s in sources if s.title])
+        
         if candidate.grounding_metadata and candidate.grounding_metadata.grounding_chunks:
             for chunk in candidate.grounding_metadata.grounding_chunks:
                 if chunk.web:
                     title = chunk.web.title
                     uri = chunk.web.uri
                     
-                    # Add if it has a URI we haven't seen, or if it has a title we haven't seen (even without URI)
                     if uri and uri not in seen_uris:
                         sources.append(Source(title=title, uri=uri))
                         seen_uris.add(uri)
@@ -193,10 +208,62 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
         text_output = "I'm sorry, I couldn't generate a response for that situation. The model returned no candidates."
         text_output = ResponseValidator.validate_and_fix(text_output)
 
-    return LegalResult(
+    return LegalHelpResponse(
         text=text_output,
         sources=sources
     )
+
+@app.post("/analyze-document")
+@app.post("/api/analyze-document", response_model=AnalysisResponse)
+async def analyze_document(
+    jurisdiction: str = Form(...),
+    file: UploadFile = File(...),
+    x_gemini_api_key: str | None = Header(None)
+) -> AnalysisResponse:
+    if not x_gemini_api_key:
+        raise HTTPException(status_code=401, detail="Gemini API Key is missing.")
+
+    content = await file.read()
+    filename = file.filename or "unknown"
+    
+    if filename.endswith(".pdf"):
+        text = DocumentProcessor.extract_text_from_pdf(content)
+    elif filename.endswith(".docx"):
+        text = DocumentProcessor.extract_text_from_docx(content)
+    else:
+        text = content.decode("utf-8", errors="ignore")
+
+    client = genai.Client(api_key=x_gemini_api_key)
+    
+    prompt = f"""
+    Analyze the following legal document (Red Team Analysis).
+    Identify weaknesses, potential counter-arguments, and strategic recommendations for a pro se litigant.
+    
+    Jurisdiction: {jurisdiction}
+    Document Text:
+    {text[:5000]}  # Limit text to avoid token overflow
+    
+    Respond in JSON format with the following fields:
+    - analysis: A high-level summary of the document.
+    - weaknesses: A list of legal or procedural weaknesses found.
+    - recommendations: A list of actionable steps to improve the position.
+    """
+
+    MODEL_ID = get_settings()["model"]["id"]
+    
+    response = client.models.generate_content(
+        model=MODEL_ID,
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=AnalysisResponse
+        )
+    )
+
+    if response.parsed:
+        return response.parsed
+    
+    raise HTTPException(status_code=500, detail="Failed to analyze document")
 
 if __name__ == "__main__":
     import uvicorn
