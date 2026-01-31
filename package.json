@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"next dev\" \"PYTHONPATH=. uvicorn api.main:app --host 127.0.0.1 --port 8000 --reload\"",
+    "dev": "concurrently \"next dev\" \"PYTHONPATH=. uvicorn api.index:app --host 127.0.0.1 --port 8000 --reload\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
