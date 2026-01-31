@@ -18,13 +18,18 @@ try:
 except ImportError:
     VaultService = None
 
+_embeddings_cache = {}
+
 class VectorStoreService:
     def __init__(self, api_key: str, encryption_key: Optional[bytes] = None):
         self.encryption_key = encryption_key or os.getenv("LAWSAGE_ENCRYPTION_KEY", "").encode()
-        self.embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/embedding-001",
-            google_api_key=api_key
-        )
+        
+        if api_key not in _embeddings_cache:
+            _embeddings_cache[api_key] = GoogleGenerativeAIEmbeddings(
+                model="models/embedding-001",
+                google_api_key=api_key
+            )
+        self.embeddings = _embeddings_cache[api_key]
         
         # Check if running on Vercel
         self.is_vercel = os.getenv("VERCEL") == "1"

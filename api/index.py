@@ -6,6 +6,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import FastAPI, Header, HTTPException, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from google import genai
 from google.genai import types, errors
 from google.api_core import exceptions as google_exceptions
@@ -121,8 +122,6 @@ async def get_procedural_guide(jurisdiction: str):
     checklist = ProceduralEngine.get_checklist(jurisdiction)
     return {"guide": guide, "checklist": checklist}
 
-from api.services.workflow_manager import LegalWorkflowManager
-
 @app.post("/api/process-case")
 async def process_case(
     user_input: str = Form(...),
@@ -144,8 +143,10 @@ async def process_case(
             pass
 
     manager = LegalWorkflowManager(api_key=x_gemini_api_key)
-    result = await manager.process_case(user_input, jurisdiction, files, case_id, history)
-    return result
+    return StreamingResponse(
+        manager.process_case_stream(user_input, jurisdiction, files, case_id, history),
+        media_type="text/event-stream"
+    )
 
 @app.post("/api/generate", response_model=LegalHelpResponse)
 async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | None = Header(None)) -> Any:

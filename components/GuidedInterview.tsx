@@ -88,8 +88,11 @@ export default function GuidedInterview({ onComplete }: GuidedInterviewProps) {
     recognition.start();
   };
 
+  const [thinkingMessage, setThinkingMessage] = useState<string>('');
+
   const handleSubmit = async () => {
     setError('');
+    setThinkingMessage('Starting processing...');
     const apiKey = localStorage.getItem('GEMINI_API_KEY');
     if (!apiKey) {
       setError('Please set your Gemini API Key in Settings first.');
@@ -114,20 +117,53 @@ export default function GuidedInterview({ onComplete }: GuidedInterviewProps) {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to process case');
+        if (response.status === 401) {
+          throw new Error('API Key is invalid or expired.');
+        } else if (response.status === 504) {
+          throw new Error('Server timeout. The case is being processed in the background.');
+        }
+        throw new Error(`Failed to process case (${response.status})`);
       }
 
-      const data = await response.json();
-      setResult({
-        text: data.analysis,
-        sources: [] // Add sources if backend provides them
-      });
-      // Handle timeline/transcripts if needed
-      nextStep();
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('Failed to read response stream');
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const data = JSON.parse(line);
+            if (data.status === 'processing') {
+              setThinkingMessage(data.message);
+            } else if (data.status === 'complete') {
+              setResult({
+                text: data.analysis,
+                sources: [],
+                fact_law_matrix: data.fact_law_matrix,
+                verification_report: data.verification_report
+              });
+              nextStep();
+            }
+          } catch (e) {
+            console.error('Error parsing stream line', e);
+          }
+        }
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
+      setThinkingMessage('');
     }
   };
 
@@ -234,7 +270,16 @@ export default function GuidedInterview({ onComplete }: GuidedInterviewProps) {
                 disabled={!userInput.trim() && !selectedFile}
                 className="flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 disabled:bg-slate-300 transition-colors"
               >
-                Review Deadlines <ChevronRight size={20} />
+                {loading ? (
+                  <>
+                    <Loader2 className="animate-spin" />
+                    <span>{thinkingMessage || 'Analyzing...'}</span>
+                  </>
+                ) : (
+                  <>
+                    Review Deadlines <ChevronRight size={20} />
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -272,8 +317,17 @@ export default function GuidedInterview({ onComplete }: GuidedInterviewProps) {
                 disabled={loading}
                 className="flex items-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 disabled:bg-slate-300 transition-colors"
               >
-                {loading ? <Loader2 className="animate-spin" /> : <Send size={20} />}
-                Generate Legal Memo
+                {loading ? (
+                  <>
+                    <Loader2 className="animate-spin" />
+                    <span>{thinkingMessage || 'Analyzing...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <Send size={20} />
+                    <span>Generate Legal Memo</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
