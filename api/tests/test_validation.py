@@ -84,29 +84,45 @@ def test_response_validator_validate_and_fix():
 
 def test_response_validator_validate_legal_output():
     """Test the ResponseValidator.validate_legal_output method."""
-    # Valid content with citations and roadmap
+    # Valid content with 3 citations and roadmap (should pass)
     valid_content = """
     This is a legal strategy with citations.
-    
+
     Citations:
     - 12 U.S.C. § 345
     - Cal. Civ. Code § 1708
-    
+    - Rule 12(b)(6)
+
     Next Steps:
     1. File initial paperwork
     2. Serve opposing party
     """
-    
+
     assert ResponseValidator.validate_legal_output(valid_content) is True
-    
+
+    # Content with only 2 citations (should fail now - needs 3)
+    two_citations_content = """
+    This is a legal strategy with citations.
+
+    Citations:
+    - 12 U.S.C. § 345
+    - Cal. Civ. Code § 1708
+
+    Next Steps:
+    1. File initial paperwork
+    2. Serve opposing party
+    """
+
+    assert ResponseValidator.validate_legal_output(two_citations_content) is False
+
     # Invalid content without sufficient citations
     invalid_content = """
     This is a legal strategy without enough citations.
-    
+
     Next Steps:
     1. File initial paperwork
     """
-    
+
     assert ResponseValidator.validate_legal_output(invalid_content) is False
 
 

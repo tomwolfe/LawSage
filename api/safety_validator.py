@@ -39,18 +39,37 @@ class SafetyValidator:
         """
         Mandatory safety audit before final output generation.
         Rejects prompts without a clear jurisdiction or containing prohibited content.
+        Logs attempts to generate content for unsupported jurisdictions.
         """
         if not jurisdiction or len(jurisdiction.strip()) < 2:
             return False
-            
+
+        # Define supported jurisdictions (this should match the frontend dropdown)
+        SUPPORTED_JURISDICTIONS = {
+            "Federal", "Alabama", "Alaska", "Arizona", "Arkansas", "California",
+            "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii",
+            "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana",
+            "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi",
+            "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey",
+            "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio",
+            "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina",
+            "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia",
+            "Washington", "West Virginia", "Wisconsin", "Wyoming"
+        }
+
+        # Check if the jurisdiction is supported
+        if jurisdiction not in SUPPORTED_JURISDICTIONS:
+            print(f"RED TEAM AUDIT: Attempt to generate content for unsupported jurisdiction: '{jurisdiction}'")
+            return False
+
         prohibited_terms = [
-            "how to commit", "bypass security", "illegal drugs", 
+            "how to commit", "bypass security", "illegal drugs",
             "hack", "exploit", "untraceable"
         ]
-        
+
         input_lower = user_input.lower()
         for term in prohibited_terms:
             if term in input_lower:
                 return False
-                
+
         return True

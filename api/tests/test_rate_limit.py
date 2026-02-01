@@ -23,7 +23,7 @@ def test_retry_mechanism(mock_sleep: MagicMock, mock_genai_client: MagicMock) ->
     mock_candidate = MagicMock()
     mock_candidate.finish_reason = "STOP"
     mock_part = MagicMock()
-    mock_part.text = "According to 12 U.S.C. § 345 and Rule 12(b)(6). Procedural Roadmap: Step 1. --- Success Filings"
+    mock_part.text = "According to 12 U.S.C. § 345, Rule 12(b)(6), and Cal. Civ. Code § 1708. Procedural Roadmap: Step 1. --- Success Filings"
     mock_part.thought = False
     mock_candidate.content.parts = [mock_part]
     

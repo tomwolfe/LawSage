@@ -84,32 +84,49 @@ class ResponseValidator:
         Validates AI-generated legal content for structural and procedural completeness.
         Returns True if content meets reliability standards, False otherwise.
         Checks for:
-        a) At least two legal citations (e.g., U.S.C., Cal. Civ. Code, etc.)
+        a) At least three legal citations (e.g., U.S.C., Cal. Civ. Code, etc.)
         b) A 'Next Steps' or 'Roadmap' section.
         """
         import re
-        
+
         # Check for citations: Look for common legal citation patterns
         # e.g., "12 U.S.C. § 345", "Cal. Civ. Code § 1708", "Rule 12(b)(6)"
         citation_patterns = [
             r"\d+\s+[A-Z]\.[A-Z]\.[A-Z]\.?\s+§?\s*\d+", # Federal/State statutes
             r"[A-Z][a-z]+\.?\s+[Cc]ode\s+§?\s*\d+",     # Named codes
             r"[Rr]ule\s+\d+\(?[a-z]?\)?",                # Rules of procedure
-            r"§\s*\d+",                                  # Section symbols
             r"Section\s+\d+",                            # Section keyword
         ]
-        
-        citation_count = 0
+
+        # Find all citations using all patterns
+        all_matches = set()  # Use a set to avoid duplicates
         for pattern in citation_patterns:
             matches = re.findall(pattern, content)
-            citation_count += len(matches)
-        
-        has_citations = citation_count >= 2
-        
+            for match in matches:
+                all_matches.add(match.lower().strip())  # Normalize to lowercase for comparison
+
+        # Also look for standalone section symbols but only if they're not already captured in other patterns
+        section_matches = re.findall(r"§\s*\d+", content)
+        for match in section_matches:
+            # Only add if this section reference is not already part of a more specific citation
+            match_normalized = match.lower().strip()
+            # Check if this section is already part of a more specific citation we found
+            already_found = False
+            for existing_match in all_matches:
+                if match_normalized.replace("§", "").strip() in existing_match:
+                    already_found = True
+                    break
+            if not already_found:
+                all_matches.add(match_normalized)
+
+        citation_count = len(all_matches)
+
+        has_citations = citation_count >= 3
+
         # Check for Roadmap/Next Steps
         roadmap_keywords = ["Next Steps", "Roadmap", "Procedural Roadmap", "What to do next", "Step-by-step"]
         has_roadmap = any(kw.lower() in content.lower() for kw in roadmap_keywords)
-        
+
         return has_citations and has_roadmap
 
     @classmethod

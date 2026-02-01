@@ -4,19 +4,29 @@ const nextConfig: NextConfig = {
   /* config options here */
   reactCompiler: true,
   rewrites: async () => {
+    // Environment-aware backendUrl that defaults to internal Vercel rewrites in production
     const isDev = process.env.NODE_ENV === 'development';
-    const backendUrl = process.env.BACKEND_URL || (isDev ? "http://127.0.0.1:8000" : "");
-    
-    // If no backendUrl is provided in production, let Next.js handle it normally
-    // (e.g., if it's deployed as a Vercel Function in the same project)
-    if (!backendUrl) return [];
+    const isProd = !isDev;
 
-    return [
-      {
-        source: "/api/:path*",
-        destination: `${backendUrl}/:path*`,
-      },
-    ];
+    // In production, use internal routing to Vercel Functions
+    // In development, use local backend server
+    if (isProd) {
+      return [
+        {
+          source: "/api/:path*",
+          destination: "/api/:path*", // Internal routing to Vercel Functions
+        },
+      ];
+    } else {
+      // Development environment - use local backend
+      const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:8000";
+      return [
+        {
+          source: "/api/:path*",
+          destination: `${backendUrl}/:path*`,
+        },
+      ];
+    }
   },
 };
 

@@ -102,62 +102,96 @@ def test_validate_grounding_logic():
 def test_validate_legal_output_logic():
     """Verify that validate_legal_output requires citations and a roadmap."""
     from api.processor import ResponseValidator
-    
-    # Case 1: Valid content
+
+    # Case 1: Valid content with 3 citations (should pass)
     valid_content = """
     Here is your strategy:
-    According to 12 U.S.C. § 345 and Cal. Civ. Code § 1708, you have rights.
-    
+    According to 12 U.S.C. § 345, Cal. Civ. Code § 1708, and Rule 12(b)(6), you have rights.
+
     Procedural Roadmap:
     1. File the form.
     2. Serve the papers.
-    
+
     ---
     Template document here.
     """
     assert ResponseValidator.validate_legal_output(valid_content) is True
-    
-    # Case 2: Missing citations
+
+    # Case 2: Only 2 citations (should fail now - needs 3)
+    two_citations = """
+    Here is your strategy:
+    According to 12 U.S.C. § 345 and Cal. Civ. Code § 1708, you have rights.
+
+    Procedural Roadmap:
+    1. File the form.
+    2. Serve the papers.
+
+    ---
+    Template document here.
+    """
+    assert ResponseValidator.validate_legal_output(two_citations) is False
+
+    # Case 3: Missing citations
     no_citations = """
     Here is your strategy:
     You have rights.
-    
+
     Next Steps:
     1. File the form.
-    
+
     ---
     Template document here.
     """
     assert ResponseValidator.validate_legal_output(no_citations) is False
-    
-    # Case 3: Missing roadmap
+
+    # Case 4: Missing roadmap
     no_roadmap = """
-    According to 12 U.S.C. § 345 and Cal. Civ. Code § 1708, you have rights.
-    
+    According to 12 U.S.C. § 345, Cal. Civ. Code § 1708, and Rule 12(b)(6), you have rights.
+
     ---
     Template document here.
     """
     assert ResponseValidator.validate_legal_output(no_roadmap) is False
+
+def test_red_team_audit_jurisdiction_consistency():
+    """Verify that red_team_audit rejects unsupported jurisdictions."""
+    from api.safety_validator import SafetyValidator
+
+    # Test supported jurisdiction
+    assert SafetyValidator.red_team_audit("How do I file for divorce?", "California") is True
+
+    # Test federal jurisdiction
+    assert SafetyValidator.red_team_audit("How do I file for bankruptcy?", "Federal") is True
+
+    # Test unsupported jurisdiction (should be rejected)
+    assert SafetyValidator.red_team_audit("How do I file for divorce?", "Atlantis") is False
+
+    # Test empty jurisdiction
+    assert SafetyValidator.red_team_audit("How do I file for divorce?", "") is False
+
+    # Test invalid jurisdiction
+    assert SafetyValidator.red_team_audit("How do I file for divorce?", "X") is False
+
 
 @patch("google.genai.Client")
 def test_safety_finish_reason(mock_client_class):
     """Verify that a 'SAFETY' finish reason is caught and returns ModelConstraint error."""
     mock_client = MagicMock()
     mock_client_class.return_value = mock_client
-    
+
     mock_response = MagicMock()
     # Mock candidate with finish_reason="SAFETY"
     mock_response.candidates = [
         MagicMock(finish_reason="SAFETY", content=None, grounding_metadata=None)
     ]
     mock_client.models.generate_content.return_value = mock_response
-    
+
     workflow = LawSageWorkflow(api_key="AIzaTestKey1234567890")
     request = LegalRequest(user_input="unsafe request", jurisdiction="California")
-    
+
     with pytest.raises(AppException) as excinfo:
         workflow.step_2_generate(request)
-    
+
     assert excinfo.value.status_code == 400
     assert excinfo.value.type == "ModelConstraint"
     assert "SAFETY" in excinfo.value.detail

@@ -12,7 +12,7 @@ def test_workflow_execution_time(mock_generate):
     is well within the 10s Hobby tier limit.
     """
     # Mock the slow part (Gemini call) to take 2 seconds
-    mock_generate.return_value = ("According to 12 U.S.C. § 345 and Rule 12(b)(6). Procedural Roadmap: Step 1. --- filing.", [])
+    mock_generate.return_value = ("According to 12 U.S.C. § 345, Rule 12(b)(6), and Cal. Civ. Code § 1708. Procedural Roadmap: Step 1. --- filing.", [])
     
     workflow = LawSageWorkflow(api_key="AIzaTestKey1234567890")
     request = LegalRequest(user_input="Test", jurisdiction="California")
