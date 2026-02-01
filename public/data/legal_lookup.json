@@ -1,0 +1,804 @@
+{
+  "pro_se_procedural_rules": [
+    {
+      "id": 1,
+      "rule_number": "FRCP 1",
+      "title": "Scope of Rules",
+      "description": "These rules govern procedure in the United States district courts in all suits of a civil nature arising under the Constitution, laws, or treaties of the United States.",
+      "jurisdiction": "Federal",
+      "category": "Civil Procedure"
+    },
+    {
+      "id": 2,
+      "rule_number": "FRCP 8",
+      "title": "General Rules of Pleading",
+      "description": "A pleading that states a claim for relief must contain a short and plain statement of the grounds for the court's jurisdiction and a short and plain statement of the claim showing that the pleader is entitled to relief.",
+      "jurisdiction": "Federal",
+      "category": "Pleading Standards"
+    },
+    {
+      "id": 3,
+      "rule_number": "FRCP 12",
+      "title": "Defenses and Objections",
+      "description": "A party may assert the defenses of lack of subject-matter jurisdiction, lack of personal jurisdiction, improper venue, or insufficient service of process by motion.",
+      "jurisdiction": "Federal",
+      "category": "Motions"
+    },
+    {
+      "id": 4,
+      "rule_number": "FRCP 55",
+      "title": "Default",
+      "description": "If a party fails to plead or otherwise defend, the other party may obtain a default judgment.",
+      "jurisdiction": "Federal",
+      "category": "Judgments"
+    },
+    {
+      "id": 5,
+      "rule_number": "FRCP 65",
+      "title": "Injunctions",
+      "description": "A preliminary injunction may be granted if the movant shows a likelihood of success on the merits, irreparable harm, favorable balance of hardships, and public interest.",
+      "jurisdiction": "Federal",
+      "category": "Equitable Relief"
+    },
+    {
+      "id": 6,
+      "rule_number": "FRCP 68",
+      "title": "Offer of Judgment",
+      "description": "A party defending against a claim may serve an offer to allow judgment on specified terms, with potential cost consequences if the offer is rejected and the offeree obtains a less favorable judgment.",
+      "jurisdiction": "Federal",
+      "category": "Settlement"
+    },
+    {
+      "id": 7,
+      "rule_number": "FRCP 69",
+      "title": "Execution",
+      "description": "Process to enforce a judgment for the recovery of money shall be a writ of execution, unless the court directs otherwise.",
+      "jurisdiction": "Federal",
+      "category": "Enforcement"
+    },
+    {
+      "id": 8,
+      "rule_number": "FRCP 83",
+      "title": "Rules by District Courts",
+      "description": "District courts may regulate their practice in any way consistent with federal law, but local rules must be filed with the Judicial Conference.",
+      "jurisdiction": "Federal",
+      "category": "Local Rules"
+    },
+    {
+      "id": 9,
+      "rule_number": "FRCP 11",
+      "title": "Signing Pleadings",
+      "description": "Every pleading, written motion, and other paper must be signed by at least one attorney of record or by the party personally if unrepresented. The signature certifies that the paper is well-grounded in fact and law.",
+      "jurisdiction": "Federal",
+      "category": "Sanctions"
+    },
+    {
+      "id": 10,
+      "rule_number": "FRCP 26",
+      "title": "Duty to Disclose",
+      "description": "Parties must disclose certain information without awaiting a discovery request, including documents and witnesses that may be used to support their claims or defenses.",
+      "jurisdiction": "Federal",
+      "category": "Discovery"
+    },
+    {
+      "id": 11,
+      "rule_number": "FRCP 30",
+      "title": "Depositions",
+      "description": "A party may depose an adverse party or any person who has been served with a complaint. Depositions must be taken before an officer authorized to administer oaths.",
+      "jurisdiction": "Federal",
+      "category": "Discovery"
+    },
+    {
+      "id": 12,
+      "rule_number": "FRCP 34",
+      "title": "Production of Documents",
+      "description": "A party may serve on any other party a request to produce documents, electronically stored information, or tangible things for inspection and copying.",
+      "jurisdiction": "Federal",
+      "category": "Discovery"
+    },
+    {
+      "id": 13,
+      "rule_number": "FRCP 36",
+      "title": "Requests for Admission",
+      "description": "A party may serve on any other party a written request to admit the truth of specified facts or the genuineness of specified documents.",
+      "jurisdiction": "Federal",
+      "category": "Discovery"
+    },
+    {
+      "id": 14,
+      "rule_number": "FRCP 56",
+      "title": "Summary Judgment",
+      "description": "A party may move for summary judgment, identifying each claim or defense for which summary judgment is sought. The court shall grant summary judgment if there is no genuine dispute as to any material fact.",
+      "jurisdiction": "Federal",
+      "category": "Motions"
+    },
+    {
+      "id": 15,
+      "rule_number": "FRCP 58",
+      "title": "Entry of Judgment",
+      "description": "Every judgment and amended judgment must be set forth on a separate document, but a jury verdict need not be set forth in a separate document.",
+      "jurisdiction": "Federal",
+      "category": "Judgments"
+    },
+    {
+      "id": 16,
+      "rule_number": "FRCP 59",
+      "title": "New Trial",
+      "description": "A party may move for a new trial, which the court may grant for any reason for which a new trial has heretofore been granted in an action at law in federal court.",
+      "jurisdiction": "Federal",
+      "category": "Post-Trial Motions"
+    },
+    {
+      "id": 17,
+      "rule_number": "FRCP 60",
+      "title": "Relief from a Judgment or Order",
+      "description": "A court may relieve a party from a final judgment or order for reasons including mistake, inadvertence, surprise, excusable neglect, newly discovered evidence, or fraud.",
+      "jurisdiction": "Federal",
+      "category": "Post-Judgment Relief"
+    },
+    {
+      "id": 18,
+      "rule_number": "FRCP 62",
+      "title": "Stay of Proceedings to Enforce a Judgment",
+      "description": "An appeal from a judgment does not stay proceedings for its enforcement unless the court orders otherwise.",
+      "jurisdiction": "Federal",
+      "category": "Stays"
+    },
+    {
+      "id": 19,
+      "rule_number": "FRCP 63",
+      "title": "Substitution of Parties",
+      "description": "If a party dies and the claim is not extinguished, the court may order substitution of the proper parties.",
+      "jurisdiction": "Federal",
+      "category": "Party Substitution"
+    },
+    {
+      "id": 20,
+      "rule_number": "FRCP 25",
+      "title": "Death or Substitution of Parties",
+      "description": "When a party dies and the claim is not extinguished, the court may order substitution of the proper parties.",
+      "jurisdiction": "Federal",
+      "category": "Party Substitution"
+    },
+    {
+      "id": 21,
+      "rule_number": "FRCP 17",
+      "title": "Capacity to Sue or Be Sued",
+      "description": "Every action must be prosecuted in the name of the real party in interest, except as provided by law.",
+      "jurisdiction": "Federal",
+      "category": "Parties"
+    },
+    {
+      "id": 22,
+      "rule_number": "FRCP 19",
+      "title": "Required Joinder of Parties",
+      "description": "A person who is subject to service of process must be joined as a party if complete relief cannot be accorded among those already parties.",
+      "jurisdiction": "Federal",
+      "category": "Joinder"
+    },
+    {
+      "id": 23,
+      "rule_number": "FRCP 20",
+      "title": "Permissive Joinder of Parties",
+      "description": "Persons may join in one action as plaintiffs if they assert any right to relief jointly, severally, or in the alternative.",
+      "jurisdiction": "Federal",
+      "category": "Joinder"
+    },
+    {
+      "id": 24,
+      "rule_number": "FRCP 22",
+      "title": "Interpleader",
+      "description": "Two or more claimants may interplead when they have or may have adverse claims against a plaintiff who holds or claims an interest in property or money.",
+      "jurisdiction": "Federal",
+      "category": "Special Procedures"
+    },
+    {
+      "id": 25,
+      "rule_number": "FRCP 23",
+      "title": "Class Actions",
+      "description": "Class actions may be maintained if numerosity, commonality, typicality, adequacy, and either predominance, superiority, or Rule 23(b)(1)/(2) requirements are met.",
+      "jurisdiction": "Federal",
+      "category": "Class Actions"
+    },
+    {
+      "id": 26,
+      "rule_number": "FRCP 24",
+      "title": "Intervention",
+      "description": "A nonparty may intervene as a matter of right when their interests may be affected by the outcome and representation by existing parties is inadequate.",
+      "jurisdiction": "Federal",
+      "category": "Intervention"
+    },
+    {
+      "id": 27,
+      "rule_number": "FRCP 28",
+      "title": "Impartial Special Master",
+      "description": "The court may appoint a special master to hear and determine any or all matters in an action.",
+      "jurisdiction": "Federal",
+      "category": "Special Masters"
+    },
+    {
+      "id": 28,
+      "rule_number": "FRCP 37",
+      "title": "Failure to Make Disclosures or Cooperate in Discovery",
+      "description": "If a party fails to make required disclosures or to cooperate in discovery, the court may order sanctions including striking pleadings or entering default judgment.",
+      "jurisdiction": "Federal",
+      "category": "Discovery Sanctions"
+    },
+    {
+      "id": 29,
+      "rule_number": "FRCP 38",
+      "title": "Right of Trial by Jury",
+      "description": "The right of trial by jury as declared by the Seventh Amendment to the Constitution is preserved to the parties inviolate.",
+      "jurisdiction": "Federal",
+      "category": "Jury Trials"
+    },
+    {
+      "id": 30,
+      "rule_number": "FRCP 39",
+      "title": "Trial by Jury or by the Court",
+      "description": "Issues triable of right by a jury are designated by the demand for jury trial filed as provided in Rule 38(b). Issues not triable of right by a jury shall be tried by the court.",
+      "jurisdiction": "Federal",
+      "category": "Jury Trials"
+    },
+    {
+      "id": 31,
+      "rule_number": "FRCP 41",
+      "title": "Dismissal of Actions",
+      "description": "An action may be dismissed on stipulation of the parties or by court order for failure to prosecute or to comply with these rules or any court order.",
+      "jurisdiction": "Federal",
+      "category": "Dismissal"
+    },
+    {
+      "id": 32,
+      "rule_number": "FRCP 45",
+      "title": "Subpoena",
+      "description": "A subpoena may command a person to attend a trial, hearing, or deposition, or to produce documents or other tangible things.",
+      "jurisdiction": "Federal",
+      "category": "Service and Process"
+    },
+    {
+      "id": 33,
+      "rule_number": "FRCP 48",
+      "title": "Number of Jurors",
+      "description": "In a civil action in which the right to a jury trial is preserved, the trial jury shall consist of 6 to 12 members unless a different number is stipulated.",
+      "jurisdiction": "Federal",
+      "category": "Jury Trials"
+    },
+    {
+      "id": 34,
+      "rule_number": "FRCP 49",
+      "title": "Special Verdicts and Interrogatories",
+      "description": "The court may require a jury to return a special verdict, which shall make findings on each material issue of fact separately.",
+      "jurisdiction": "Federal",
+      "category": "Jury Trials"
+    },
+    {
+      "id": 35,
+      "rule_number": "FRCP 50",
+      "title": "Judgment as a Matter of Law",
+      "description": "If a party has been fully heard on an issue and there is no legally sufficient evidentiary basis for a reasonable jury to find for that party, the court may grant judgment as a matter of law.",
+      "jurisdiction": "Federal",
+      "category": "Motions"
+    },
+    {
+      "id": 36,
+      "rule_number": "FRCP 51",
+      "title": "Instructions to the Jury",
+      "description": "The court must inform counsel of its proposed action on the jury instructions before the jury begins deliberating.",
+      "jurisdiction": "Federal",
+      "category": "Jury Trials"
+    },
+    {
+      "id": 37,
+      "rule_number": "FRCP 52",
+      "title": "Findings by the Court",
+      "description": "In an action tried without a jury, the court must find the facts specially and state its conclusions of law separately.",
+      "jurisdiction": "Federal",
+      "category": "Court Findings"
+    },
+    {
+      "id": 38,
+      "rule_number": "FRCP 53",
+      "title": "Masters",
+      "description": "The court may appoint a master to hear and determine any or all matters in an action, with exceptions for certain types of cases.",
+      "jurisdiction": "Federal",
+      "category": "Special Masters"
+    },
+    {
+      "id": 39,
+      "rule_number": "FRCP 54",
+      "title": "Judgments",
+      "description": "A judgment is final when it adjudicates all the claims and the rights and liabilities of all the parties.",
+      "jurisdiction": "Federal",
+      "category": "Judgments"
+    },
+    {
+      "id": 40,
+      "rule_number": "FRCP 61",
+      "title": "New Trial Ordered Secured Against Error",
+      "description": "The court at every stage of the proceeding must disregard any error or defect of the proceedings that does not affect the substantial rights of the parties.",
+      "jurisdiction": "Federal",
+      "category": "Errors"
+    },
+    {
+      "id": 41,
+      "rule_number": "FRCP 64",
+      "title": "Seizure of Person or Property",
+      "description": "At the commencement of and during the course of an action, the court may order the seizure of property for preservation or security purposes.",
+      "jurisdiction": "Federal",
+      "category": "Remedies"
+    },
+    {
+      "id": 42,
+      "rule_number": "FRCP 66",
+      "title": "Appointment of Receiver",
+      "description": "The court may appoint a receiver to take and preserve property in dispute and in litigation pending the suit.",
+      "jurisdiction": "Federal",
+      "category": "Remedies"
+    },
+    {
+      "id": 43,
+      "rule_number": "FRCP 67",
+      "title": "Deposit of Money",
+      "description": "Money may be deposited with the court for safekeeping or to secure satisfaction of a judgment.",
+      "jurisdiction": "Federal",
+      "category": "Remedies"
+    },
+    {
+      "id": 44,
+      "rule_number": "FRCP 71",
+      "title": "Process in Aid of Execution",
+      "description": "The court may issue all writs necessary or appropriate in aid of its jurisdiction and to effectuate its judgments.",
+      "jurisdiction": "Federal",
+      "category": "Enforcement"
+    },
+    {
+      "id": 45,
+      "rule_number": "FRCP 72",
+      "title": "Magistrate Judges",
+      "description": "A judge may designate a magistrate judge to conduct hearings and submit proposed findings of fact and recommendations for disposition.",
+      "jurisdiction": "Federal",
+      "category": "Magistrates"
+    },
+    {
+      "id": 46,
+      "rule_number": "FRCP 73",
+      "title": "Consent by Parties to Magistrate Judge",
+      "description": "The parties may consent to have a magistrate judge conduct any or all proceedings in a civil action.",
+      "jurisdiction": "Federal",
+      "category": "Magistrates"
+    },
+    {
+      "id": 47,
+      "rule_number": "FRCP 77",
+      "title": "Records Open to Inspection",
+      "description": "The clerk's office and the records of the court are open to inspection and copying during business hours.",
+      "jurisdiction": "Federal",
+      "category": "Court Records"
+    },
+    {
+      "id": 48,
+      "rule_number": "FRCP 79",
+      "title": "Maintaining Records",
+      "description": "The clerk must maintain records of all proceedings and filings in accordance with federal regulations.",
+      "jurisdiction": "Federal",
+      "category": "Court Records"
+    },
+    {
+      "id": 49,
+      "rule_number": "FRCP 80",
+      "title": "Transcripts",
+      "description": "Transcripts of proceedings are available upon request and payment of costs.",
+      "jurisdiction": "Federal",
+      "category": "Court Records"
+    },
+    {
+      "id": 50,
+      "rule_number": "FRCP 81",
+      "title": "Applicability to Appellate Review",
+      "description": "These rules apply to proceedings for review of civil actions in the courts of appeals.",
+      "jurisdiction": "Federal",
+      "category": "Appellate Review"
+    },
+    {
+      "id": 51,
+      "rule_number": "FRCP 82",
+      "title": "Construction of Rules",
+      "description": "These rules shall be construed and administered to secure the just, speedy, and inexpensive determination of every action.",
+      "jurisdiction": "Federal",
+      "category": "General Construction"
+    },
+    {
+      "id": 52,
+      "rule_number": "FRCP 7",
+      "title": "Pleadings Allowed",
+      "description": "There is one form of action—the civil action. The pleadings are the complaint and the answer.",
+      "jurisdiction": "Federal",
+      "category": "Pleading Standards"
+    },
+    {
+      "id": 53,
+      "rule_number": "FRCP 9",
+      "title": "Pleading Special Matters",
+      "description": "In all averments of fraud or mistake, the circumstances constituting fraud or mistake must be stated with particularity.",
+      "jurisdiction": "Federal",
+      "category": "Pleading Standards"
+    },
+    {
+      "id": 54,
+      "rule_number": "FRCP 10",
+      "title": "Form of Pleadings",
+      "description": "Pleadings must be filed with the court and served on all parties. Each paragraph must be numbered consecutively.",
+      "jurisdiction": "Federal",
+      "category": "Pleading Standards"
+    },
+    {
+      "id": 55,
+      "rule_number": "FRCP 13",
+      "title": "Counterclaim and Cross-Claim",
+      "description": "A pleading may state as a counterclaim any claim that the opposing party may have against the pleader.",
+      "jurisdiction": "Federal",
+      "category": "Pleading Standards"
+    },
+    {
+      "id": 56,
+      "rule_number": "FRCP 14",
+      "title": "Third-Party Practice",
+      "description": "A defendant may serve a third-party complaint against a person not a party to the action who is or may be liable to the defendant.",
+      "jurisdiction": "Federal",
+      "category": "Joinder"
+    },
+    {
+      "id": 57,
+      "rule_number": "FRCP 15",
+      "title": "Amended and Supplemental Pleadings",
+      "description": "A party may amend its pleading once as a matter of course within certain timeframes, otherwise by leave of court or stipulation.",
+      "jurisdiction": "Federal",
+      "category": "Pleading Standards"
+    },
+    {
+      "id": 58,
+      "rule_number": "FRCP 16",
+      "title": "Pretrial Conferences",
+      "description": "The court may hold pretrial conferences to expedite the action and encourage settlement.",
+      "jurisdiction": "Federal",
+      "category": "Case Management"
+    },
+    {
+      "id": 59,
+      "rule_number": "FRCP 18",
+      "title": "Joinder of Claims",
+      "description": "A party asserting a claim may join as many claims as it has against an opposing party.",
+      "jurisdiction": "Federal",
+      "category": "Joinder"
+    },
+    {
+      "id": 60,
+      "rule_number": "FRCP 21",
+      "title": "Misjoinder and Nonjoinder of Parties",
+      "description": "Misjoinder of parties or causes of action is not ground for dismissal, and parties may be dropped or added by court order.",
+      "jurisdiction": "Federal",
+      "category": "Joinder"
+    },
+    {
+      "id": 61,
+      "rule_number": "FRCP 27",
+      "title": "Depositions Pending Appeal",
+      "description": "After an appeal is filed, the court of appeals may permit the taking of depositions to preserve testimony for possible use in the trial.",
+      "jurisdiction": "Federal",
+      "category": "Discovery"
+    },
+    {
+      "id": 62,
+      "rule_number": "FRCP 29",
+      "title": "Stipulations Regarding Discovery Procedure",
+      "description": "Parties may stipulate to extend or limit time for discovery, but the court may not approve a stipulation that would cause delay.",
+      "jurisdiction": "Federal",
+      "category": "Discovery"
+    },
+    {
+      "id": 63,
+      "rule_number": "FRCP 31",
+      "title": "Notice of Deposition",
+      "description": "A party desiring to depose a person shall give reasonable notice to every other party to the action.",
+      "jurisdiction": "Federal",
+      "category": "Discovery"
+    },
+    {
+      "id": 64,
+      "rule_number": "FRCP 32",
+      "title": "Use of Depositions",
+      "description": "Subject to certain exceptions, a deposition previously taken may be used by any party for any purpose.",
+      "jurisdiction": "Federal",
+      "category": "Discovery"
+    },
+    {
+      "id": 65,
+      "rule_number": "FRCP 33",
+      "title": "Interrogatories to Parties",
+      "description": "A party may serve written interrogatories on another party, which must be answered in writing under oath.",
+      "jurisdiction": "Federal",
+      "category": "Discovery"
+    },
+    {
+      "id": 66,
+      "rule_number": "FRCP 35",
+      "title": "Physical and Mental Examinations",
+      "description": "The court may order a party to submit to a physical or mental examination by a qualified examiner.",
+      "jurisdiction": "Federal",
+      "category": "Discovery"
+    },
+    {
+      "id": 67,
+      "rule_number": "FRCP 40",
+      "title": "Stipulations",
+      "description": "Parties may stipulate concerning the admission of facts or the admissibility of evidence.",
+      "jurisdiction": "Federal",
+      "category": "Evidence"
+    },
+    {
+      "id": 68,
+      "rule_number": "FRCP 42",
+      "title": "Consolidation; Separate Trials",
+      "description": "The court may order a joint hearing or trial of motions or of separate cases when doing so would avoid prejudice.",
+      "jurisdiction": "Federal",
+      "category": "Case Management"
+    },
+    {
+      "id": 69,
+      "rule_number": "FRCP 43",
+      "title": "Taking of Testimony",
+      "description": "The testimony of a witness shall be taken in open court, except as provided by these rules.",
+      "jurisdiction": "Federal",
+      "category": "Evidence"
+    },
+    {
+      "id": 70,
+      "rule_number": "FRCP 44",
+      "title": "Proof of Official Record",
+      "description": "An official record may be evidenced by an official publication or by a copy attested by the custodian.",
+      "jurisdiction": "Federal",
+      "category": "Evidence"
+    },
+    {
+      "id": 71,
+      "rule_number": "FRCP 46",
+      "title": "Exceptions",
+      "description": "Formal exception to a ruling or order is not necessary to preserve the right to review.",
+      "jurisdiction": "Federal",
+      "category": "Appeals"
+    },
+    {
+      "id": 72,
+      "rule_number": "FRCP 47",
+      "title": "Selection of Juries",
+      "description": "Juries shall be selected at random from a fair cross-section of the community.",
+      "jurisdiction": "Federal",
+      "category": "Jury Selection"
+    },
+    {
+      "id": 73,
+      "rule_number": "FRCP 57",
+      "title": "Declaratory Judgments",
+      "description": "The existence of another adequate remedy does not preclude a declaratory judgment that is otherwise appropriate.",
+      "jurisdiction": "Federal",
+      "category": "Declaratory Relief"
+    },
+    {
+      "id": 74,
+      "rule_number": "FRCP 69A",
+      "title": "Garnishment",
+      "description": "Process to reach property of a judgment debtor in the hands of a third party may be garnishment.",
+      "jurisdiction": "Federal",
+      "category": "Enforcement"
+    },
+    {
+      "id": 75,
+      "rule_number": "FRCP 70",
+      "title": "Ancillary Remedies",
+      "description": "The court may issue all writs necessary or appropriate in aid of its jurisdiction and to effectuate its judgments.",
+      "jurisdiction": "Federal",
+      "category": "Remedies"
+    },
+    {
+      "id": 76,
+      "rule_number": "FRCP 74",
+      "title": "Petition for Writ of Habeas Corpus",
+      "description": "A petition for writ of habeas corpus shall state the facts concerning the applicant's commitment or detention.",
+      "jurisdiction": "Federal",
+      "category": "Habeas Corpus"
+    },
+    {
+      "id": 77,
+      "rule_number": "FRCP 75",
+      "title": "Petition for Writ of Mandamus or Prohibition",
+      "description": "A petition for writ of mandamus or prohibition shall state the facts showing that the applicant is entitled to the writ.",
+      "jurisdiction": "Federal",
+      "category": "Extraordinary Writs"
+    },
+    {
+      "id": 78,
+      "rule_number": "FRCP 76",
+      "title": "Petition for Writ of Certiorari",
+      "description": "A petition for writ of certiorari shall state the facts showing that the applicant is entitled to the writ.",
+      "jurisdiction": "Federal",
+      "category": "Extraordinary Writs"
+    },
+    {
+      "id": 79,
+      "rule_number": "FRCP 78",
+      "title": "Petition for Other Extraordinary Writs",
+      "description": "A petition for other extraordinary writs shall state the facts showing that the applicant is entitled to the writ.",
+      "jurisdiction": "Federal",
+      "category": "Extraordinary Writs"
+    },
+    {
+      "id": 80,
+      "rule_number": "FRCP 80.1",
+      "title": "Petition for Review of Administrative Action",
+      "description": "A petition for review of administrative action shall state the facts showing that the applicant is entitled to review.",
+      "jurisdiction": "Federal",
+      "category": "Administrative Law"
+    },
+    {
+      "id": 81,
+      "rule_number": "FRCP 80.2",
+      "title": "Petition for Review of Arbitration Award",
+      "description": "A petition to confirm, vacate, or modify an arbitration award shall state the facts showing the basis for relief.",
+      "jurisdiction": "Federal",
+      "category": "Arbitration"
+    },
+    {
+      "id": 82,
+      "rule_number": "FRCP 80.3",
+      "title": "Petition for Review of Bankruptcy Orders",
+      "description": "A petition for review of bankruptcy orders shall state the facts showing that the applicant is entitled to review.",
+      "jurisdiction": "Federal",
+      "category": "Bankruptcy"
+    },
+    {
+      "id": 83,
+      "rule_number": "FRCP 80.4",
+      "title": "Petition for Review of Probate Orders",
+      "description": "A petition for review of probate orders shall state the facts showing that the applicant is entitled to review.",
+      "jurisdiction": "Federal",
+      "category": "Probate"
+    },
+    {
+      "id": 84,
+      "rule_number": "FRCP 80.5",
+      "title": "Petition for Review of Tax Court Decisions",
+      "description": "A petition for review of Tax Court decisions shall state the facts showing that the applicant is entitled to review.",
+      "jurisdiction": "Federal",
+      "category": "Tax Law"
+    },
+    {
+      "id": 85,
+      "rule_number": "FRCP 80.6",
+      "title": "Petition for Review of Immigration Decisions",
+      "description": "A petition for review of immigration decisions shall state the facts showing that the applicant is entitled to review.",
+      "jurisdiction": "Federal",
+      "category": "Immigration Law"
+    },
+    {
+      "id": 86,
+      "rule_number": "FRCP 80.7",
+      "title": "Petition for Review of Social Security Decisions",
+      "description": "A petition for review of Social Security decisions shall state the facts showing that the applicant is entitled to review.",
+      "jurisdiction": "Federal",
+      "category": "Social Security"
+    },
+    {
+      "id": 87,
+      "rule_number": "FRCP 80.8",
+      "title": "Petition for Review of Veterans Affairs Decisions",
+      "description": "A petition for review of Veterans Affairs decisions shall state the facts showing that the applicant is entitled to review.",
+      "jurisdiction": "Federal",
+      "category": "Veterans Affairs"
+    },
+    {
+      "id": 88,
+      "rule_number": "FRCP 80.9",
+      "title": "Petition for Review of Patent and Trademark Office Decisions",
+      "description": "A petition for review of Patent and Trademark Office decisions shall state the facts showing that the applicant is entitled to review.",
+      "jurisdiction": "Federal",
+      "category": "Intellectual Property"
+    },
+    {
+      "id": 89,
+      "rule_number": "FRCP 80.10",
+      "title": "Petition for Review of Securities and Exchange Commission Decisions",
+      "description": "A petition for review of SEC decisions shall state the facts showing that the applicant is entitled to review.",
+      "jurisdiction": "Federal",
+      "category": "Securities Law"
+    },
+    {
+      "id": 90,
+      "rule_number": "FRCP 80.11",
+      "title": "Petition for Review of Federal Trade Commission Decisions",
+      "description": "A petition for review of FTC decisions shall state the facts showing that the applicant is entitled to review.",
+      "jurisdiction": "Federal",
+      "category": "Trade Regulation"
+    },
+    {
+      "id": 91,
+      "rule_number": "FRCP 80.12",
+      "title": "Petition for Review of Environmental Protection Agency Decisions",
+      "description": "A petition for review of EPA decisions shall state the facts showing that the applicant is entitled to review.",
+      "jurisdiction": "Federal",
+      "category": "Environmental Law"
+    },
+    {
+      "id": 92,
+      "rule_number": "FRCP 80.13",
+      "title": "Petition for Review of Occupational Safety and Health Administration Decisions",
+      "description": "A petition for review of OSHA decisions shall state the facts showing that the applicant is entitled to review.",
+      "jurisdiction": "Federal",
+      "category": "Labor Law"
+    },
+    {
+      "id": 93,
+      "rule_number": "FRCP 80.14",
+      "title": "Petition for Review of National Labor Relations Board Decisions",
+      "description": "A petition for review of NLRB decisions shall state the facts showing that the applicant is entitled to review.",
+      "jurisdiction": "Federal",
+      "category": "Labor Law"
+    },
+    {
+      "id": 94,
+      "rule_number": "FRCP 80.15",
+      "title": "Petition for Review of Equal Employment Opportunity Commission Decisions",
+      "description": "A petition for review of EEOC decisions shall state the facts showing that the applicant is entitled to review.",
+      "jurisdiction": "Federal",
+      "category": "Employment Law"
+    },
+    {
+      "id": 95,
+      "rule_number": "FRCP 80.16",
+      "title": "Petition for Review of Department of Transportation Decisions",
+      "description": "A petition for review of DOT decisions shall state the facts showing that the applicant is entitled to review.",
+      "jurisdiction": "Federal",
+      "category": "Transportation Law"
+    },
+    {
+      "id": 96,
+      "rule_number": "FRCP 80.17",
+      "title": "Petition for Review of Department of Energy Decisions",
+      "description": "A petition for review of DOE decisions shall state the facts showing that the applicant is entitled to review.",
+      "jurisdiction": "Federal",
+      "category": "Energy Law"
+    },
+    {
+      "id": 97,
+      "rule_number": "FRCP 80.18",
+      "title": "Petition for Review of Nuclear Regulatory Commission Decisions",
+      "description": "A petition for review of NRC decisions shall state the facts showing that the applicant is entitled to review.",
+      "jurisdiction": "Federal",
+      "category": "Nuclear Regulation"
+    },
+    {
+      "id": 98,
+      "rule_number": "FRCP 80.19",
+      "title": "Petition for Review of Federal Communications Commission Decisions",
+      "description": "A petition for review of FCC decisions shall state the facts showing that the applicant is entitled to review.",
+      "jurisdiction": "Federal",
+      "category": "Communications Law"
+    },
+    {
+      "id": 99,
+      "rule_number": "FRCP 80.20",
+      "title": "Petition for Review of Internal Revenue Service Decisions",
+      "description": "A petition for review of IRS decisions shall state the facts showing that the applicant is entitled to review.",
+      "jurisdiction": "Federal",
+      "category": "Tax Law"
+    },
+    {
+      "id": 100,
+      "rule_number": "FRCP 80.21",
+      "title": "Petition for Review of Customs and Border Protection Decisions",
+      "description": "A petition for review of CBP decisions shall state the facts showing that the applicant is entitled to review.",
+      "jurisdiction": "Federal",
+      "category": "Customs Law"
+    }
+  ]
+}

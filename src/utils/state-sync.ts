@@ -56,7 +56,7 @@ export function decompressStateFromUrlFragment(fragment: string): any {
 export function updateUrlWithState(state: any): void {
   try {
     const compressedState = compressStateToUrlFragment(state);
-    
+
     // Update the URL hash without triggering a page reload
     const newUrl = `${window.location.pathname}${window.location.search}#${compressedState}`;
     window.history.replaceState({}, '', newUrl);
@@ -72,14 +72,59 @@ export function updateUrlWithState(state: any): void {
 export function getStateFromUrl(): any {
   try {
     const hash = window.location.hash.substring(1); // Remove the '#' character
-    
+
     if (!hash) {
       return null;
     }
-    
+
     return decompressStateFromUrlFragment(hash);
   } catch (error) {
     console.error('Error getting state from URL:', error);
+    return null;
+  }
+}
+
+/**
+ * Enhanced state synchronization that handles Virtual Case Folder metadata and summaries
+ * @param caseFolder The Virtual Case Folder state to sync
+ * @param analysisResult The analysis result to sync
+ * @returns A combined state object with both case folder and analysis result
+ */
+export function createVirtualCaseFolderState(caseFolder: any, analysisResult: any): any {
+  return {
+    caseFolder,
+    analysisResult,
+    timestamp: Date.now(),
+    version: '1.0'
+  };
+}
+
+/**
+ * Restores the Virtual Case Folder state from the URL
+ * @param urlHash The URL hash containing the compressed state
+ * @returns The restored state object with case folder and analysis result
+ */
+export function restoreVirtualCaseFolderState(urlHash: string): any {
+  try {
+    if (!urlHash) {
+      return null;
+    }
+
+    const decompressedState = decompressStateFromUrlFragment(urlHash);
+
+    if (!decompressedState) {
+      return null;
+    }
+
+    // Validate the state structure
+    if (typeof decompressedState !== 'object') {
+      console.warn('Invalid state structure in URL hash');
+      return null;
+    }
+
+    return decompressedState;
+  } catch (error) {
+    console.error('Error restoring Virtual Case Folder state from URL:', error);
     return null;
   }
 }

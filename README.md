@@ -5,8 +5,12 @@ LawSage is an open-source, AI-powered platform designed to empower individuals r
 
 > **Legal Disclaimer:** I am an AI, not an attorney. This tool provides legal information, not legal advice. Use of this tool does not create an attorney-client relationship.
 
-## Key Advancements (v3.0)
-LawSage has undergone a major transformation! The latest version is now a **comprehensive legal assistant with Virtual Case Folder architecture and adversarial strategy capabilities**. This means:
+## Key Advancements (v4.0)
+LawSage has undergone another major transformation! The latest version is now a **resilient, high-performance 'zero-infrastructure' platform with enhanced capabilities**. This means:
+*   **URL-Based State Persistence:** Zero-DB state synchronization using lz-string compression to store Virtual Case Folder metadata and summaries directly in the URL hash, enabling persistent sessions without external storage.
+*   **API Request Consolidation:** Unified 'Structural Hardening' suite combining Adversarial Strategy, Procedural Roadmap, and Local Logistics into a single batch request to minimize Gemini API latency and token usage.
+*   **Optimized Document Processing:** Client-side image downscaling and grayscaling before transmission to OCR endpoints, preventing Vercel Hobby tier timeouts and improving performance.
+*   **High-Reliability Static Grounding:** Static `legal_lookup.json` containing the top 100 pro se procedural rules for instant, zero-latency research of common queries without API calls.
 *   **Virtual Case Folder Architecture:** Leverages Gemini 2.5 Flash's long context to analyze multiple documents simultaneously, enabling cross-document reasoning without external vector databases.
 *   **Adversarial Strategy Component:** Automatically generates opposition arguments and 'red-teams' your case to identify potential weaknesses and counterarguments.
 *   **Procedural Grounding Enhancement:** Retrieves and validates Local Rules of Court (county/district level) in addition to general statutes for comprehensive procedural compliance.
@@ -31,12 +35,16 @@ LawSage has undergone a major transformation! The latest version is now a **comp
 *   **Local Rules Compliance:** Retrieves and validates Local Rules of Court (county/district level) for procedural compliance.
 *   **Pro Se Survival Guide:** Dedicated UI tab displaying hyper-local logistical data (courthouse addresses, filing fees, dress codes) fetched via real-time search.
 *   **Local & Private:** Your data never leaves your browser. Your API key is stored securely in your browser's `localStorage`.
+*   **URL-Based State Persistence:** Comprehensive case data and analysis results are automatically saved to and restored from the URL hash, eliminating the need for external storage.
+*   **Zero-DB Architecture:** No traditional SQL/NoSQL database required - all state is managed through compressed URL fragments.
 *   **Comprehensive History:** Save and revisit your past cases with a full audit trail. Import and export your history as JSON.
 *   **Export & Share:** Copy all content to your clipboard or download your filings as a Markdown (.md) file, PDF, or Word (.docx) document.
 *   **OCR for Evidence:** Upload images of legal documents to extract text and analyze them alongside your description.
+*   **Optimized Image Processing:** Client-side downscaling and grayscaling of images before transmission to prevent API timeouts and reduce bandwidth usage.
 *   **Court-Standard Formatting:** Automatically generate filings with professional court captions and formatting for PDF printing.
 *   **Structured Output:** AI responses are validated for reliability, ensuring mandatory disclaimers, legal citations, and a clear procedural roadmap.
 *   **Robust Reliability Layer:** A multi-layered system ensures safety, accuracy, and structural completeness of every output.
+*   **Static Procedural Knowledge Base:** Instant access to the top 100 pro se procedural rules without API calls for common legal queries.
 *   **Structural Hardening Validation:** Implements a strict 'Mission Contract' that enforces deterministic AI output compliance, mandating the presence of at least three verifiable legal citations, a procedural roadmap, adversarial strategy, and local court logistics in every response.
 *   **Citation Verification:** Verify legal citations in real-time to ensure they are still 'good law' using the Verify Citation button.
 *   **Interactive Next Steps Checklist:** Track your legal progress with a proactive checklist featuring due dates and status indicators.
@@ -47,7 +55,8 @@ LawSage is built on a modern, performant full-stack architecture:
 *   **Frontend & Backend:** Next.js 16 (React 19) with Tailwind CSS and Lucide Icons. The entire backend logic now runs on Vercel Edge Functions.
 *   **AI Engine:** Google Gemini 2.5 Flash (via the Google AI Python SDK) with web search grounding for real-time legal research.
 *   **AI Safety & Structure:** A multi-layered Reliability Layer ensures consistent, safe output with mandatory disclaimers, citation validation, and structural hardening.
-*   **State Management:** Local browser storage (`localStorage`) for user preferences and case history.
+*   **State Management:** URL-based state persistence using lz-string compression for zero-DB architecture.
+*   **Static Grounding Layer:** Embedded procedural rules database for instant legal research without API calls.
 *   **Document Generation:** Docx library for professional Word (.docx) export functionality.
 *   **Rate Limiting:** Client-side rate limiting utility for Vercel Hobby Tier compliance.
 *   **Deployment:** Optimized for seamless deployment on Vercel.
@@ -93,13 +102,14 @@ Open your browser and navigate to [http://localhost:3000](http://localhost:3000)
     *   Creates a draft, court-admissible legal filing (e.g., an Answer or Motion).
     *   Provides hyper-local logistical data (courthouse addresses, filing fees, dress codes).
     *   Provides direct links to the legal sources used for grounding.
-    *   *(For OCR)* Extracts text from your uploaded image and performs the same analysis.
+    *   *(For OCR)* Extracts text from your uploaded image with optimized processing and performs the same analysis.
 5.  **Verification & Action:**
     *   **Citation Verification:** Use the "Verify Citation" button to check if legal citations are still 'good law' using real-time web search.
     *   **Opposition View:** Review potential opposition arguments in the dedicated tab.
     *   **Pro Se Survival Guide:** Access courthouse logistics and local procedural requirements in the dedicated tab.
     *   **Interactive Checklist:** Track your progress with the Next Steps checklist featuring due dates and status indicators.
     *   **Export Options:** Download your analysis as a `.md` file, PDF, or Word (.docx) document.
+    *   **URL Sharing:** Share your complete case analysis via URL with automatic state restoration.
     *   **Review & Edit:** Review, edit, and copy the generated content to use in your case.
 
 ## Deployment (Vercel)
@@ -115,8 +125,8 @@ The easiest and recommended way to deploy LawSage is on **Vercel**. The entire a
 
 ## API Routes
 The application includes several API routes optimized for Vercel Edge Functions:
-*   **/api/analyze:** Main analysis endpoint for legal situation processing with grounding.
-*   **/api/ocr:** Multimodal OCR endpoint for legal document image analysis.
+*   **/api/analyze:** Main analysis endpoint for legal situation processing with grounding. Consolidated response includes adversarial strategy, procedural roadmap, and local logistics.
+*   **/api/ocr:** Multimodal OCR endpoint for legal document image analysis with optimized image processing.
 *   **/api/health:** Health check endpoint.
 *   **/api/verify-citation:** Real-time citation verification endpoint using Gemini Web Search.
 All API routes are configured to run on Vercel's Edge Runtime for optimal performance and cost efficiency within Hobby Tier limits.
@@ -124,6 +134,7 @@ All API routes are configured to run on Vercel's Edge Runtime for optimal perfor
 ## AI Safety & Structure
 LawSage employs a multi-layered Reliability Layer to ensure that AI-generated content is safe, accurate, and structurally complete:
 *   **Red-Team Auditing:** Every user request is audited for safety violations and jurisdictional clarity before being processed.
+*   **Static Grounding Layer:** Checks the embedded procedural rules database for common queries before making API calls, providing instant zero-latency research.
 *   **Grounded Generation:** Gemini 2.5 Flash is utilized with real-time Google Search grounding to ensure information is based on current statutes and Local Rules of Court.
 *   **Reliability Validation:**
     *   **Citations Validation:** Ensures every response contains at least three verifiable legal citations (e.g., U.S.C., State Codes).
@@ -154,3 +165,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 *   [Tailwind CSS](https://tailwindcss.com/)
 *   [Lucide Icons](https://lucide.dev/)
 *   [Vercel](https://vercel.com/)
+*   [lz-string](https://github.com/pieroxy/lz-string)

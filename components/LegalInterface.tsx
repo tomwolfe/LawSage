@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Upload, FileText } from 'lucide-react';
 import { processImageForOCR } from '../src/utils/image-processor';
-import { updateUrlWithState, getStateFromUrl, watchStateAndSyncToUrl } from '../src/utils/state-sync';
+import { updateUrlWithState, getStateFromUrl, watchStateAndSyncToUrl, createVirtualCaseFolderState } from '../src/utils/state-sync';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ResultDisplay from './ResultDisplay';
@@ -76,28 +76,45 @@ export default function LegalInterface() {
   useEffect(() => {
     const savedState = getStateFromUrl();
     if (savedState) {
-      if (savedState.userInput !== undefined) setUserInput(savedState.userInput);
-      if (savedState.jurisdiction !== undefined) setJurisdiction(savedState.jurisdiction);
-      if (savedState.result !== undefined) setResult(savedState.result);
-      if (savedState.activeTab !== undefined) setActiveTab(savedState.activeTab);
-      if (savedState.history !== undefined) setHistory(savedState.history);
-      if (savedState.selectedHistoryItem !== undefined) setSelectedHistoryItem(savedState.selectedHistoryItem);
-      if (savedState.backendUnreachable !== undefined) setBackendUnreachable(savedState.backendUnreachable);
+      // Check if this is the enhanced Virtual Case Folder state format
+      if (savedState.caseFolder && savedState.analysisResult) {
+        // Restore from Virtual Case Folder state
+        const caseFolder = savedState.caseFolder;
+        const analysisResult = savedState.analysisResult;
+
+        if (caseFolder.userInput !== undefined) setUserInput(caseFolder.userInput);
+        if (caseFolder.jurisdiction !== undefined) setJurisdiction(caseFolder.jurisdiction);
+        if (caseFolder.activeTab !== undefined) setActiveTab(caseFolder.activeTab);
+        if (caseFolder.history !== undefined) setHistory(caseFolder.history);
+        if (caseFolder.selectedHistoryItem !== undefined) setSelectedHistoryItem(caseFolder.selectedHistoryItem);
+        if (caseFolder.backendUnreachable !== undefined) setBackendUnreachable(caseFolder.backendUnreachable);
+
+        if (analysisResult !== undefined) setResult(analysisResult);
+      } else {
+        // Restore from legacy state format
+        if (savedState.userInput !== undefined) setUserInput(savedState.userInput);
+        if (savedState.jurisdiction !== undefined) setJurisdiction(savedState.jurisdiction);
+        if (savedState.result !== undefined) setResult(savedState.result);
+        if (savedState.activeTab !== undefined) setActiveTab(savedState.activeTab);
+        if (savedState.history !== undefined) setHistory(savedState.history);
+        if (savedState.selectedHistoryItem !== undefined) setSelectedHistoryItem(savedState.selectedHistoryItem);
+        if (savedState.backendUnreachable !== undefined) setBackendUnreachable(savedState.backendUnreachable);
+      }
+
       // Note: We don't restore file selection as that would require re-reading the file
     }
   }, []);
 
   // Set up URL state synchronization
   useEffect(() => {
-    const getStateToSync = () => ({
+    const getStateToSync = () => createVirtualCaseFolderState({
       userInput,
       jurisdiction,
-      result,
       activeTab,
       history,
       selectedHistoryItem,
       backendUnreachable
-    });
+    }, result);
 
     // Update URL immediately with current state
     updateUrlWithState(getStateToSync());

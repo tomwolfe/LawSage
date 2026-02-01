@@ -35,7 +35,7 @@ Your response MUST be in valid JSON format with the following structure:
   "disclaimer": "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. This is legal information, not legal advice. Always consult with a qualified attorney.",
   "strategy": "Your legal strategy and analysis here",
   "adversarial_strategy": "Opposition arguments and 'red-team' analysis of the user's case",
-  "roadmap": [
+  "procedural_roadmap": [
     {
       "step": 1,
       "title": "First step title",
@@ -74,8 +74,9 @@ CRITICAL INSTRUCTIONS:
 4. If Local Rules search fails, fall back to general state rules with a warning flag
 5. Ensure the response is valid JSON with all required fields
 6. Include at least 3 proper legal citations in the citations array
-7. Include a detailed roadmap with at least 3 steps
+7. Include a detailed procedural_roadmap with at least 3 steps
 8. Include comprehensive local logistics information
+9. Return ALL requested information in a single JSON response to minimize API calls
 `;
 
 export const runtime = 'edge'; // Enable edge runtime
@@ -84,27 +85,6 @@ export async function POST(req: NextRequest) {
   try {
     // Get the Gemini API key from headers
     const xGeminiApiKey = req.headers.get('X-Gemini-API-Key');
-    
-    if (!xGeminiApiKey) {
-      return NextResponse.json(
-        {
-          type: "AuthenticationError",
-          detail: "Gemini API Key is missing."
-        } satisfies StandardErrorResponse,
-        { status: 401 }
-      );
-    }
-
-    // Basic validation
-    if (!xGeminiApiKey.startsWith("AIza") || xGeminiApiKey.length < 20) {
-      return NextResponse.json(
-        {
-          type: "ValidationError",
-          detail: "Invalid Gemini API Key format."
-        } satisfies StandardErrorResponse,
-        { status: 400 }
-      );
-    }
 
     // Parse the request body
     const { user_input, jurisdiction, documents }: LegalRequest = await req.json();
@@ -127,6 +107,42 @@ export async function POST(req: NextRequest) {
           detail: "Jurisdiction is required."
         } satisfies StandardErrorResponse,
         { status: 400 }
+      );
+    }
+
+    // Check if the query matches any rules in the legal lookup database first (static grounding layer)
+    // This provides instant, zero-latency research for common queries
+    if (xGeminiApiKey) {
+      // Only validate API key if provided (for advanced features)
+      if (!xGeminiApiKey.startsWith("AIza") || xGeminiApiKey.length < 20) {
+        return NextResponse.json(
+          {
+            type: "ValidationError",
+            detail: "Invalid Gemini API Key format."
+          } satisfies StandardErrorResponse,
+          { status: 400 }
+        );
+      }
+    }
+
+    // Try the static grounding layer first - check if this is a common procedural question
+    const { getLegalLookupResponse } = await import('../../../src/utils/legal-lookup');
+    const staticResponse = await getLegalLookupResponse(`${user_input} ${jurisdiction}`);
+
+    if (staticResponse) {
+      // If we found a match in the static grounding layer, return it immediately
+      // This provides zero-latency research for common procedural rules
+      return NextResponse.json(staticResponse);
+    }
+
+    // If no match in static grounding layer, proceed with Gemini API call
+    if (!xGeminiApiKey) {
+      return NextResponse.json(
+        {
+          type: "AuthenticationError",
+          detail: "Gemini API Key is missing. Static grounding layer did not find a match for this query."
+        } satisfies StandardErrorResponse,
+        { status: 401 }
       );
     }
 
@@ -188,7 +204,7 @@ Generate a comprehensive legal response in the following JSON format:
   "disclaimer": "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. This is legal information, not legal advice. Always consult with a qualified attorney.",
   "strategy": "Your legal strategy and analysis for ${jurisdiction} jurisdiction",
   "adversarial_strategy": "Opposition arguments and 'red-team' analysis of the user's case",
-  "roadmap": [
+  "procedural_roadmap": [
     {
       "step": 1,
       "title": "First step title",
@@ -250,7 +266,7 @@ Generate a comprehensive legal response in the following JSON format:
   "procedural_checks": ["Results of procedural technicality checks against Local Rules of Court in ${jurisdiction}"]
 }
 
-CRITICAL: Your response must be valid JSON with all required fields. Include at least 3 legal citations, a detailed roadmap with at least 3 steps, and comprehensive local logistics information specific to ${jurisdiction}.
+CRITICAL: Your response must be valid JSON with all required fields. Include at least 3 legal citations, a detailed procedural_roadmap with at least 3 steps, and comprehensive local logistics information specific to ${jurisdiction}. Return ALL information in a single response to minimize API calls.
 `;
 
     // Generate content using the model
@@ -319,9 +335,9 @@ CRITICAL: Your response must be valid JSON with all required fields. Include at 
       formattedOutput += `ADVERSARIAL STRATEGY:\n${parsedOutput.adversarial_strategy}\n\n`;
     }
 
-    if (parsedOutput.roadmap && Array.isArray(parsedOutput.roadmap)) {
-      formattedOutput += "ROADMAP:\n";
-      for (const item of parsedOutput.roadmap) {
+    if (parsedOutput.procedural_roadmap && Array.isArray(parsedOutput.procedural_roadmap)) {
+      formattedOutput += "PROCEDURAL ROADMAP:\n";
+      for (const item of parsedOutput.procedural_roadmap) {
         formattedOutput += `\n${item.step}. ${item.title}\n`;
         formattedOutput += `   Description: ${item.description}\n`;
         if (item.estimated_time) {
