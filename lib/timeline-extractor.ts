@@ -2,7 +2,7 @@
  * Service for extracting chronological timelines from discovery documents
  */
 
-interface TimelineEvent {
+export interface TimelineEvent {
   date: string;
   event: string;
   description: string;
@@ -10,7 +10,7 @@ interface TimelineEvent {
   document_reference?: string;
 }
 
-interface TimelineExtractionResult {
+export interface TimelineExtractionResult {
   events: TimelineEvent[];
   summary: string;
   key_dates: string[];

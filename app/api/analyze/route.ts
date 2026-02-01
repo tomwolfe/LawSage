@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 import { SafetyValidator, ResponseValidator, Source } from '../../../lib/validation';
 import { SelfCorrectionLayer } from '../../../lib/self-correction';
-import { TimelineExtractor } from '../../../lib/timeline-extractor';
+import { TimelineExtractor, TimelineExtractionResult } from '../../../lib/timeline-extractor';
 import { AgenticResearchSystem } from '../../../lib/agentic-research';
 import { LegalResponseSchema } from '../../../lib/schemas';
 
@@ -27,6 +27,24 @@ interface LegalResult {
 interface StandardErrorResponse {
   type: string;
   detail: string;
+}
+
+// Define types for internal use
+interface ResearchFindings {
+  synthesized_analysis: string;
+  sources: Source[];
+  search_queries_used: string[];
+}
+
+interface ValidationResult {
+  isValid: boolean;
+  data: any;
+  errors: Array<{ message: string }> | string[] | null;
+}
+
+interface CorrectionResult {
+  text: string;
+  sources: Source[];
 }
 
 // System instruction for the model
@@ -178,9 +196,9 @@ export async function POST(req: NextRequest) {
 
     // Perform agentic research with timeout protection (reduced to fit within 60s total)
     console.log('Starting agentic research...');
-    const researchFindings = await Promise.race([
-      researchSystem.performResearch(user_input, jurisdiction),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Agentic research timeout')), 25000)) // 25 second timeout
+    const researchFindings: ResearchFindings = await Promise.race<ResearchFindings>([
+      researchSystem.performResearch(user_input, jurisdiction) as Promise<ResearchFindings>,
+      new Promise<ResearchFindings>((_, reject) => setTimeout(() => reject(new Error('Agentic research timeout')), 25000)) // 25 second timeout
     ]).catch(error => {
       console.error('Agentic research failed or timed out:', error);
       // Return minimal research findings to continue processing
@@ -189,7 +207,7 @@ export async function POST(req: NextRequest) {
         sources: [],
         search_queries_used: []
       };
-    });
+    }) as ResearchFindings;
     console.log('Agentic research completed');
 
     // Initialize the Google Generative AI client for final synthesis
@@ -304,7 +322,7 @@ CRITICAL: The response must be valid JSON that conforms to the schema with at le
 
     try {
       // Attempt to generate structured output with timeout (reduced to fit within 60s total)
-      const result = await Promise.race([
+      const result: any = await Promise.race([
         model.generateContent(structuredPrompt),
         new Promise((_, reject) => setTimeout(() => reject(new Error('AI generation timeout')), 35000)) // 35 second timeout to leave room for other operations
       ]);
@@ -319,13 +337,13 @@ CRITICAL: The response must be valid JSON that conforms to the schema with at le
       let sources: Source[] = [...researchFindings.sources]; // Start with research sources
 
       // Validate the structured output using Zod with timeout (reduced to fit within 60s total)
-      const validation = await Promise.race([
-        Promise.resolve(ResponseValidator.validateStructuredOutput(rawOutput)),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Validation timeout')), 5000)) // 5 second timeout
+      const validation: ValidationResult = await Promise.race<ValidationResult>([
+        Promise.resolve(ResponseValidator.validateStructuredOutput(rawOutput)) as Promise<ValidationResult>,
+        new Promise<ValidationResult>((_, reject) => setTimeout(() => reject(new Error('Validation timeout')), 5000)) // 5 second timeout
       ]).catch(error => {
         console.error('Validation failed or timed out:', error);
-        return { isValid: false, data: null, errors: [error.message] };
-      });
+        return { isValid: false, data: null, errors: [{ message: error.message }] };
+      }) as ValidationResult;
 
       let finalText: string;
       if (validation.isValid && validation.data) {
@@ -417,10 +435,10 @@ CRITICAL: The response must be valid JSON that conforms to the schema with at le
       if (documents && documents.length > 0) {
         try {
           // Run timeline extraction with timeout (reduced to fit within 60s total)
-          const timelineResult = await Promise.race([
-            Promise.resolve(TimelineExtractor.extractTimeline(documents)),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeline extraction timeout')), 5000)) // 5 second timeout
-          ]);
+          const timelineResult: TimelineExtractionResult = await Promise.race<TimelineExtractionResult>([
+            Promise.resolve(TimelineExtractor.extractTimeline(documents)) as Promise<TimelineExtractionResult>,
+            new Promise<TimelineExtractionResult>((_, reject) => setTimeout(() => reject(new Error('Timeline extraction timeout')), 5000)) // 5 second timeout
+          ]) as TimelineExtractionResult;
 
           // Add timeline information to the response
           const timelineSection = `\n\n---\nTIMELINE EXTRACTION:\n${timelineResult.summary}\n\nKey Events:\n${timelineResult.events.map(event =>
@@ -434,14 +452,14 @@ CRITICAL: The response must be valid JSON that conforms to the schema with at le
       }
 
       // Apply self-correction layer to verify citations and improve accuracy with timeout (reduced to fit within 60s total)
-      const correctedResult = await Promise.race([
-        SelfCorrectionLayer.correctResponse(finalText, sources, jurisdiction),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Self-correction timeout')), 15000)) // 15 second timeout
+      const correctedResult: CorrectionResult = await Promise.race<CorrectionResult>([
+        SelfCorrectionLayer.correctResponse(finalText, sources, jurisdiction) as Promise<CorrectionResult>,
+        new Promise<CorrectionResult>((_, reject) => setTimeout(() => reject(new Error('Self-correction timeout')), 15000)) // 15 second timeout
       ]).catch(error => {
         console.error('Self-correction failed or timed out:', error);
         // Return original text and sources if self-correction fails
         return { text: finalText, sources };
-      });
+      }) as CorrectionResult;
 
       // Ensure the hardcoded disclaimer is present if not already added by workflow
       let resultText = correctedResult.text;
@@ -485,7 +503,7 @@ ${documents && documents.length > 0 ? `Additional context from provided document
 Ensure your response includes proper legal citations in formats like "12 U.S.C. § 345", "Cal. Civ. Code § 1708", or "Rule 12(b)(6)".
 Also include a procedural roadmap with numbered steps, adversarial strategy considerations, and local logistics information.`;
 
-    const result = await Promise.race([
+    const result: any = await Promise.race([
       model.generateContent(prompt),
       new Promise((_, reject) => setTimeout(() => reject(new Error('AI generation timeout')), 35000)) // 35 second timeout to leave room for other operations
     ]);
@@ -525,10 +543,10 @@ Also include a procedural roadmap with numbered steps, adversarial strategy cons
     if (documents && documents.length > 0) {
       try {
         // Run timeline extraction with timeout (reduced to fit within 60s total)
-        const timelineResult = await Promise.race([
-          Promise.resolve(TimelineExtractor.extractTimeline(documents)),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeline extraction timeout')), 5000)) // 5 second timeout
-        ]);
+        const timelineResult: TimelineExtractionResult = await Promise.race<TimelineExtractionResult>([
+          Promise.resolve(TimelineExtractor.extractTimeline(documents)) as Promise<TimelineExtractionResult>,
+          new Promise<TimelineExtractionResult>((_, reject) => setTimeout(() => reject(new Error('Timeline extraction timeout')), 5000)) // 5 second timeout
+        ]) as TimelineExtractionResult;
 
         // Add timeline information to the response
         const timelineSection = `\n\n---\nTIMELINE EXTRACTION:\n${timelineResult.summary}\n\nKey Events:\n${timelineResult.events.map(event =>
@@ -542,14 +560,14 @@ Also include a procedural roadmap with numbered steps, adversarial strategy cons
     }
 
     // Apply self-correction layer to verify citations and improve accuracy with timeout (reduced to fit within 60s total)
-    const correctedResult = await Promise.race([
-      SelfCorrectionLayer.correctResponse(finalText, sources, jurisdiction),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Self-correction timeout')), 15000)) // 15 second timeout
+    const correctedResult: CorrectionResult = await Promise.race<CorrectionResult>([
+      SelfCorrectionLayer.correctResponse(finalText, sources, jurisdiction) as Promise<CorrectionResult>,
+      new Promise<CorrectionResult>((_, reject) => setTimeout(() => reject(new Error('Self-correction timeout')), 15000)) // 15 second timeout
     ]).catch(error => {
       console.error('Self-correction failed or timed out:', error);
       // Return original text and sources if self-correction fails
       return { text: finalText, sources };
-    });
+    }) as CorrectionResult;
 
     // Ensure the hardcoded disclaimer is present if not already added by workflow
     let resultText = correctedResult.text;
