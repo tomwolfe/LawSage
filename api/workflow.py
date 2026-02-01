@@ -1,5 +1,6 @@
 import json
 import re
+import requests
 from google import genai
 from google.genai import types, errors
 from api.models import LegalRequest, LegalResult, Source, GeminiCandidate
@@ -76,6 +77,34 @@ def is_retryable_exception(e):
         return True
     return False
 
+def cosine_similarity(text1: str, text2: str) -> float:
+    """Simple cosine similarity calculation for template matching"""
+    if not text1 or not text2:
+        return 0.0
+
+    # Tokenize and create term frequency vectors
+    tokens1 = text1.lower().split()
+    tokens2 = text2.lower().split()
+
+    # Create sets of unique tokens
+    all_tokens = set(tokens1 + tokens2)
+
+    # Create frequency vectors
+    vec1 = [tokens1.count(token) for token in all_tokens]
+    vec2 = [tokens2.count(token) for token in all_tokens]
+
+    # Calculate dot product
+    dot_product = sum(a * b for a, b in zip(vec1, vec2))
+
+    # Calculate magnitudes
+    mag1 = sum(a * a for a in vec1) ** 0.5
+    mag2 = sum(b * b for b in vec2) ** 0.5
+
+    if mag1 == 0 or mag2 == 0:
+        return 0.0
+
+    return dot_product / (mag1 * mag2)
+
 class LawSageWorkflow:
     """
     Decomposed workflow for LawSage to ensure reliability and safety.
@@ -85,6 +114,61 @@ class LawSageWorkflow:
         self.client = genai.Client(api_key=api_key)
         self.settings = get_settings()
         self.model_id = self.settings["model"]["id"]
+
+    def get_templates_manifest(self):
+        """Fetch the templates manifest from the public directory"""
+        try:
+            # For local development, read from the local file
+            import os
+            manifest_path = os.path.join(os.path.dirname(__file__), '..', 'public', 'templates', 'manifest.json')
+
+            with open(manifest_path, 'r', encoding='utf-8') as f:
+                manifest_data = json.load(f)
+
+            return manifest_data.get('templates', [])
+        except Exception as e:
+            print(f"Error loading templates manifest: {e}")
+            return []
+
+    def find_best_template(self, user_input: str, templates: list) -> dict:
+        """Find the best matching template using cosine similarity"""
+        best_match = None
+        highest_similarity = 0
+
+        for template in templates:
+            # Calculate similarity with title
+            title_similarity = cosine_similarity(user_input.lower(), template.get('title', '').lower())
+
+            # Calculate similarity with description
+            desc_similarity = cosine_similarity(user_input.lower(), template.get('description', '').lower())
+
+            # Calculate similarity with keywords
+            keywords_text = ' '.join(template.get('keywords', []))
+            keywords_similarity = cosine_similarity(user_input.lower(), keywords_text.lower())
+
+            # Weighted combination of similarities
+            combined_similarity = (title_similarity * 0.4) + (desc_similarity * 0.3) + (keywords_similarity * 0.3)
+
+            if combined_similarity > highest_similarity:
+                highest_similarity = combined_similarity
+                best_match = template
+
+        return best_match if best_match else None
+
+    def get_template_content(self, template_path: str) -> str:
+        """Fetch the content of a specific template"""
+        try:
+            import os
+            # Adjust the path to be relative to the project root
+            template_full_path = os.path.join(os.path.dirname(__file__), '..', 'public', template_path.lstrip('/'))
+
+            with open(template_full_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            return content
+        except Exception as e:
+            print(f"Error loading template {template_path}: {e}")
+            return ""
 
     def step_1_audit(self, request: LegalRequest):
         """
@@ -119,12 +203,22 @@ class LawSageWorkflow:
 
     def step_2_generate(self, request: LegalRequest) -> Tuple[str, List[Source], str]:
         """
-        Step 2: Grounded Generation.
+        Step 2: Grounded Generation with Template Injection.
         Calls Gemini with Google Search tool and structured output.
         Returns: (formatted_text, sources, original_json_str)
         """
         search_tool = types.Tool(google_search=types.GoogleSearch())
 
+        # Template injection: Find the best matching template for the user's input
+        templates = self.get_templates_manifest()
+        best_template = self.find_best_template(request.user_input, templates)
+
+        # Get the template content if a match was found
+        template_content = ""
+        if best_template:
+            template_content = self.get_template_content(best_template.get('templatePath', ''))
+
+        # Construct the prompt with the selected template
         prompt = f"""
 User Situation: {request.user_input}
 Jurisdiction: {request.jurisdiction}
@@ -150,6 +244,7 @@ CITATIONS:
 ---
 FILING TEMPLATE:
 [Actual legal filing template with specific forms and procedures for {request.jurisdiction}]
+{f"INJECTED TEMPLATE CONTENT:{template_content}" if template_content else ""}
 
 CRITICAL: Your response must contain the EXACT format above with at least 3 legal citations in the specified formats and a numbered procedural roadmap.
 """

@@ -1,0 +1,164 @@
+{
+  "templates": [
+    {
+      "id": "motion-to-dismiss",
+      "title": "Motion to Dismiss",
+      "category": "Civil Procedure",
+      "description": "A motion filed by a defendant requesting the court to dismiss the plaintiff's case.",
+      "keywords": ["motion", "dismiss", "defendant", "case", "court"],
+      "templatePath": "/templates/motion-to-dismiss.md"
+    },
+    {
+      "id": "small-claims-complaint",
+      "title": "Small Claims Complaint",
+      "category": "Civil Procedure",
+      "description": "Initial pleading filed to initiate a small claims case.",
+      "keywords": ["complaint", "small claims", "initiate", "pleading", "court"],
+      "templatePath": "/templates/small-claims-complaint.md"
+    },
+    {
+      "id": "demand-letter",
+      "title": "Demand Letter",
+      "category": "General Practice",
+      "description": "A formal letter requesting payment or performance before initiating litigation.",
+      "keywords": ["demand", "letter", "payment", "performance", "litigation"],
+      "templatePath": "/templates/demand-letter.md"
+    },
+    {
+      "id": "contract-review-checklist",
+      "title": "Contract Review Checklist",
+      "category": "Business Law",
+      "description": "A checklist for reviewing contracts for common provisions and risks.",
+      "keywords": ["contract", "review", "checklist", "provisions", "risks"],
+      "templatePath": "/templates/contract-review-checklist.md"
+    },
+    {
+      "id": "employment-agreement",
+      "title": "Employment Agreement",
+      "category": "Employment Law",
+      "description": "Standard employment agreement outlining terms and conditions of employment.",
+      "keywords": ["employment", "agreement", "terms", "conditions", "employee"],
+      "templatePath": "/templates/employment-agreement.md"
+    },
+    {
+      "id": "nda-template",
+      "title": "Non-Disclosure Agreement",
+      "category": "Business Law",
+      "description": "Agreement to protect confidential information shared between parties.",
+      "keywords": ["nda", "confidential", "information", "disclosure", "agreement"],
+      "templatePath": "/templates/nda-template.md"
+    },
+    {
+      "id": "landlord-notice-eviction",
+      "title": "Landlord's Notice of Eviction",
+      "category": "Real Estate Law",
+      "description": "Notice served by landlord to tenant for lease termination and eviction.",
+      "keywords": ["landlord", "eviction", "notice", "tenant", "lease"],
+      "templatePath": "/templates/landlord-notice-eviction.md"
+    },
+    {
+      "id": "power-of-attorney",
+      "title": "Power of Attorney",
+      "category": "Estate Planning",
+      "description": "Document granting authority to another person to act on behalf of the principal.",
+      "keywords": ["power", "attorney", "authority", "principal", "agent"],
+      "templatePath": "/templates/power-of-attorney.md"
+    },
+    {
+      "id": "warranty-disclaimer",
+      "title": "Warranty Disclaimer",
+      "category": "Consumer Law",
+      "description": "Legal document disclaiming warranties for products or services.",
+      "keywords": ["warranty", "disclaimer", "product", "service", "liability"],
+      "templatePath": "/templates/warranty-disclaimer.md"
+    },
+    {
+      "id": "subpoena-duces-tecum",
+      "title": "Subpoena Duces Tecum",
+      "category": "Civil Procedure",
+      "description": "Court order requiring production of documents or evidence.",
+      "keywords": ["subpoena", "duces tecum", "documents", "evidence", "court"],
+      "templatePath": "/templates/subpoena-duces-tecum.md"
+    },
+    {
+      "id": "amicus-brief",
+      "title": "Amicus Curiae Brief",
+      "category": "Appellate Practice",
+      "description": "Brief filed by a friend of the court offering expertise on legal issues.",
+      "keywords": ["amicus", "brief", "court", "expertise", "legal issues"],
+      "templatePath": "/templates/amicus-brief.md"
+    },
+    {
+      "id": "appeal-brief",
+      "title": "Appeal Brief",
+      "category": "Appellate Practice",
+      "description": "Written argument submitted to appellate court challenging lower court decision.",
+      "keywords": ["appeal", "brief", "appellate", "court", "decision"],
+      "templatePath": "/templates/appeal-brief.md"
+    },
+    {
+      "id": "bankruptcy-petition",
+      "title": "Bankruptcy Petition",
+      "category": "Bankruptcy Law",
+      "description": "Formal request to court for bankruptcy protection under federal law.",
+      "keywords": ["bankruptcy", "petition", "protection", "federal", "court"],
+      "templatePath": "/templates/bankruptcy-petition.md"
+    },
+    {
+      "id": "divorce-complaint",
+      "title": "Divorce Complaint",
+      "category": "Family Law",
+      "description": "Initial pleading filed to initiate divorce proceedings.",
+      "keywords": ["divorce", "complaint", "proceedings", "marriage", "dissolution"],
+      "templatePath": "/templates/divorce-complaint.md"
+    },
+    {
+      "id": "custody-agreement",
+      "title": "Child Custody Agreement",
+      "category": "Family Law",
+      "description": "Agreement establishing custody arrangements for minor children.",
+      "keywords": ["custody", "agreement", "children", "parenting", "arrangements"],
+      "templatePath": "/templates/custody-agreement.md"
+    },
+    {
+      "id": "personal-injury-complaint",
+      "title": "Personal Injury Complaint",
+      "category": "Tort Law",
+      "description": "Initial pleading filed to initiate personal injury lawsuit.",
+      "keywords": ["personal injury", "complaint", "lawsuit", "damages", "negligence"],
+      "templatePath": "/templates/personal-injury-complaint.md"
+    },
+    {
+      "id": "cease-desist-letter",
+      "title": "Cease and Desist Letter",
+      "category": "Intellectual Property",
+      "description": "Letter demanding that someone stop infringing on intellectual property rights.",
+      "keywords": ["cease", "desist", "intellectual property", "infringement", "rights"],
+      "templatePath": "/templates/cease-desist-letter.md"
+    },
+    {
+      "id": "will-template",
+      "title": "Last Will and Testament",
+      "category": "Estate Planning",
+      "description": "Legal document specifying how assets should be distributed after death.",
+      "keywords": ["will", "testament", "assets", "distribution", "death"],
+      "templatePath": "/templates/will-template.md"
+    },
+    {
+      "id": "trust-deed",
+      "title": "Revocable Living Trust Deed",
+      "category": "Estate Planning",
+      "description": "Document creating a trust that can be modified during grantor's lifetime.",
+      "keywords": ["trust", "deed", "revocable", "living", "grantor"],
+      "templatePath": "/templates/trust-deed.md"
+    },
+    {
+      "id": "partnership-agreement",
+      "title": "Partnership Agreement",
+      "category": "Business Law",
+      "description": "Agreement establishing terms and responsibilities of business partners.",
+      "keywords": ["partnership", "agreement", "business", "partners", "responsibilities"],
+      "templatePath": "/templates/partnership-agreement.md"
+    }
+  ]
+}

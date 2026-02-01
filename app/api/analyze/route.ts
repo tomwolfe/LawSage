@@ -25,6 +25,53 @@ interface StandardErrorResponse {
   detail: string;
 }
 
+// Simple cosine similarity function for template matching
+function cosineSimilarity(text1: string, text2: string): number {
+  if (!text1 || !text2) return 0;
+
+  // Tokenize and normalize the texts
+  const tokens1 = text1.toLowerCase().split(/\W+/).filter(Boolean);
+  const tokens2 = text2.toLowerCase().split(/\W+/).filter(Boolean);
+
+  // Create term frequency maps
+  const freqMap1 = new Map<string, number>();
+  const freqMap2 = new Map<string, number>();
+
+  for (const token of tokens1) {
+    freqMap1.set(token, (freqMap1.get(token) || 0) + 1);
+  }
+
+  for (const token of tokens2) {
+    freqMap2.set(token, (freqMap2.get(token) || 0) + 1);
+  }
+
+  // Get all unique terms
+  const allTerms = new Set([...tokens1, ...tokens2]);
+
+  // Calculate vectors
+  const vec1: number[] = [];
+  const vec2: number[] = [];
+
+  for (const term of allTerms) {
+    vec1.push(freqMap1.get(term) || 0);
+    vec2.push(freqMap2.get(term) || 0);
+  }
+
+  // Calculate dot product
+  let dotProduct = 0;
+  for (let i = 0; i < vec1.length; i++) {
+    dotProduct += vec1[i] * vec2[i];
+  }
+
+  // Calculate magnitudes
+  const magnitude1 = Math.sqrt(vec1.reduce((sum, val) => sum + val * val, 0));
+  const magnitude2 = Math.sqrt(vec2.reduce((sum, val) => sum + val * val, 0));
+
+  if (magnitude1 === 0 || magnitude2 === 0) return 0;
+
+  return dotProduct / (magnitude1 * magnitude2);
+}
+
 // System instruction for the model
 const SYSTEM_INSTRUCTION = `
 You are a legal assistant helping pro se litigants (people representing themselves).
@@ -135,6 +182,53 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(staticResponse);
     }
 
+    // Template injection: Find the best matching template for the user's input
+    let templateContent = '';
+    try {
+      // Fetch the templates manifest
+      const manifestResponse = await fetch(`${req.nextUrl.origin}/templates/manifest.json`);
+      if (manifestResponse.ok) {
+        const manifest = await manifestResponse.json();
+        const templates = manifest.templates || [];
+
+        // Find the best matching template using cosine similarity
+        let bestMatch = null;
+        let highestSimilarity = -1;
+
+        for (const template of templates) {
+          // Calculate similarity with title
+          const titleSimilarity = cosineSimilarity(user_input.toLowerCase(), template.title.toLowerCase());
+
+          // Calculate similarity with description
+          const descSimilarity = cosineSimilarity(user_input.toLowerCase(), template.description.toLowerCase());
+
+          // Calculate similarity with keywords
+          const keywordsText = template.keywords.join(' ');
+          const keywordsSimilarity = cosineSimilarity(user_input.toLowerCase(), keywordsText.toLowerCase());
+
+          // Weighted combination of similarities
+          const combinedSimilarity = (titleSimilarity * 0.4) + (descSimilarity * 0.3) + (keywordsSimilarity * 0.3);
+
+          if (combinedSimilarity > highestSimilarity) {
+            highestSimilarity = combinedSimilarity;
+            bestMatch = template;
+          }
+        }
+
+        // If we found a good match, fetch the template content
+        if (bestMatch && highestSimilarity > 0.1) { // Threshold for considering a match
+          const templatePath = bestMatch.templatePath;
+          const templateResponse = await fetch(`${req.nextUrl.origin}${templatePath}`);
+          if (templateResponse.ok) {
+            templateContent = await templateResponse.text();
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Template matching failed:', error);
+      // Continue without template injection if it fails
+    }
+
     // If no match in static grounding layer, proceed with Gemini API call
     if (!xGeminiApiKey) {
       return NextResponse.json(
@@ -230,7 +324,7 @@ Generate a comprehensive legal response in the following JSON format:
       "status": "pending"
     }
   ],
-  "filing_template": "Actual legal filing template with specific forms and procedures for ${jurisdiction}",
+  "filing_template": "${templateContent || `Actual legal filing template with specific forms and procedures for ${jurisdiction}`}",
   "citations": [
     {
       "text": "12 U.S.C. § 345",
