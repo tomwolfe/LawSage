@@ -43,6 +43,10 @@ class LegalOutput(BaseModel):
         ...,
         description="Legal strategy and analysis for the user's situation"
     )
+    adversarial_strategy: str = Field(
+        ...,
+        description="Opposition arguments and 'red-team' analysis of the user's case"
+    )
     roadmap: List[StrategyItem] = Field(
         ...,
         description="Step-by-step procedural roadmap for the user"
@@ -58,6 +62,14 @@ class LegalOutput(BaseModel):
     sources: List[str] = Field(
         default_factory=list,
         description="Additional sources referenced in the response"
+    )
+    local_logistics: dict = Field(
+        default_factory=dict,
+        description="Hyper-local logistical data (courthouse addresses, filing fees, dress codes)"
+    )
+    procedural_checks: List[str] = Field(
+        default_factory=list,
+        description="Results of procedural technicality checks against Local Rules of Court"
     )
 
 

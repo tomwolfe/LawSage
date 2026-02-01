@@ -12,6 +12,7 @@ const LEGAL_DISCLAIMER = (
 interface LegalRequest {
   user_input: string;
   jurisdiction: string;
+  documents?: string[]; // Virtual Case Folder - array of document texts
 }
 
 interface LegalResult {
@@ -27,17 +28,26 @@ interface StandardErrorResponse {
 // System instruction for the model
 const SYSTEM_INSTRUCTION = `
 You are a legal assistant helping pro se litigants (people representing themselves).
-Even though you cannot return structured JSON when using tools, you must format your response to include ALL required elements clearly separated by the '---' delimiter.
+You must perform a comprehensive analysis that includes adversarial strategy and procedural checks.
 
 Your response MUST include:
 - A legal disclaimer at the beginning
 - A strategy section with legal analysis
+- An adversarial strategy section with opposition arguments and 'red-team' analysis of the user's case
 - A roadmap with step-by-step procedural instructions (clearly labeled as "ROADMAP:" or "NEXT STEPS:")
+- Procedural checks against Local Rules of Court
 - A filing template section with actual legal documents
 - At least 3 proper legal citations supporting your recommendations in these EXACT formats:
   * Federal statutes: "12 U.S.C. § 345" (number, space, U.S.C., space, §, number)
   * State codes: "Cal. Civ. Code § 1708" (state abbreviation, space, code name, space, §, number)
   * Court rules: "Rule 12(b)(6)" (Rule, space, number with parentheses)
+- Local logistics information in JSON format (courthouse address, filing fees, dress code, etc.)
+
+CRITICAL INSTRUCTIONS:
+1. Perform a 'red-team' analysis of the user's claims - identify weaknesses and potential opposition arguments
+2. Use the Google Search tool to find 'Local Rules of Court' for the user's specific county/district
+3. Extract courthouse location, filing fees, and procedural requirements from these local rules
+4. If Local Rules search fails, fall back to general state rules with a warning flag
 
 Format your response as follows:
 LEGAL DISCLAIMER: [Your disclaimer here]
@@ -45,15 +55,32 @@ LEGAL DISCLAIMER: [Your disclaimer here]
 STRATEGY:
 [Your legal strategy and analysis here]
 
+ADVERSARIAL STRATEGY:
+[Opposition arguments and 'red-team' analysis of the user's case]
+
 ROADMAP:
 1. [First step with title and description]
 2. [Second step with title and description]
 3. [Third step with title and description]
 
+PROCEDURAL CHECKS:
+[Results of procedural technicality checks against Local Rules of Court]
+
 CITATIONS:
 - 12 U.S.C. § 345 (or similar federal statute)
 - Cal. Civ. Code § 1708 (or similar state code)
 - Rule 12(b)(6) (or similar court rule)
+
+---
+LOCAL LOGISTICS:
+{
+  "courthouse_address": "[Complete address of the courthouse]",
+  "filing_fees": "[Specific filing fees for this case type]",
+  "dress_code": "[Courthouse dress code requirements]",
+  "parking_info": "[Parking information near courthouse]",
+  "hours_of_operation": "[Courthouse hours of operation]",
+  "local_rules_url": "[URL to local rules of court]"
+}
 
 ---
 FILING TEMPLATE:
@@ -152,7 +179,17 @@ export async function POST(req: NextRequest) {
     });
 
     // Create the prompt
+    let documentsText = "";
+    if (documents && documents.length > 0) {
+      documentsText = "RELEVANT DOCUMENTS FROM VIRTUAL CASE FOLDER:\n\n";
+      documents.forEach((doc, index) => {
+        documentsText += `Document ${index + 1}:\n${doc}\n\n`;
+      });
+    }
+
     const prompt = `
+${documentsText}
+
 User Situation: ${user_input}
 Jurisdiction: ${jurisdiction}
 
@@ -164,10 +201,16 @@ LEGAL DISCLAIMER: [Your disclaimer here]
 STRATEGY:
 [Your legal strategy and analysis for ${jurisdiction} jurisdiction]
 
+ADVERSARIAL STRATEGY:
+[Opposition arguments and 'red-team' analysis of the user's case]
+
 ROADMAP:
 1. [First step with title and description]
 2. [Second step with title and description]
 3. [Third step with title and description]
+
+PROCEDURAL CHECKS:
+[Results of procedural technicality checks against Local Rules of Court]
 
 CITATIONS:
 - [Federal statute in format: 12 U.S.C. § 345]
@@ -175,10 +218,21 @@ CITATIONS:
 - [Court rule in format: Rule 12(b)(6)]
 
 ---
+LOCAL LOGISTICS:
+{
+  "courthouse_address": "[Complete address of the courthouse]",
+  "filing_fees": "[Specific filing fees for this case type]",
+  "dress_code": "[Courthouse dress code requirements]",
+  "parking_info": "[Parking information near courthouse]",
+  "hours_of_operation": "[Courthouse hours of operation]",
+  "local_rules_url": "[URL to local rules of court]"
+}
+
+---
 FILING TEMPLATE:
 [Actual legal filing template with specific forms and procedures for ${jurisdiction}]
 
-CRITICAL: Your response must contain the EXACT format above with at least 3 legal citations in the specified formats and a numbered procedural roadmap.
+CRITICAL: Your response must contain the EXACT format above with at least 3 legal citations in the specified formats, a numbered procedural roadmap, adversarial strategy, procedural checks, and local logistics JSON.
 `;
 
     // Generate content using the model

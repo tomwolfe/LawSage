@@ -91,9 +91,70 @@ export class ResponseValidator {
   static NO_FILINGS_MSG = "No filings generated. Please try a more specific request or check the strategy tab.";
 
   static validateAndFix(content: string): string {
-    // For now, we'll implement the legacy validation approach
-    // since we're not using structured output with tools
-    
+    // Try to parse as structured JSON first
+    try {
+      const parsed = JSON.parse(content);
+
+      // If it's structured JSON, format it appropriately
+      if (parsed.disclaimer && parsed.strategy && parsed.filing_template) {
+        let formattedOutput = `${parsed.disclaimer}\n\n`;
+
+        formattedOutput += `STRATEGY:\n${parsed.strategy}\n\n`;
+
+        if (parsed.adversarial_strategy) {
+          formattedOutput += `ADVERSARIAL STRATEGY:\n${parsed.adversarial_strategy}\n\n`;
+        }
+
+        if (parsed.roadmap && parsed.roadmap.length > 0) {
+          formattedOutput += "ROADMAP:\n";
+          for (const item of parsed.roadmap) {
+            formattedOutput += `${item.step}. ${item.title}: ${item.description}\n`;
+            if (item.estimated_time) {
+              formattedOutput += `   Estimated Time: ${item.estimated_time}\n`;
+            }
+            if (item.required_documents) {
+              formattedOutput += `   Required Documents: ${item.required_documents.join(', ')}\n`;
+            }
+          }
+          formattedOutput += "\n";
+        }
+
+        if (parsed.procedural_checks && parsed.procedural_checks.length > 0) {
+          formattedOutput += "PROCEDURAL CHECKS:\n";
+          for (const check of parsed.procedural_checks) {
+            formattedOutput += `- ${check}\n`;
+          }
+          formattedOutput += "\n";
+        }
+
+        if (parsed.citations && parsed.citations.length > 0) {
+          formattedOutput += "CITATIONS:\n";
+          for (const citation of parsed.citations) {
+            formattedOutput += `- ${citation.text}`;
+            if (citation.source) {
+              formattedOutput += ` (${citation.source})`;
+            }
+            if (citation.url) {
+              formattedOutput += ` ${citation.url}`;
+            }
+            formattedOutput += "\n";
+          }
+          formattedOutput += "\n";
+        }
+
+        if (parsed.local_logistics) {
+          formattedOutput += "LOCAL LOGISTICS:\n";
+          formattedOutput += JSON.stringify(parsed.local_logistics, null, 2) + "\n\n";
+        }
+
+        formattedOutput += `---\n\nFILING TEMPLATE:\n${parsed.filing_template}`;
+
+        return formattedOutput;
+      }
+    } catch (e) {
+      // If JSON parsing fails, fall back to legacy approach
+    }
+
     // 1. Normalize Delimiter first to separate strategy and filings
     // We look for '---', '***', or '___' with optional surrounding whitespace
     const delimiterPattern = /\n\s*([-*_]{3,})\s*\n/;
@@ -141,7 +202,7 @@ export class ResponseValidator {
 
       const sentences = line.split(/(?<=[.!?])\s+/);
       const filteredSentences: string[] = [];
-      
+
       for (const s of sentences) {
         const sLower = s.toLowerCase();
         if (!disclaimerKeywords.some(kw => sLower.includes(kw))) {
@@ -208,7 +269,15 @@ export class ResponseValidator {
     const roadmapKeywords = ["Next Steps", "Roadmap", "Procedural Roadmap", "What to do next", "Step-by-step", "ROADMAP:", "NEXT STEPS:"];
     const hasRoadmap = roadmapKeywords.some(kw => content.toLowerCase().includes(kw.toLowerCase()));
 
-    return hasCitations && hasRoadmap;
+    // Check for Adversarial Strategy
+    const adversarialKeywords = ["Adversarial Strategy", "Opposition View", "Red-Team Analysis", "Opposition arguments"];
+    const hasAdversarial = adversarialKeywords.some(kw => content.toLowerCase().includes(kw.toLowerCase()));
+
+    // Check for Procedural Checks
+    const proceduralKeywords = ["Procedural Checks", "Local Rules of Court", "Procedural technicality"];
+    const hasProcedural = proceduralKeywords.some(kw => content.toLowerCase().includes(kw.toLowerCase()));
+
+    return hasCitations && hasRoadmap && hasAdversarial && hasProcedural;
   }
   
   // Additional validation methods to match the Python implementation

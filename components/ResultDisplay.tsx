@@ -31,10 +31,20 @@ interface StrategyItem {
 interface StructuredLegalOutput {
   disclaimer: string;
   strategy: string;
+  adversarial_strategy: string;
   roadmap: StrategyItem[];
   filing_template: string;
   citations: Citation[];
   sources: string[];
+  local_logistics: {
+    courthouse_address?: string;
+    filing_fees?: string;
+    dress_code?: string;
+    parking_info?: string;
+    hours_of_operation?: string;
+    local_rules_url?: string;
+  };
+  procedural_checks: string[];
 }
 
 interface Source {
@@ -49,8 +59,8 @@ interface LegalResult {
 
 interface ResultDisplayProps {
   result: LegalResult;
-  activeTab: 'strategy' | 'filings' | 'sources';
-  setActiveTab: (tab: 'strategy' | 'filings' | 'sources') => void;
+  activeTab: 'strategy' | 'filings' | 'sources' | 'survival-guide' | 'opposition-view';
+  setActiveTab: (tab: 'strategy' | 'filings' | 'sources' | 'survival-guide' | 'opposition-view') => void;
   jurisdiction: string;
 }
 
@@ -70,6 +80,12 @@ function parseLegalOutput(text: string): { strategy: string; filings: string; st
       // Format the structured output for display
       let strategyText = `${parsed.disclaimer}\n\n${parsed.strategy}\n\n`;
 
+      // Add adversarial strategy if present
+      if (parsed.adversarial_strategy) {
+        strategyText += "## Opposition View (Red-Team Analysis):\n";
+        strategyText += `${parsed.adversarial_strategy}\n\n`;
+      }
+
       if (parsed.roadmap && parsed.roadmap.length > 0) {
         strategyText += "## Procedural Roadmap:\n";
         for (const item of parsed.roadmap) {
@@ -81,6 +97,13 @@ function parseLegalOutput(text: string): { strategy: string; filings: string; st
           if (item.required_documents && item.required_documents.length > 0) {
             strategyText += `*Required Documents: ${item.required_documents.join(', ')}*\n`;
           }
+        }
+      }
+
+      if (parsed.procedural_checks && parsed.procedural_checks.length > 0) {
+        strategyText += "\n## Procedural Checks:\n";
+        for (const check of parsed.procedural_checks) {
+          strategyText += `- ${check}\n`;
         }
       }
 
@@ -143,7 +166,7 @@ function parseLegalOutput(text: string): { strategy: string; filings: string; st
 }
 
 export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdiction }: ResultDisplayProps) {
-  const [copyStatus, setCopyStatus] = useState<{[key: string]: boolean}>({ all: false });
+  const [copyStatus, setCopyStatus] = useState<{[key: string]: boolean}>({ all: false, 'opposition-view': false, 'survival-guide': false });
   const [citationVerificationStatus, setCitationVerificationStatus] = useState<{[key: string]: {
     is_verified: boolean | undefined;
     verification_source?: string;
@@ -425,6 +448,16 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
           Strategy & Analysis
         </button>
         <button
+          onClick={() => setActiveTab('opposition-view')}
+          className={cn(
+            "px-6 py-4 font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap",
+            activeTab === 'opposition-view' ? "border-indigo-600 text-indigo-600 bg-indigo-50/30" : "border-transparent text-slate-500 hover:text-slate-700"
+          )}
+        >
+          <Gavel size={18} />
+          Opposition View
+        </button>
+        <button
           onClick={() => setActiveTab('filings')}
           className={cn(
             "px-6 py-4 font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap",
@@ -433,6 +466,16 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
         >
           <FileText size={18} />
           Generated Filings
+        </button>
+        <button
+          onClick={() => setActiveTab('survival-guide')}
+          className={cn(
+            "px-6 py-4 font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap",
+            activeTab === 'survival-guide' ? "border-indigo-600 text-indigo-600 bg-indigo-50/30" : "border-transparent text-slate-500 hover:text-slate-700"
+          )}
+        >
+          <FileText size={18} />
+          Pro Se Survival Guide
         </button>
         <button
           onClick={() => setActiveTab('sources')}
@@ -462,6 +505,30 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                 <div className="prose max-w-none prose-slate mt-8">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {strategyText}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            );
+          }
+
+          if (activeTab === 'opposition-view') {
+            const adversarialText = structured?.adversarial_strategy || "No adversarial strategy provided.";
+
+            return (
+              <div className="relative">
+                <button
+                  onClick={() => copyToClipboard(adversarialText, 'opposition-view')}
+                  className="absolute top-0 right-0 p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors z-10"
+                  title={copyStatus['opposition-view'] ? "Copied!" : "Copy to clipboard"}
+                >
+                  <Copy size={16} />
+                  <span>{copyStatus['opposition-view'] ? "Copied!" : "Copy"}</span>
+                </button>
+                <div className="prose max-w-none prose-slate mt-8">
+                  <h2 className="text-red-600 font-bold">Opposition View (Red-Team Analysis)</h2>
+                  <p className="text-red-600 mb-4">This section presents potential challenges and counterarguments to your case:</p>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {adversarialText}
                   </ReactMarkdown>
                 </div>
               </div>
@@ -512,6 +579,99 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                     </div>
                   )}
                 </div>
+              </div>
+            );
+          }
+
+          if (activeTab === 'survival-guide') {
+            const logistics = structured?.local_logistics || {};
+
+            return (
+              <div className="space-y-6">
+                <h2 className="text-2xl font-bold text-slate-800">Pro Se Survival Guide</h2>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+                    <h3 className="font-bold text-lg text-blue-800 mb-4 flex items-center gap-2">
+                      <FileText size={20} />
+                      Courthouse Information
+                    </h3>
+
+                    <div className="space-y-4">
+                      {logistics.courthouse_address && (
+                        <div>
+                          <h4 className="font-semibold text-slate-700">Address:</h4>
+                          <p className="text-slate-600">{logistics.courthouse_address}</p>
+                        </div>
+                      )}
+
+                      {logistics.hours_of_operation && (
+                        <div>
+                          <h4 className="font-semibold text-slate-700">Hours:</h4>
+                          <p className="text-slate-600">{logistics.hours_of_operation}</p>
+                        </div>
+                      )}
+
+                      {logistics.parking_info && (
+                        <div>
+                          <h4 className="font-semibold text-slate-700">Parking:</h4>
+                          <p className="text-slate-600">{logistics.parking_info}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-6">
+                    <h3 className="font-bold text-lg text-green-800 mb-4 flex items-center gap-2">
+                      <Gavel size={20} />
+                      Filing Requirements
+                    </h3>
+
+                    <div className="space-y-4">
+                      {logistics.filing_fees && (
+                        <div>
+                          <h4 className="font-semibold text-slate-700">Filing Fees:</h4>
+                          <p className="text-slate-600">{logistics.filing_fees}</p>
+                        </div>
+                      )}
+
+                      {logistics.dress_code && (
+                        <div>
+                          <h4 className="font-semibold text-slate-700">Dress Code:</h4>
+                          <p className="text-slate-600">{logistics.dress_code}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {logistics.local_rules_url && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
+                    <h3 className="font-bold text-lg text-yellow-800 mb-4 flex items-center gap-2">
+                      <LinkIcon size={20} />
+                      Local Rules of Court
+                    </h3>
+                    <a
+                      href={logistics.local_rules_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-600 hover:underline break-all"
+                    >
+                      {logistics.local_rules_url}
+                    </a>
+                  </div>
+                )}
+
+                {structured?.procedural_checks && structured.procedural_checks.length > 0 && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-xl p-6">
+                    <h3 className="font-bold text-lg text-purple-800 mb-4">Procedural Checks</h3>
+                    <ul className="list-disc pl-5 space-y-2">
+                      {structured.procedural_checks.map((check, index) => (
+                        <li key={index} className="text-slate-700">{check}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             );
           }

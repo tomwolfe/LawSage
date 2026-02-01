@@ -225,6 +225,8 @@ class ResponseValidator:
         Checks for:
         a) At least three legal citations (e.g., U.S.C., Cal. Civ. Code, etc.)
         b) A 'Next Steps' or 'Roadmap' section.
+        c) Adversarial strategy section
+        d) Procedural checks against Local Rules of Court
         """
         # Parse the content if it's a string
         if isinstance(content, str):
@@ -240,7 +242,13 @@ class ResponseValidator:
                     # Check that we have a roadmap with at least one item
                     has_roadmap = len(parsed_data.roadmap) > 0
 
-                    return has_citations and has_roadmap
+                    # Check that we have an adversarial strategy
+                    has_adversarial = bool(parsed_data.adversarial_strategy and parsed_data.adversarial_strategy.strip())
+
+                    # Check that we have procedural checks
+                    has_procedural_checks = len(parsed_data.procedural_checks) > 0
+
+                    return has_citations and has_roadmap and has_adversarial and has_procedural_checks
                 except json.JSONDecodeError:
                     # If it's not valid JSON, try to parse it as the old format
                     return cls._validate_legal_output_legacy(content)
@@ -256,7 +264,13 @@ class ResponseValidator:
             # Check that we have a roadmap with at least one item
             has_roadmap = len(parsed_data.roadmap) > 0
 
-            return has_citations and has_roadmap
+            # Check that we have an adversarial strategy
+            has_adversarial = bool(parsed_data.adversarial_strategy and parsed_data.adversarial_strategy.strip())
+
+            # Check that we have procedural checks
+            has_procedural_checks = len(parsed_data.procedural_checks) > 0
+
+            return has_citations and has_roadmap and has_adversarial and has_procedural_checks
         else:
             raise ValueError("Content must be a string or dictionary")
 
@@ -302,10 +316,18 @@ class ResponseValidator:
         has_citations = citation_count >= 3
 
         # Check for Roadmap/Next Steps
-        roadmap_keywords = ["Next Steps", "Roadmap", "Procedural Roadmap", "What to do next", "Step-by-step"]
+        roadmap_keywords = ["Next Steps", "Roadmap", "Procedural Roadmap", "What to do next", "Step-by-step", "ROADMAP:", "NEXT STEPS:"]
         has_roadmap = any(kw.lower() in content.lower() for kw in roadmap_keywords)
 
-        return has_citations and has_roadmap
+        # Check for Adversarial Strategy
+        adversarial_keywords = ["Adversarial Strategy", "Opposition View", "Red-Team Analysis", "Opposition arguments"]
+        has_adversarial = any(kw.lower() in content.lower() for kw in adversarial_keywords)
+
+        # Check for Procedural Checks
+        procedural_keywords = ["Procedural Checks", "Local Rules of Court", "Procedural technicality"]
+        has_procedural = any(kw.lower() in content.lower() for kw in procedural_keywords)
+
+        return has_citations and has_roadmap and has_adversarial and has_procedural
 
     @classmethod
     def parse_to_dict(cls, text: str) -> Dict[str, str]:

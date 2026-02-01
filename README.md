@@ -5,8 +5,12 @@ LawSage is an open-source, AI-powered platform designed to empower individuals r
 
 > **Legal Disclaimer:** I am an AI, not an attorney. This tool provides legal information, not legal advice. Use of this tool does not create an attorney-client relationship.
 
-## Key Advancements (v2.0)
-LawSage has undergone a major transformation! The latest version is now a **proactive legal agent with human-in-the-loop verification**. This means:
+## Key Advancements (v3.0)
+LawSage has undergone a major transformation! The latest version is now a **comprehensive legal assistant with Virtual Case Folder architecture and adversarial strategy capabilities**. This means:
+*   **Virtual Case Folder Architecture:** Leverages Gemini 2.5 Flash's long context to analyze multiple documents simultaneously, enabling cross-document reasoning without external vector databases.
+*   **Adversarial Strategy Component:** Automatically generates opposition arguments and 'red-teams' your case to identify potential weaknesses and counterarguments.
+*   **Procedural Grounding Enhancement:** Retrieves and validates Local Rules of Court (county/district level) in addition to general statutes for comprehensive procedural compliance.
+*   **Pro Se Survival Guide UI:** Displays hyper-local logistical data (courthouse addresses, filing fees, and dress codes) fetched via real-time search in a dedicated tab.
 *   **No External Backend Required:** The entire application, including the AI processing, runs within Vercel's Edge Functions. No need to host a separate FastAPI server.
 *   **Multimodal OCR:** Upload images of legal documents (summonses, notices, complaints) for AI-powered text extraction and analysis.
 *   **Professional Court Templates:** Generate filings with built-in, court-standard formatting and caption templates ready for PDF export.
@@ -18,10 +22,14 @@ LawSage has undergone a major transformation! The latest version is now a **proa
 
 ## Features
 *   **Voice Input:** Describe your legal situation naturally using your microphone.
+*   **Virtual Case Folder:** Upload and analyze multiple legal documents simultaneously for comprehensive cross-document analysis.
+*   **Adversarial Strategy:** Automatic generation of opposition arguments and 'red-team' analysis to identify potential weaknesses in your case.
 *   **Jurisdiction-Specific Analysis:** Tailor your legal strategy and filings to your specific state or federal jurisdiction (all 50 U.S. states and Federal).
 *   **AI-Powered Strategy:** Receive clear, plain-language analysis and a step-by-step procedural roadmap.
 *   **Court-Admissible Filings:** Generate draft legal documents (motions, answers, etc.) formatted for court submission.
 *   **Real-Time Grounding:** All responses are grounded in current statutes and legal resources, with direct links to authoritative sources.
+*   **Local Rules Compliance:** Retrieves and validates Local Rules of Court (county/district level) for procedural compliance.
+*   **Pro Se Survival Guide:** Dedicated UI tab displaying hyper-local logistical data (courthouse addresses, filing fees, dress codes) fetched via real-time search.
 *   **Local & Private:** Your data never leaves your browser. Your API key is stored securely in your browser's `localStorage`.
 *   **Comprehensive History:** Save and revisit your past cases with a full audit trail. Import and export your history as JSON.
 *   **Export & Share:** Copy all content to your clipboard or download your filings as a Markdown (.md) file, PDF, or Word (.docx) document.
@@ -74,17 +82,22 @@ Open your browser and navigate to [http://localhost:3000](http://localhost:3000)
 *   **Important:** Your key is stored securely in your browser's `localStorage` and is only sent to Google's API when you request an analysis. It is never sent to any other server.
 
 ## How It Works
-1.  **Input:** Describe your legal issue in plain language (e.g., "I was evicted from my apartment without notice") or upload an image of a legal document.
+1.  **Input:** Describe your legal issue in plain language (e.g., "I was evicted from my apartment without notice") or upload multiple legal documents to your Virtual Case Folder.
 2.  **Jurisdiction:** Select your relevant state or "Federal" from the dropdown.
 3.  **Analyze:** Click "Analyze Case" or use the voice input button.
 4.  **Output:** LawSage's AI:
-    *   Searches the web for the latest statutes and court rules.
+    *   Performs cross-document analysis using your Virtual Case Folder for comprehensive context.
+    *   Conducts 'red-team' analysis to identify potential weaknesses and opposition arguments.
+    *   Searches the web for the latest statutes and Local Rules of Court (county/district level).
     *   Generates a clear, step-by-step legal strategy and procedural roadmap.
     *   Creates a draft, court-admissible legal filing (e.g., an Answer or Motion).
+    *   Provides hyper-local logistical data (courthouse addresses, filing fees, dress codes).
     *   Provides direct links to the legal sources used for grounding.
     *   *(For OCR)* Extracts text from your uploaded image and performs the same analysis.
 5.  **Verification & Action:**
     *   **Citation Verification:** Use the "Verify Citation" button to check if legal citations are still 'good law' using real-time web search.
+    *   **Opposition View:** Review potential opposition arguments in the dedicated tab.
+    *   **Pro Se Survival Guide:** Access courthouse logistics and local procedural requirements in the dedicated tab.
     *   **Interactive Checklist:** Track your progress with the Next Steps checklist featuring due dates and status indicators.
     *   **Export Options:** Download your analysis as a `.md` file, PDF, or Word (.docx) document.
     *   **Review & Edit:** Review, edit, and copy the generated content to use in your case.
@@ -112,10 +125,13 @@ All API routes are configured to run on Vercel's Edge Runtime for optimal perfor
 ## AI Safety & Structure
 LawSage employs a multi-layered Reliability Layer to ensure that AI-generated content is safe, accurate, and structurally complete:
 *   **Red-Team Auditing:** Every user request is audited for safety violations and jurisdictional clarity before being processed.
-*   **Grounded Generation:** Gemini 2.5 Flash is utilized with real-time Google Search grounding to ensure information is based on current statutes.
+*   **Grounded Generation:** Gemini 2.5 Flash is utilized with real-time Google Search grounding to ensure information is based on current statutes and Local Rules of Court.
 *   **Reliability Validation:**
     *   **Citations Validation:** Ensures every response contains at least three verifiable legal citations (e.g., U.S.C., State Codes).
     *   **Procedural Completeness:** Verifies the presence of a 'Procedural Roadmap' section to guide the pro se litigant.
+    *   **Adversarial Strategy Validation:** Ensures the presence of opposition arguments and 'red-team' analysis of the user's case.
+    *   **Procedural Checks Validation:** Verifies inclusion of local court rule compliance checks.
+    *   **Logistics Data Validation:** Ensures hyper-local courthouse information is included in responses.
     *   **Mandatory Disclaimers:** Every response is prepended with a legal disclaimer to clearly distinguish legal information from legal advice.
     *   **Structural Hardening:** A custom validator enforces a strict delimiter system ('---') to separate legal strategy from filing templates.
 *   **Retry Mechanism:** Built-in exponential backoff for AI service rate limits ensures high availability.
