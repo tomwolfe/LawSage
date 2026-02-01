@@ -48,74 +48,17 @@ export class AgenticResearchSystem {
    * Generates a search plan based on the user's legal situation
    */
   async generateSearchPlan(userInput: string, jurisdiction: string): Promise<SearchPlan> {
-    const prompt = `
-      Given the following legal situation, create a comprehensive search plan to research the matter thoroughly:
+    // Simplified search plan to reduce API calls - only 1-2 queries instead of 3-5
+    console.log(`Generating simplified search plan for: ${userInput} in ${jurisdiction}`);
 
-      User Situation: ${userInput}
-      Jurisdiction: ${jurisdiction}
-
-      Create a search plan with 3-5 specific research questions that need to be answered.
-      For each research question, specify the search type (legal, local_rules, precedent, statute).
-      
-      Respond in the following JSON format:
-      {
-        "queries": [
-          {
-            "query": "specific research question",
-            "search_type": "legal | local_rules | precedent | statute"
-          }
-        ],
-        "objectives": [
-          "objective 1",
-          "objective 2"
-        ]
-      }
-    `;
-
-    try {
-      const result = await this.model.generateContent({
-        contents: [{
-          role: 'user',
-          parts: [{ text: prompt }]
-        }]
-      });
-
-      const response = await result.response;
-      let textResponse = response.text();
-
-      // Extract JSON from response
-      const jsonMatch = textResponse.match(/```json\n?([\s\S]*?)\n?```|```([\s\S]*?)```/);
-      let jsonString = '';
-
-      if (jsonMatch) {
-        jsonString = jsonMatch[1] || jsonMatch[2] || textResponse;
-      } else {
-        jsonString = textResponse;
-      }
-
-      // Clean up the JSON string
-      jsonString = jsonString.trim();
-      if (jsonString.startsWith('```json')) {
-        jsonString = jsonString.substring(7);
-      }
-      if (jsonString.endsWith('```')) {
-        jsonString = jsonString.substring(0, jsonString.length - 3);
-      }
-      jsonString = jsonString.trim();
-
-      return JSON.parse(jsonString);
-    } catch (error) {
-      console.error('Error generating search plan:', error);
-      // Fallback search plan
-      return {
-        queries: [
-          { query: `legal precedents for ${userInput} in ${jurisdiction}`, search_type: 'legal' },
-          { query: `relevant statutes for ${userInput} in ${jurisdiction}`, search_type: 'statute' },
-          { query: `local rules of court for ${jurisdiction}`, search_type: 'local_rules' }
-        ],
-        objectives: [`Research legal options for ${userInput}`, `Identify applicable laws`, `Find local court rules`]
-      };
-    }
+    // Fallback search plan with fewer queries to reduce API usage
+    return {
+      queries: [
+        { query: `legal precedents and statutes for ${userInput} in ${jurisdiction}`, search_type: 'legal' },
+        { query: `local rules of court for ${jurisdiction}`, search_type: 'local_rules' }
+      ],
+      objectives: [`Research legal options for ${userInput}`, `Find local court rules`]
+    };
   }
 
   /**
@@ -286,6 +229,9 @@ export class AgenticResearchSystem {
       console.log(`Executing search: ${query.query}`);
       const result = await this.executeSearch(query, jurisdiction);
       searchResults.push(result);
+
+      // Add a small delay to help with rate limiting
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     // Step 3: Synthesize findings

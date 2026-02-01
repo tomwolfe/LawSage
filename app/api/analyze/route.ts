@@ -191,24 +191,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Initialize the Agentic Research System
-    const researchSystem = new AgenticResearchSystem(xGeminiApiKey);
-
-    // Perform agentic research with timeout protection (reduced to fit within 60s total)
-    console.log('Starting agentic research...');
-    const researchFindings: ResearchFindings = await Promise.race<ResearchFindings>([
-      researchSystem.performResearch(user_input, jurisdiction) as Promise<ResearchFindings>,
-      new Promise<ResearchFindings>((_, reject) => setTimeout(() => reject(new Error('Agentic research timeout')), 25000)) // 25 second timeout
-    ]).catch(error => {
-      console.error('Agentic research failed or timed out:', error);
-      // Return minimal research findings to continue processing
-      return {
-        synthesized_analysis: `Initial analysis for ${jurisdiction} jurisdiction based on user input: ${user_input}`,
-        sources: [],
-        search_queries_used: []
-      };
-    }) as ResearchFindings;
-    console.log('Agentic research completed');
+    // Skip agentic research to reduce API usage - use simpler approach
+    console.log('Skipping agentic research to reduce API usage');
+    const researchFindings: ResearchFindings = {
+      synthesized_analysis: `Initial analysis for ${jurisdiction} jurisdiction based on user input: ${user_input}`,
+      sources: [],
+      search_queries_used: []
+    };
 
     // Initialize the Google Generative AI client for final synthesis
     const genAI = new GoogleGenerativeAI(xGeminiApiKey);
@@ -451,18 +440,9 @@ CRITICAL: The response must be valid JSON that conforms to the schema with at le
         }
       }
 
-      // Apply self-correction layer to verify citations and improve accuracy with timeout (reduced to fit within 60s total)
-      const correctedResult: CorrectionResult = await Promise.race<CorrectionResult>([
-        SelfCorrectionLayer.correctResponse(finalText, sources, jurisdiction) as Promise<CorrectionResult>,
-        new Promise<CorrectionResult>((_, reject) => setTimeout(() => reject(new Error('Self-correction timeout')), 15000)) // 15 second timeout
-      ]).catch(error => {
-        console.error('Self-correction failed or timed out:', error);
-        // Return original text and sources if self-correction fails
-        return { text: finalText, sources };
-      }) as CorrectionResult;
-
-      // Ensure the hardcoded disclaimer is present if not already added by workflow
-      let resultText = correctedResult.text;
+      // Skip self-correction to reduce API usage
+      console.log('Skipping self-correction to reduce API usage');
+      let resultText = finalText;
       if (!resultText.includes(LEGAL_DISCLAIMER)) {
         resultText = LEGAL_DISCLAIMER + resultText;
       }
@@ -470,7 +450,7 @@ CRITICAL: The response must be valid JSON that conforms to the schema with at le
       // Prepare the response
       const legalResult: LegalResult = {
         text: resultText,
-        sources: correctedResult.sources
+        sources: sources
       };
 
     // Return the response with Vercel streaming headers
@@ -559,18 +539,9 @@ Also include a procedural roadmap with numbered steps, adversarial strategy cons
       }
     }
 
-    // Apply self-correction layer to verify citations and improve accuracy with timeout (reduced to fit within 60s total)
-    const correctedResult: CorrectionResult = await Promise.race<CorrectionResult>([
-      SelfCorrectionLayer.correctResponse(finalText, sources, jurisdiction) as Promise<CorrectionResult>,
-      new Promise<CorrectionResult>((_, reject) => setTimeout(() => reject(new Error('Self-correction timeout')), 15000)) // 15 second timeout
-    ]).catch(error => {
-      console.error('Self-correction failed or timed out:', error);
-      // Return original text and sources if self-correction fails
-      return { text: finalText, sources };
-    }) as CorrectionResult;
-
-    // Ensure the hardcoded disclaimer is present if not already added by workflow
-    let resultText = correctedResult.text;
+    // Skip self-correction to reduce API usage
+    console.log('Skipping self-correction in fallback to reduce API usage');
+    let resultText = finalText;
     if (!resultText.includes(LEGAL_DISCLAIMER)) {
       resultText = LEGAL_DISCLAIMER + resultText;
     }
@@ -578,7 +549,7 @@ Also include a procedural roadmap with numbered steps, adversarial strategy cons
     // Prepare the response
     const legalResult: LegalResult = {
       text: resultText,
-      sources: correctedResult.sources
+      sources: sources
     };
 
     // Return the response with Vercel streaming headers
