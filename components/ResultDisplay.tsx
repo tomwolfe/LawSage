@@ -1,6 +1,6 @@
 'use client';
 
-import { Copy, Download, FileText, Gavel, Link as LinkIcon, FileDown } from 'lucide-react';
+import { Copy, Download, FileText, Gavel, Link as LinkIcon, FileDown, CheckCircle, AlertTriangle, RotateCcw } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useState } from 'react';
@@ -15,6 +15,8 @@ interface Citation {
   text: string;
   source?: string;
   url?: string;
+  is_verified?: boolean;
+  verification_source?: string;
 }
 
 interface StrategyItem {
@@ -142,6 +144,12 @@ function parseLegalOutput(text: string): { strategy: string; filings: string; st
 
 export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdiction }: ResultDisplayProps) {
   const [copyStatus, setCopyStatus] = useState<{[key: string]: boolean}>({ all: false });
+  const [citationVerificationStatus, setCitationVerificationStatus] = useState<{[key: string]: {
+    is_verified: boolean | undefined;
+    verification_source?: string;
+    status_message?: string;
+    loading: boolean;
+  }}>({});
 
   const copyToClipboard = async (text: string, section: string) => {
     try {
@@ -279,6 +287,115 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
 
   const { strategy: strategyText, filings: filingsText, structured } = parseLegalOutput(result.text);
 
+  // Function to verify a citation
+  const verifyCitation = async (citationText: string) => {
+    try {
+      const response = await fetch('/api/verify-citation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          citation: citationText,
+          jurisdiction: jurisdiction
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error verifying citation:', error);
+      return {
+        is_verified: false,
+        verification_source: 'Error',
+        status_message: 'Verification failed'
+      };
+    }
+  };
+
+  // Function to handle citation verification
+  const handleVerifyCitation = async (citation: Citation) => {
+    if (citation.is_verified !== undefined) {
+      // If already verified, return the existing status
+      return {
+        is_verified: citation.is_verified,
+        verification_source: citation.verification_source || 'Previously verified',
+        status_message: citation.is_verified ? 'Previously verified' : 'Previously unverified'
+      };
+    }
+
+    // Verify the citation
+    return await verifyCitation(citation.text);
+  };
+
+  // Function to download as Word document
+  const handleExportToWord = async () => {
+    // Dynamically import the docx library
+    const { Document, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType } = await import('docx');
+
+    // Create a document with the legal content
+    const doc = new Document({
+      sections: [{
+        properties: {},
+        children: [
+          new Paragraph({
+            text: "LEGAL ANALYSIS AND FILINGS",
+            heading: HeadingLevel.HEADING_1,
+          }),
+          new Paragraph({
+            text: "Disclaimer: This document contains legal information, not legal advice. Consult with a qualified attorney.",
+            heading: HeadingLevel.HEADING_2,
+          }),
+          new Paragraph({
+            text: strategyText,
+          }),
+          new Paragraph({
+            text: "Generated Filings",
+            heading: HeadingLevel.HEADING_2,
+          }),
+          new Paragraph({
+            text: filingsText,
+          }),
+          new Paragraph({
+            text: "Sources & Citations",
+            heading: HeadingLevel.HEADING_2,
+          }),
+          ...(structured?.citations || []).map(citation => new Paragraph({
+            children: [
+              new TextRun({
+                text: citation.text,
+                bold: true,
+              }),
+              new TextRun(` - ${citation.source || ''}`),
+              ...(citation.url ? [new TextRun(` (${citation.url})`)] : []),
+              ...(citation.is_verified !== undefined ? [
+                new TextRun(` [Status: ${citation.is_verified ? 'VERIFIED' : 'UNVERIFIED'}]`)
+              ] : []),
+            ]
+          })),
+        ],
+      }],
+    });
+
+    // Export the document
+    const { Packer } = await import('docx');
+    const blob = await Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+
+    // Create a download link
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `legal_analysis_${jurisdiction.toLowerCase()}_${new Date().toISOString().slice(0, 10)}.docx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   // Function to aggregate all content for copying
   const copyAllToClipboard = async () => {
     const allContent = `# Legal Strategy & Analysis\n\n${strategyText}\n\n# Generated Filings\n\n${filingsText}\n\n# Sources\n\n${result.sources.map(source => `- [${source.title || 'Legal Resource'}](${source.uri || 'No direct link'})`).join('\n')}`;
@@ -400,35 +517,176 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
           }
 
           return (
-            <div className="space-y-4">
-              <h3 className="font-bold text-slate-800">Citations & Grounding</h3>
-              {result.sources.length > 0 ? (
-                <div className="grid gap-4">
-                  {result.sources.map((source, i) => (
-                    <a
-                      key={i}
-                      href={source.uri || '#'}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={cn(
-                        "p-4 border border-slate-200 rounded-xl transition-colors flex justify-between items-center group",
-                        source.uri ? "hover:bg-slate-50" : "pointer-events-none opacity-80"
-                      )}
-                    >
-                      <div>
-                        <p className="font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">
-                          {source.title || "Legal Resource"}
-                        </p>
-                        <p className="text-sm text-slate-500 truncate max-w-md">
-                          {source.uri || "Source context available but no direct link provided."}
-                        </p>
+            <div className="space-y-6">
+              <div className="flex justify-between items-center">
+                <h3 className="font-bold text-slate-800">Citations & Verification</h3>
+                <button
+                  onClick={handleExportToWord}
+                  className="p-2 bg-indigo-600 text-white rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors hover:bg-indigo-700"
+                >
+                  <FileDown size={16} />
+                  Export to Word
+                </button>
+              </div>
+
+              {/* Display structured citations if available */}
+              {structured?.citations && structured.citations.length > 0 ? (
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-slate-700">Legal Citations</h4>
+                  {structured.citations.map((citation, index) => {
+                    const [verificationStatus, setVerificationStatus] = useState<{
+                      is_verified: boolean | undefined;
+                      verification_source?: string;
+                      status_message?: string;
+                      loading: boolean;
+                    }>({
+                      is_verified: citation.is_verified,
+                      verification_source: citation.verification_source,
+                      loading: false
+                    });
+
+                    const verifyCitationHandler = async () => {
+                      setVerificationStatus(prev => ({ ...prev, loading: true }));
+
+                      try {
+                        const result = await handleVerifyCitation(citation);
+                        setVerificationStatus({
+                          is_verified: result.is_verified,
+                          verification_source: result.verification_source,
+                          status_message: result.status_message,
+                          loading: false
+                        });
+                      } catch (error) {
+                        setVerificationStatus({
+                          is_verified: false,
+                          verification_source: 'Error',
+                          status_message: 'Verification failed',
+                          loading: false
+                        });
+                      }
+                    };
+
+                    return (
+                      <div
+                        key={index}
+                        className="p-4 border border-slate-200 rounded-xl bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start gap-2">
+                            <p className="font-semibold text-slate-900 break-words">
+                              {citation.text}
+                            </p>
+                          </div>
+                          {citation.source && (
+                            <p className="text-sm text-slate-500 mt-1">{citation.source}</p>
+                          )}
+                          {citationVerificationStatus[citation.text]?.verification_source && (
+                            <p className="text-xs text-slate-400 mt-1">
+                              Verified by: {citationVerificationStatus[citation.text].verification_source}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {citationVerificationStatus[citation.text]?.loading ? (
+                            <RotateCcw className="animate-spin text-indigo-600" size={18} />
+                          ) : (
+                            <>
+                              {citationVerificationStatus[citation.text]?.is_verified !== undefined ? (
+                                <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+                                  citationVerificationStatus[citation.text].is_verified
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {citationVerificationStatus[citation.text].is_verified ? (
+                                    <>
+                                      <CheckCircle size={12} />
+                                      Verified
+                                    </>
+                                  ) : (
+                                    <>
+                                      <AlertTriangle size={12} />
+                                      Warning
+                                    </>
+                                  )}
+                                </div>
+                              ) : null}
+
+                              <button
+                                onClick={async () => {
+                                  setCitationVerificationStatus(prev => ({
+                                    ...prev,
+                                    [citation.text]: { loading: true, is_verified: prev[citation.text]?.is_verified, verification_source: prev[citation.text]?.verification_source }
+                                  }));
+
+                                  try {
+                                    const result = await handleVerifyCitation(citation);
+                                    setCitationVerificationStatus(prev => ({
+                                      ...prev,
+                                      [citation.text]: {
+                                        is_verified: result.is_verified,
+                                        verification_source: result.verification_source,
+                                        status_message: result.status_message,
+                                        loading: false
+                                      }
+                                    }));
+                                  } catch (error) {
+                                    setCitationVerificationStatus(prev => ({
+                                      ...prev,
+                                      [citation.text]: {
+                                        is_verified: false,
+                                        verification_source: 'Error',
+                                        status_message: 'Verification failed',
+                                        loading: false
+                                      }
+                                    }));
+                                  }
+                                }}
+                                disabled={citationVerificationStatus[citation.text]?.loading}
+                                className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-50"
+                                title="Verify citation status"
+                              >
+                                <RotateCcw size={16} />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      {source.uri && <LinkIcon size={16} className="text-slate-400" />}
-                    </a>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
-                <p className="text-slate-500 italic">No direct links available. The AI used search grounding to inform its response.</p>
+                <div className="space-y-4">
+                  <h4 className="font-semibold text-slate-700">Legal Sources</h4>
+                  {result.sources.length > 0 ? (
+                    <div className="grid gap-4">
+                      {result.sources.map((source, i) => (
+                        <a
+                          key={i}
+                          href={source.uri || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={cn(
+                            "p-4 border border-slate-200 rounded-xl transition-colors flex justify-between items-center group",
+                            source.uri ? "hover:bg-slate-50" : "pointer-events-none opacity-80"
+                          )}
+                        >
+                          <div>
+                            <p className="font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                              {source.title || "Legal Resource"}
+                            </p>
+                            <p className="text-sm text-slate-500 truncate max-w-md">
+                              {source.uri || "Source context available but no direct link provided."}
+                            </p>
+                          </div>
+                          {source.uri && <LinkIcon size={16} className="text-slate-400" />}
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-slate-500 italic">No direct links available. The AI used search grounding to inform its response.</p>
+                  )}
+                </div>
               )}
             </div>
           );

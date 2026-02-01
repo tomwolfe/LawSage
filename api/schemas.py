@@ -13,6 +13,8 @@ class Citation(BaseModel):
     text: str = Field(..., description="The citation text (e.g., '12 U.S.C. § 345')")
     source: Optional[str] = Field(None, description="Source of the citation (e.g., statute, case law)")
     url: Optional[str] = Field(None, description="URL to the citation source")
+    is_verified: bool = Field(False, description="Whether the citation has been verified as 'good law'")
+    verification_source: Optional[str] = Field(None, description="Source used to verify the citation status")
 
 
 class StrategyItem(BaseModel):
@@ -24,6 +26,8 @@ class StrategyItem(BaseModel):
     description: str = Field(..., description="Detailed description of the step")
     estimated_time: Optional[str] = Field(None, description="Estimated time to complete the step")
     required_documents: Optional[List[str]] = Field(default_factory=list, description="Documents needed for this step")
+    due_date_placeholder: Optional[str] = Field(None, description="Placeholder for due date of the step")
+    status: str = Field("pending", description="Current status of the step (pending, in_progress, completed)")
 
 
 class LegalOutput(BaseModel):
