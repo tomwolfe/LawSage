@@ -1,3 +1,5 @@
+import json
+import re
 from google import genai
 from google.genai import types, errors
 from api.models import LegalRequest, LegalResult, Source, GeminiCandidate
@@ -88,9 +90,9 @@ class LawSageWorkflow:
             config=types.GenerateContentConfig(
                 tools=[search_tool],
                 system_instruction=system_instruction,
-                max_output_tokens=4096,
-                response_mime_type='application/json',  # Use structured JSON output
-                response_schema=LegalOutput  # Use structured output
+                max_output_tokens=4096
+                # Note: Cannot use response_mime_type='application/json' with tools
+                # So we'll parse the JSON response manually
             )
         )
 
@@ -148,46 +150,56 @@ Generate a structured legal response with the following fields:
             # Extract the structured output
             for part in candidate.content.parts:
                 if part.text and not part.thought:
-                    # Parse the structured output from JSON
-                    import json
-                    try:
-                        parsed_output = LegalOutput.model_validate_json(part.text)
-                        # Combine all sections into a single text output
-                        text_output = (
-                            f"{parsed_output.disclaimer}\n\n"
-                            f"STRATEGY:\n{parsed_output.strategy}\n\n"
-                            f"ROADMAP:\n"
-                        )
+                    # Since we can't use structured output with tools,
+                    # we need to extract the JSON from the response text
 
-                        # Format roadmap items
-                        for item in parsed_output.roadmap:
-                            text_output += f"{item.step}. {item.title}: {item.description}\n"
-                            if item.estimated_time:
-                                text_output += f"   Estimated Time: {item.estimated_time}\n"
-                            if item.required_documents:
-                                text_output += f"   Required Documents: {', '.join(item.required_documents)}\n"
+                    # Look for JSON within the response text
+                    # The model should still return JSON within the text even without structured output
+                    json_match = re.search(r'\{[\s\S]*\}', part.text)
 
-                        text_output += f"\nFILING TEMPLATE:\n{parsed_output.filing_template}\n\n"
-                        text_output += "CITATIONS:\n"
-                        for citation in parsed_output.citations:
-                            text_output += f"- {citation.text}"
-                            if citation.source:
-                                text_output += f" ({citation.source})"
-                            if citation.url:
-                                text_output += f" {citation.url}"
-                            text_output += "\n"
+                    if json_match:
+                        json_str = json_match.group()
+                        try:
+                            parsed_output = LegalOutput.model_validate_json(json_str)
+                            # Combine all sections into a single text output
+                            text_output = (
+                                f"{parsed_output.disclaimer}\n\n"
+                                f"STRATEGY:\n{parsed_output.strategy}\n\n"
+                                f"ROADMAP:\n"
+                            )
 
-                        # Add sources
-                        if parsed_output.sources:
-                            text_output += "\nSOURCES:\n"
-                            for source in parsed_output.sources:
-                                text_output += f"- {source}\n"
+                            # Format roadmap items
+                            for item in parsed_output.roadmap:
+                                text_output += f"{item.step}. {item.title}: {item.description}\n"
+                                if item.estimated_time:
+                                    text_output += f"   Estimated Time: {item.estimated_time}\n"
+                                if item.required_documents:
+                                    text_output += f"   Required Documents: {', '.join(item.required_documents)}\n"
 
-                    except json.JSONDecodeError:
-                        # Fallback if parsing fails
-                        text_output = part.text
-                    except Exception:
-                        # Fallback if validation fails
+                            text_output += f"\nFILING TEMPLATE:\n{parsed_output.filing_template}\n\n"
+                            text_output += "CITATIONS:\n"
+                            for citation in parsed_output.citations:
+                                text_output += f"- {citation.text}"
+                                if citation.source:
+                                    text_output += f" ({citation.source})"
+                                if citation.url:
+                                    text_output += f" {citation.url}"
+                                text_output += "\n"
+
+                            # Add sources
+                            if parsed_output.sources:
+                                text_output += "\nSOURCES:\n"
+                                for source in parsed_output.sources:
+                                    text_output += f"- {source}\n"
+
+                        except json.JSONDecodeError:
+                            # Fallback if parsing fails
+                            text_output = part.text
+                        except Exception:
+                            # Fallback if validation fails
+                            text_output = part.text
+                    else:
+                        # Fallback if no JSON found in response
                         text_output = part.text
 
         # Extract sources
