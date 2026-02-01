@@ -63,8 +63,17 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
         workflow = LawSageWorkflow(api_key=x_gemini_api_key)
         result = workflow.invoke(request)
 
+        # Ensure the hardcoded disclaimer is present if not already added by workflow
+        if LEGAL_DISCLAIMER.strip() not in result.text:
+            result.text = LEGAL_DISCLAIMER + result.text
+
         # Prepare the JSON response content
         response_content = result.model_dump()
+
+        # Debug: Print the sources to see if they're being populated
+        print(f"DEBUG: Sources in response: {len(result.sources)}")
+        for i, source in enumerate(result.sources):
+            print(f"DEBUG: Source {i+1}: title='{source.title}', uri='{source.uri}'")
 
         # For successful responses, we can still use streaming to prevent Vercel timeout
         import json

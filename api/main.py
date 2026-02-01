@@ -68,6 +68,12 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
 
         # Prepare the JSON response content
         response_content = result.model_dump()
+
+        # Debug: Print the sources to see if they're being populated
+        print(f"DEBUG: Sources in response: {len(result.sources)}")
+        for i, source in enumerate(result.sources):
+            print(f"DEBUG: Source {i+1}: title='{source.title}', uri='{source.uri}'")
+
         import json
         json_str = json.dumps(response_content)
 
