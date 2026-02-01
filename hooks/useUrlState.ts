@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import * as LZString from 'lz-string';
+import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from 'lz-string';
 
 interface UrlStateOptions<T> {
   defaultValue?: T;
@@ -45,7 +45,7 @@ export function useUrlState<T>(
 
       if (shouldCompress) {
         // Decompress the fragment
-        const decompressed = LZString.decompressFromEncodedURIComponent(hash);
+        const decompressed = decompressFromEncodedURIComponent(hash);
         if (!decompressed) return null;
         return JSON.parse(decompressed);
       } else {
@@ -74,7 +74,7 @@ export function useUrlState<T>(
         if (compress) {
           // Serialize and compress the state
           const jsonString = JSON.stringify(updatedState);
-          serializedState = LZString.compressToEncodedURIComponent(jsonString);
+          serializedState = compressToEncodedURIComponent(jsonString);
         } else {
           serializedState = encodeURIComponent(JSON.stringify(updatedState));
         }
@@ -146,7 +146,7 @@ export function useUrlStateObject(compress: boolean = true) {
 
         if (compress) {
           // Decompress the fragment
-          const decompressed = LZString.decompressFromEncodedURIComponent(hash);
+          const decompressed = decompressFromEncodedURIComponent(hash);
           if (!decompressed) return null;
           return JSON.parse(decompressed);
         } else {
