@@ -1,5 +1,7 @@
 // lib/validation.ts
 // Validation utilities that can be shared between API routes and tests
+import { LegalAnalysisSchema, LegalResponseSchema } from './schemas';
+import { z } from 'zod';
 
 // Supported jurisdictions
 export const SUPPORTED_JURISDICTIONS = new Set([
@@ -91,23 +93,44 @@ export class ResponseValidator {
   static NO_FILINGS_MSG = "No filings generated. Please try a more specific request or check the strategy tab.";
 
   static validateAndFix(content: string): string {
-    // Try to parse as structured JSON first
+    // Try to parse as structured JSON first using Zod schema
     try {
-      const parsed = JSON.parse(content);
+      // First, try to extract JSON from markdown code blocks
+      const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```|```([\s\S]*?)```/);
+      let jsonString = content;
 
-      // If it's structured JSON, format it appropriately
-      if (parsed.disclaimer && parsed.strategy && parsed.filing_template) {
-        let formattedOutput = `${parsed.disclaimer}\n\n`;
+      if (jsonMatch) {
+        jsonString = jsonMatch[1] || jsonMatch[2] || content;
+      }
 
-        formattedOutput += `STRATEGY:\n${parsed.strategy}\n\n`;
+      // Clean up the JSON string
+      jsonString = jsonString.trim();
+      if (jsonString.startsWith('```json')) {
+        jsonString = jsonString.substring(7); // Remove ```json
+      }
+      if (jsonString.endsWith('```')) {
+        jsonString = jsonString.substring(0, jsonString.length - 3); // Remove ```
+      }
+      jsonString = jsonString.trim();
 
-        if (parsed.adversarial_strategy) {
-          formattedOutput += `ADVERSARIAL STRATEGY:\n${parsed.adversarial_strategy}\n\n`;
+      // Attempt to parse and validate with Zod
+      const parsed = JSON.parse(jsonString);
+      const validated = LegalResponseSchema.safeParse(parsed);
+
+      if (validated.success) {
+        // If validation passes, format it appropriately
+        const data = validated.data;
+        let formattedOutput = `${data.disclaimer}\n\n`;
+
+        formattedOutput += `STRATEGY:\n${data.strategy}\n\n`;
+
+        if (data.adversarial_strategy) {
+          formattedOutput += `ADVERSARIAL STRATEGY:\n${data.adversarial_strategy}\n\n`;
         }
 
-        if (parsed.roadmap && parsed.roadmap.length > 0) {
+        if (data.roadmap && data.roadmap.length > 0) {
           formattedOutput += "ROADMAP:\n";
-          for (const item of parsed.roadmap) {
+          for (const item of data.roadmap) {
             formattedOutput += `${item.step}. ${item.title}: ${item.description}\n`;
             if (item.estimated_time) {
               formattedOutput += `   Estimated Time: ${item.estimated_time}\n`;
@@ -119,17 +142,17 @@ export class ResponseValidator {
           formattedOutput += "\n";
         }
 
-        if (parsed.procedural_checks && parsed.procedural_checks.length > 0) {
+        if (data.procedural_checks && data.procedural_checks.length > 0) {
           formattedOutput += "PROCEDURAL CHECKS:\n";
-          for (const check of parsed.procedural_checks) {
+          for (const check of data.procedural_checks) {
             formattedOutput += `- ${check}\n`;
           }
           formattedOutput += "\n";
         }
 
-        if (parsed.citations && parsed.citations.length > 0) {
+        if (data.citations && data.citations.length > 0) {
           formattedOutput += "CITATIONS:\n";
-          for (const citation of parsed.citations) {
+          for (const citation of data.citations) {
             formattedOutput += `- ${citation.text}`;
             if (citation.source) {
               formattedOutput += ` (${citation.source})`;
@@ -142,17 +165,21 @@ export class ResponseValidator {
           formattedOutput += "\n";
         }
 
-        if (parsed.local_logistics) {
+        if (data.local_logistics) {
           formattedOutput += "LOCAL LOGISTICS:\n";
-          formattedOutput += JSON.stringify(parsed.local_logistics, null, 2) + "\n\n";
+          formattedOutput += JSON.stringify(data.local_logistics, null, 2) + "\n\n";
         }
 
-        formattedOutput += `---\n\nFILING TEMPLATE:\n${parsed.filing_template}`;
+        formattedOutput += `---\n\nFILING TEMPLATE:\n${data.filing_template}`;
 
         return formattedOutput;
+      } else {
+        // Log validation errors for debugging
+        console.log("Zod validation errors:", validated.error.errors);
       }
     } catch (e) {
       // If JSON parsing fails, fall back to legacy approach
+      console.log("JSON parsing failed, using legacy approach:", e);
     }
 
     // 1. Normalize Delimiter first to separate strategy and filings
@@ -279,7 +306,7 @@ export class ResponseValidator {
 
     return hasCitations && hasRoadmap && hasAdversarial && hasProcedural;
   }
-  
+
   // Additional validation methods to match the Python implementation
   static validateAndFixLegacy(content: string): string {
     // Legacy validation and fix method for backward compatibility.
@@ -333,7 +360,7 @@ export class ResponseValidator {
 
       const sentences = line.split(/(?<=[.!?])\s+/);
       const filteredSentences: string[] = [];
-      
+
       for (const s of sentences) {
         const sLower = s.toLowerCase();
         if (!disclaimerKeywords.some(kw => sLower.includes(kw))) {
@@ -353,5 +380,45 @@ export class ResponseValidator {
 
     // 3. Re-assemble
     return `${finalStrategy}\n\n---\n\n${filingsPart}`;
+  }
+
+  // Validate using Zod schema
+  static validateStructuredOutput(content: string) {
+    try {
+      // Try to extract JSON from the content
+      const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```|```([\s\S]*?)```|(\{[\s\S]*\})/);
+      let jsonString = content;
+
+      if (jsonMatch) {
+        // Use the first capturing group that matched, or the third (full JSON object)
+        jsonString = jsonMatch[1] || jsonMatch[2] || jsonMatch[3] || content;
+      }
+
+      // Clean up the JSON string
+      jsonString = jsonString.trim();
+      if (jsonString.startsWith('```json')) {
+        jsonString = jsonString.substring(7); // Remove ```json
+      }
+      if (jsonString.endsWith('```')) {
+        jsonString = jsonString.substring(0, jsonString.length - 3); // Remove ```
+      }
+      jsonString = jsonString.trim();
+
+      // Parse and validate
+      const parsed = JSON.parse(jsonString);
+      const validationResult = LegalAnalysisSchema.safeParse({ response: parsed });
+
+      return {
+        isValid: validationResult.success,
+        errors: validationResult.success ? null : validationResult.error.errors,
+        data: validationResult.success ? parsed : null
+      };
+    } catch (e) {
+      return {
+        isValid: false,
+        errors: [{ message: `JSON parsing error: ${e instanceof Error ? e.message : 'Unknown error'}` }],
+        data: null
+      };
+    }
   }
 }

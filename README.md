@@ -45,6 +45,9 @@ LawSage has undergone a major transformation! The latest version is now a **comp
 *   **Citation Verification:** Verify legal citations in real-time to ensure they are still 'good law' using the Verify Citation button.
 *   **Interactive Next Steps Checklist:** Track your legal progress with a proactive checklist featuring due dates and status indicators.
 *   **Human-in-the-Loop Verification:** Proactive legal agent with verification layers to prevent hallucinations and ensure accuracy.
+*   **Agentic RAG System:** Multi-turn research engine that generates search plans, performs iterative legal research, and synthesizes findings for comprehensive analysis.
+*   **Zod Schema Validation:** Strict JSON schema validation ensures structured, complete legal responses with all required sections.
+*   **Enhanced Local Rules Compliance:** Dedicated service for retrieving hyper-local court rules, filing fees, courthouse logistics, and procedural requirements.
 
 ## Technology Stack
 LawSage is built on a modern, performant full-stack architecture:
@@ -56,6 +59,7 @@ LawSage is built on a modern, performant full-stack architecture:
 *   **Citation Verification:** Advanced Shepardizing agent for automated legal citation status verification.
 *   **Document Generation:** Docx library for professional Word (.docx) export functionality with jurisdictional formatting presets.
 *   **Rate Limiting:** Client-side rate limiting utility for Vercel Hobby Tier compliance.
+*   **Validation:** Zod schemas for strict JSON validation and structured output.
 *   **Deployment:** Optimized for seamless deployment on Vercel.
 
 ## Getting Started
@@ -95,7 +99,9 @@ Open your browser and navigate to [http://localhost:3000](http://localhost:3000)
 4.  **Output:** LawSage's AI:
     *   Performs cross-document analysis using your Virtual Case Folder for comprehensive context.
     *   Conducts 'red-team' analysis to identify potential weaknesses and opposition arguments.
+    *   Executes multi-turn agentic research to find the most relevant legal precedents and statutes.
     *   Searches the web for the latest statutes and Local Rules of Court (county/district level).
+    *   Validates all responses using Zod schemas to ensure completeness and accuracy.
     *   Generates a clear, step-by-step legal strategy and procedural roadmap.
     *   Creates a draft, court-admissible legal filing (e.g., an Answer or Motion).
     *   Provides hyper-local logistical data (courthouse addresses, filing fees, dress codes).
@@ -122,7 +128,7 @@ The easiest and recommended way to deploy LawSage is on **Vercel**. The entire a
 
 ## API Routes
 The application includes several API routes optimized for Vercel Edge Functions:
-*   **/api/analyze:** Main analysis endpoint for legal situation processing with grounding.
+*   **/api/analyze:** Main analysis endpoint for legal situation processing with grounding, agentic research, and Zod validation.
 *   **/api/ocr:** Multimodal OCR endpoint for legal document image analysis.
 *   **/api/health:** Health check endpoint.
 *   **/api/verify-citation:** Real-time citation verification endpoint using Gemini Web Search.
@@ -133,6 +139,8 @@ All API routes are configured to run on Vercel's Edge Runtime for optimal perfor
 ## AI Safety & Structure
 LawSage employs a multi-layered Reliability Layer to ensure that AI-generated content is safe, accurate, and structurally complete:
 *   **Red-Team Auditing:** Every user request is audited for safety violations and jurisdictional clarity before being processed.
+*   **Agentic RAG System:** Multi-turn research engine that generates search plans, performs iterative legal research, and synthesizes findings for comprehensive analysis.
+*   **Zod Schema Validation:** Strict JSON schema validation ensures structured, complete legal responses with all required sections.
 *   **Grounded Generation:** Gemini 2.5 Flash is utilized with real-time Google Search grounding to ensure information is based on current statutes and Local Rules of Court.
 *   **Advanced Citation Verification:** The Shepardizing agent automatically verifies each legal citation for subsequent negative treatment (overruled/distinguished) to ensure only current "good law" is relied upon.
 *   **Reliability Validation:**
@@ -146,7 +154,7 @@ LawSage employs a multi-layered Reliability Layer to ensure that AI-generated co
 *   **Multi-Step Analysis:** Serverless checkpointing enables complex multi-step legal reasoning while staying under execution limits.
 *   **Scalable Context:** Shadow vector search extends the Virtual Case Folder beyond Gemini's context limits using lightweight serverless databases.
 *   **Retry Mechanism:** Built-in exponential backoff for AI service rate limits ensures high availability.
-*   **Structured Output:** The AI is prompted to return a JSON schema, which is validated server-side for completeness and safety before being presented to the user.
+*   **Structured Output:** The AI is prompted to return a JSON schema, which is validated server-side using Zod for completeness and safety before being presented to the user.
 
 ## Contributing
 LawSage is an open-source project dedicated to legal democratization. Contributions are welcome!
@@ -166,3 +174,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 *   [Tailwind CSS](https://tailwindcss.com/)
 *   [Lucide Icons](https://lucide.dev/)
 *   [Vercel](https://vercel.com/)
+*   [Zod](https://zod.dev/)

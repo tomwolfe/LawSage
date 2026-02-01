@@ -3,6 +3,8 @@ import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/ge
 import { SafetyValidator, ResponseValidator, Source } from '../../../lib/validation';
 import { SelfCorrectionLayer } from '../../../lib/self-correction';
 import { TimelineExtractor } from '../../../lib/timeline-extractor';
+import { AgenticResearchSystem } from '../../../lib/agentic-research';
+import { LegalResponseSchema } from '../../../lib/schemas';
 
 // Mandatory safety disclosure hardcoded for the response stream
 const LEGAL_DISCLAIMER = (
@@ -99,7 +101,7 @@ export async function POST(req: NextRequest) {
   try {
     // Get the Gemini API key from headers
     const xGeminiApiKey = req.headers.get('X-Gemini-API-Key');
-    
+
     if (!xGeminiApiKey) {
       return NextResponse.json(
         {
@@ -171,7 +173,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Initialize the Google Generative AI client
+    // Initialize the Agentic Research System
+    const researchSystem = new AgenticResearchSystem(xGeminiApiKey);
+
+    // Perform agentic research
+    console.log('Starting agentic research...');
+    const researchFindings = await researchSystem.performResearch(user_input, jurisdiction);
+    console.log('Agentic research completed');
+
+    // Initialize the Google Generative AI client for final synthesis
     const genAI = new GoogleGenerativeAI(xGeminiApiKey);
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
@@ -196,7 +206,7 @@ export async function POST(req: NextRequest) {
       ],
     });
 
-    // Create the prompt
+    // Create the prompt with research findings for structured output
     let documentsText = "";
     if (documents && documents.length > 0) {
       documentsText = "RELEVANT DOCUMENTS FROM VIRTUAL CASE FOLDER:\n\n";
@@ -205,115 +215,213 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const prompt = `
+    // Create a prompt that asks for structured JSON output
+    const structuredPrompt = `
 ${documentsText}
 
 User Situation: ${user_input}
 Jurisdiction: ${jurisdiction}
 
+Research Findings from Agentic Research:
+${researchFindings.synthesized_analysis}
+
 Act as a Universal Public Defender.
-Generate a comprehensive legal response that MUST follow this EXACT format:
+Generate a comprehensive legal response in the following JSON format:
 
-LEGAL DISCLAIMER: [Your disclaimer here]
-
-STRATEGY:
-[Your legal strategy and analysis for ${jurisdiction} jurisdiction]
-
-ADVERSARIAL STRATEGY:
-[Opposition arguments and 'red-team' analysis of the user's case]
-
-TIMELINE EXTRACTION:
-[Chronological timeline of key events from the provided documents with dates and descriptions]
-
-ROADMAP:
-1. [First step with title and description]
-2. [Second step with title and description]
-3. [Third step with title and description]
-
-PROCEDURAL CHECKS:
-[Results of procedural technicality checks against Local Rules of Court]
-
-CITATIONS:
-- [Federal statute in format: 12 U.S.C. § 345]
-- [State code in format: Cal. Civ. Code § 1708]
-- [Court rule in format: Rule 12(b)(6)]
-
----
-LOCAL LOGISTICS:
 {
-  "courthouse_address": "[Complete address of the courthouse]",
-  "filing_fees": "[Specific filing fees for this case type]",
-  "dress_code": "[Courthouse dress code requirements]",
-  "parking_info": "[Parking information near courthouse]",
-  "hours_of_operation": "[Courthouse hours of operation]",
-  "local_rules_url": "[URL to local rules of court]"
+  "disclaimer": "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. This is legal information, not legal advice. Always consult with a qualified attorney.",
+  "strategy": "Your legal strategy and analysis for ${jurisdiction} jurisdiction based on the research findings",
+  "adversarial_strategy": "Opposition arguments and 'red-team' analysis of the user's case based on the research findings",
+  "roadmap": [
+    {
+      "step": 1,
+      "title": "First step title",
+      "description": "Detailed description of the first step",
+      "estimated_time": "Timeframe for completion",
+      "required_documents": ["List of required documents"]
+    },
+    {
+      "step": 2,
+      "title": "Second step title",
+      "description": "Detailed description of the second step",
+      "estimated_time": "Timeframe for completion",
+      "required_documents": ["List of required documents"]
+    },
+    {
+      "step": 3,
+      "title": "Third step title",
+      "description": "Detailed description of the third step",
+      "estimated_time": "Timeframe for completion",
+      "required_documents": ["List of required documents"]
+    }
+  ],
+  "procedural_checks": [
+    "Procedural technicality check 1",
+    "Procedural technicality check 2",
+    "Procedural technicality check 3"
+  ],
+  "citations": [
+    {
+      "text": "12 U.S.C. § 345",
+      "source": "Federal Statute",
+      "url": "https://www.law.cornell.edu/uscode/text/12/345"
+    },
+    {
+      "text": "Cal. Civ. Code § 1708",
+      "source": "California Civil Code",
+      "url": "https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=CIV&sectionNum=1708"
+    },
+    {
+      "text": "Rule 12(b)(6)",
+      "source": "Federal Rules of Civil Procedure",
+      "url": "https://www.law.cornell.edu/rules/frcp/rule_12"
+    }
+  ],
+  "local_logistics": {
+    "courthouse_address": "Complete address of the courthouse",
+    "filing_fees": "Specific filing fees for this case type",
+    "dress_code": "Courthouse dress code requirements",
+    "parking_info": "Parking information near courthouse",
+    "hours_of_operation": "Courthouse hours of operation",
+    "local_rules_url": "URL to local rules of court"
+  },
+  "filing_template": "Actual legal filing template with specific forms and procedures for ${jurisdiction}"
 }
 
----
-FILING TEMPLATE:
-[Actual legal filing template with specific forms and procedures for ${jurisdiction}]
-
-CRITICAL: Your response must contain the EXACT format above with at least 3 legal citations in the specified formats, a numbered procedural roadmap, adversarial strategy, procedural checks, timeline extraction from provided documents, and local logistics JSON.
+CRITICAL: The response must be valid JSON that conforms to the schema with at least 3 legal citations in the specified formats, a numbered procedural roadmap, adversarial strategy, procedural checks, and local logistics information. Reference the research findings to ensure accuracy and comprehensiveness.
 `;
 
-    // Generate content using the model
-    const result = await model.generateContent(prompt);
-    const response = result.response;
+    try {
+      // Attempt to generate structured output
+      const result = await model.generateContent(structuredPrompt);
+      const response = result.response;
 
-    if (!response) {
-      throw new Error("No response from Gemini model");
-    }
-
-    let textOutput = response.text();
-    const sources: Source[] = [];
-
-    // Extract sources from the response
-    // Note: The Gemini API doesn't provide grounding metadata in the same way as the Python version
-    // For now, we'll extract any URLs from the response text
-    const urlRegex = /https?:\/\/[^\s'"<>]+/g;
-    const urls = textOutput.match(urlRegex) || [];
-    const seenUris = new Set<string>();
-    
-    for (const url of urls) {
-      if (!seenUris.has(url)) {
-        sources.push({ title: "Legal Resource", uri: url });
-        seenUris.add(url);
+      if (!response) {
+        throw new Error("No response from Gemini model");
       }
-    }
 
-    // Apply validation and formatting
-    let finalText = ResponseValidator.validateAndFix(textOutput);
+      let rawOutput = response.text();
+      let sources: Source[] = [...researchFindings.sources]; // Start with research sources
 
-    // If documents were provided, extract timeline information and add to the response
-    if (documents && documents.length > 0) {
-      try {
-        const timelineResult = TimelineExtractor.extractTimeline(documents);
+      // Validate the structured output using Zod
+      const validation = ResponseValidator.validateStructuredOutput(rawOutput);
 
-        // Add timeline information to the response
-        const timelineSection = `\n\n---\nTIMELINE EXTRACTION:\n${timelineResult.summary}\n\nKey Events:\n${timelineResult.events.map(event =>
-          `- ${event.date}: ${event.event} - ${event.description}`).join('\n')}\n\nKey Dates: ${timelineResult.key_dates.join(', ')}`;
+      let finalText: string;
+      if (validation.isValid && validation.data) {
+        // If validation passes, format the structured data properly
+        const data = validation.data;
 
-        finalText += timelineSection;
-      } catch (timelineError) {
-        console.error("Error extracting timeline:", timelineError);
-        // If timeline extraction fails, continue with the original response
+        // Format the response properly
+        let formattedOutput = `${data.disclaimer}\n\n`;
+
+        formattedOutput += `STRATEGY:\n${data.strategy}\n\n`;
+
+        if (data.adversarial_strategy) {
+          formattedOutput += `ADVERSARIAL STRATEGY:\n${data.adversarial_strategy}\n\n`;
+        }
+
+        if (data.roadmap && data.roadmap.length > 0) {
+          formattedOutput += "ROADMAP:\n";
+          for (const item of data.roadmap) {
+            formattedOutput += `${item.step}. ${item.title}: ${item.description}\n`;
+            if (item.estimated_time) {
+              formattedOutput += `   Estimated Time: ${item.estimated_time}\n`;
+            }
+            if (item.required_documents) {
+              formattedOutput += `   Required Documents: ${item.required_documents.join(', ')}\n`;
+            }
+          }
+          formattedOutput += "\n";
+        }
+
+        if (data.procedural_checks && data.procedural_checks.length > 0) {
+          formattedOutput += "PROCEDURAL CHECKS:\n";
+          for (const check of data.procedural_checks) {
+            formattedOutput += `- ${check}\n`;
+          }
+          formattedOutput += "\n";
+        }
+
+        if (data.citations && data.citations.length > 0) {
+          formattedOutput += "CITATIONS:\n";
+          for (const citation of data.citations) {
+            formattedOutput += `- ${citation.text}`;
+            if (citation.source) {
+              formattedOutput += ` (${citation.source})`;
+            }
+            if (citation.url) {
+              formattedOutput += ` ${citation.url}`;
+            }
+            formattedOutput += "\n";
+          }
+          formattedOutput += "\n";
+        }
+
+        if (data.local_logistics) {
+          formattedOutput += "---\nLOCAL LOGISTICS:\n";
+          formattedOutput += JSON.stringify(data.local_logistics, null, 2) + "\n\n";
+        }
+
+        formattedOutput += `---\n\nFILING TEMPLATE:\n${data.filing_template}`;
+
+        finalText = formattedOutput;
+      } else {
+        // If structured output validation fails, fall back to the original approach
+        console.log("Structured output validation failed, using fallback:", validation.errors);
+
+        // Extract additional sources from the raw output
+        const urlRegex = /https?:\/\/[^\s'"<>]+/g;
+        const urls = rawOutput.match(urlRegex) || [];
+        const seenUris = new Set<string>();
+
+        // Add research sources to the seen URIs to avoid duplication
+        for (const source of sources) {
+          if (source.uri) {
+            seenUris.add(source.uri);
+          }
+        }
+
+        for (const url of urls) {
+          if (!seenUris.has(url)) {
+            sources.push({ title: "Legal Resource", uri: url });
+            seenUris.add(url);
+          }
+        }
+
+        // Apply validation and formatting
+        finalText = ResponseValidator.validateAndFix(rawOutput);
       }
-    }
 
-    // Apply self-correction layer to verify citations and improve accuracy
-    const correctedResult = await SelfCorrectionLayer.correctResponse(finalText, sources, jurisdiction);
+      // If documents were provided, extract timeline information and add to the response
+      if (documents && documents.length > 0) {
+        try {
+          const timelineResult = TimelineExtractor.extractTimeline(documents);
 
-    // Ensure the hardcoded disclaimer is present if not already added by workflow
-    let resultText = correctedResult.text;
-    if (!resultText.includes(LEGAL_DISCLAIMER)) {
-      resultText = LEGAL_DISCLAIMER + resultText;
-    }
+          // Add timeline information to the response
+          const timelineSection = `\n\n---\nTIMELINE EXTRACTION:\n${timelineResult.summary}\n\nKey Events:\n${timelineResult.events.map(event =>
+            `- ${event.date}: ${event.event} - ${event.description}`).join('\n')}\n\nKey Dates: ${timelineResult.key_dates.join(', ')}`;
 
-    // Prepare the response
-    const legalResult: LegalResult = {
-      text: resultText,
-      sources: correctedResult.sources
-    };
+          finalText += timelineSection;
+        } catch (timelineError) {
+          console.error("Error extracting timeline:", timelineError);
+          // If timeline extraction fails, continue with the original response
+        }
+      }
+
+      // Apply self-correction layer to verify citations and improve accuracy
+      const correctedResult = await SelfCorrectionLayer.correctResponse(finalText, sources, jurisdiction);
+
+      // Ensure the hardcoded disclaimer is present if not already added by workflow
+      let resultText = correctedResult.text;
+      if (!resultText.includes(LEGAL_DISCLAIMER)) {
+        resultText = LEGAL_DISCLAIMER + resultText;
+      }
+
+      // Prepare the response
+      const legalResult: LegalResult = {
+        text: resultText,
+        sources: correctedResult.sources
+      };
 
     // Return the response with Vercel streaming headers
     return NextResponse.json(legalResult, {
