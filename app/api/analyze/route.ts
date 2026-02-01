@@ -269,130 +269,158 @@ Generate a comprehensive legal response in the following JSON format:
 CRITICAL: Your response must be valid JSON with all required fields. Include at least 3 legal citations, a detailed procedural_roadmap with at least 3 steps, and comprehensive local logistics information specific to ${jurisdiction}. Return ALL information in a single response to minimize API calls.
 `;
 
-    // Generate content using the model
-    const result = await model.generateContent(prompt);
-    const response = result.response;
+    // Create a readable stream to keep the connection alive during processing
+    const encoder = new TextEncoder();
 
-    if (!response) {
-      throw new Error("No response from Gemini model");
-    }
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          // Send a heartbeat message to keep the connection alive
+          controller.enqueue(encoder.encode(`{"status":"processing","message":"Starting legal analysis..."}\n`));
 
-    let rawOutput = response.text();
-    let parsedOutput;
+          // Stream content using the model
+          const result = await model.generateContentStream(prompt);
 
-    // Try to extract JSON from the response if it's wrapped in markdown or other text
-    let jsonMatch = rawOutput.match(/```json\s*([\s\S]*?)\s*```/);
-    if (jsonMatch) {
-      rawOutput = jsonMatch[1].trim();
-    } else {
-      // Try to find JSON within the text
-      const braceStart = rawOutput.indexOf('{');
-      const braceEnd = rawOutput.lastIndexOf('}');
-      if (braceStart !== -1 && braceEnd !== -1 && braceEnd > braceStart) {
-        rawOutput = rawOutput.substring(braceStart, braceEnd + 1);
-      }
-    }
+          // Process the streamed response
+          let rawOutput = '';
+          let parsedOutput: any = null;
+          let sources: Source[] = [];
+          let formattedOutput = '';
 
-    try {
-      parsedOutput = JSON.parse(rawOutput);
-    } catch (e) {
-      console.error("Failed to parse JSON response from Gemini:", e);
-      console.error("Raw output:", rawOutput);
+          // Process each chunk as it arrives
+          for await (const chunk of result.stream) {
+            const chunkText = chunk.text();
+            rawOutput += chunkText;
+          }
 
-      // Fallback to original format if JSON parsing fails
-      const fallbackResult: LegalResult = {
-        text: `ERROR: Failed to parse structured response from AI. Raw response: ${rawOutput}`,
-        sources: []
-      };
-      return NextResponse.json(fallbackResult);
-    }
+          // Try to extract JSON from the complete response if it's wrapped in markdown or other text
+          let processedOutput = rawOutput;
+          let jsonMatch = rawOutput.match(/```json\s*([\s\S]*?)\s*```/);
+          if (jsonMatch) {
+            processedOutput = jsonMatch[1].trim();
+          } else {
+            // Try to find JSON within the text
+            const braceStart = rawOutput.indexOf('{');
+            const braceEnd = rawOutput.lastIndexOf('}');
+            if (braceStart !== -1 && braceEnd !== -1 && braceEnd > braceStart) {
+              processedOutput = rawOutput.substring(braceStart, braceEnd + 1);
+            }
+          }
 
-    // Extract sources from the parsed JSON
-    const sources: Source[] = [];
-    if (parsedOutput.sources && Array.isArray(parsedOutput.sources)) {
-      for (const source of parsedOutput.sources) {
-        if (typeof source === 'string' && source.startsWith('http')) {
-          sources.push({ title: "Legal Resource", uri: source });
+          try {
+            parsedOutput = JSON.parse(processedOutput);
+          } catch (e) {
+            console.error("Failed to parse JSON response from Gemini:", e);
+            console.error("Raw output:", rawOutput);
+
+            // Send error response
+            const errorMessage = `ERROR: Failed to parse structured response from AI. Raw response: ${rawOutput}`;
+            controller.enqueue(encoder.encode(JSON.stringify({
+              text: errorMessage,
+              sources: []
+            })));
+            controller.close();
+            return;
+          }
+
+          // Extract sources from the parsed JSON
+          if (parsedOutput.sources && Array.isArray(parsedOutput.sources)) {
+            for (const source of parsedOutput.sources) {
+              if (typeof source === 'string' && source.startsWith('http')) {
+                sources.push({ title: "Legal Resource", uri: source });
+              }
+            }
+          }
+
+          // If no sources were found in the JSON, extract from citations
+          if (sources.length === 0 && parsedOutput.citations && Array.isArray(parsedOutput.citations)) {
+            for (const citation of parsedOutput.citations) {
+              if (citation.url && typeof citation.url === 'string' && citation.url.startsWith('http')) {
+                sources.push({ title: citation.text || "Legal Citation", uri: citation.url });
+              }
+            }
+          }
+
+          // Format the structured output as text for compatibility with existing frontend
+          formattedOutput = `${parsedOutput.disclaimer}\n\n`;
+
+          formattedOutput += `STRATEGY:\n${parsedOutput.strategy}\n\n`;
+
+          if (parsedOutput.adversarial_strategy) {
+            formattedOutput += `ADVERSARIAL STRATEGY:\n${parsedOutput.adversarial_strategy}\n\n`;
+          }
+
+          if (parsedOutput.procedural_roadmap && Array.isArray(parsedOutput.procedural_roadmap)) {
+            formattedOutput += "PROCEDURAL ROADMAP:\n";
+            for (const item of parsedOutput.procedural_roadmap) {
+              formattedOutput += `\n${item.step}. ${item.title}\n`;
+              formattedOutput += `   Description: ${item.description}\n`;
+              if (item.estimated_time) {
+                formattedOutput += `   Estimated Time: ${item.estimated_time}\n`;
+              }
+              if (item.required_documents && Array.isArray(item.required_documents) && item.required_documents.length > 0) {
+                formattedOutput += `   Required Documents: ${item.required_documents.join(', ')}\n`;
+              }
+              formattedOutput += `   Status: ${item.status}\n`;
+            }
+            formattedOutput += "\n";
+          }
+
+          if (parsedOutput.procedural_checks && Array.isArray(parsedOutput.procedural_checks) && parsedOutput.procedural_checks.length > 0) {
+            formattedOutput += "PROCEDURAL CHECKS:\n";
+            for (const check of parsedOutput.procedural_checks) {
+              formattedOutput += `- ${check}\n`;
+            }
+            formattedOutput += "\n";
+          }
+
+          if (parsedOutput.citations && Array.isArray(parsedOutput.citations)) {
+            formattedOutput += "CITATIONS:\n";
+            for (const citation of parsedOutput.citations) {
+              formattedOutput += `- ${citation.text}`;
+              if (citation.source) {
+                formattedOutput += ` (${citation.source})`;
+              }
+              if (citation.url) {
+                formattedOutput += ` ${citation.url}`;
+              }
+              formattedOutput += "\n";
+            }
+            formattedOutput += "\n";
+          }
+
+          if (parsedOutput.local_logistics) {
+            formattedOutput += "---\n\nLOCAL LOGISTICS:\n";
+            formattedOutput += JSON.stringify(parsedOutput.local_logistics, null, 2) + "\n\n";
+          }
+
+          formattedOutput += "---\n\nFILING TEMPLATE:\n";
+          formattedOutput += parsedOutput.filing_template;
+
+          // Apply validation and formatting
+          const finalText = ResponseValidator.validateAndFix(formattedOutput);
+
+          // Prepare the final response
+          const legalResult: LegalResult = {
+            text: finalText,
+            sources: sources
+          };
+
+          // Send the complete response
+          controller.enqueue(encoder.encode(JSON.stringify(legalResult)));
+        } finally {
+          controller.close();
         }
       }
-    }
+    });
 
-    // If no sources were found in the JSON, extract from citations
-    if (sources.length === 0 && parsedOutput.citations && Array.isArray(parsedOutput.citations)) {
-      for (const citation of parsedOutput.citations) {
-        if (citation.url && typeof citation.url === 'string' && citation.url.startsWith('http')) {
-          sources.push({ title: citation.text || "Legal Citation", uri: citation.url });
-        }
-      }
-    }
-
-    // Format the structured output as text for compatibility with existing frontend
-    let formattedOutput = `${parsedOutput.disclaimer}\n\n`;
-
-    formattedOutput += `STRATEGY:\n${parsedOutput.strategy}\n\n`;
-
-    if (parsedOutput.adversarial_strategy) {
-      formattedOutput += `ADVERSARIAL STRATEGY:\n${parsedOutput.adversarial_strategy}\n\n`;
-    }
-
-    if (parsedOutput.procedural_roadmap && Array.isArray(parsedOutput.procedural_roadmap)) {
-      formattedOutput += "PROCEDURAL ROADMAP:\n";
-      for (const item of parsedOutput.procedural_roadmap) {
-        formattedOutput += `\n${item.step}. ${item.title}\n`;
-        formattedOutput += `   Description: ${item.description}\n`;
-        if (item.estimated_time) {
-          formattedOutput += `   Estimated Time: ${item.estimated_time}\n`;
-        }
-        if (item.required_documents && Array.isArray(item.required_documents) && item.required_documents.length > 0) {
-          formattedOutput += `   Required Documents: ${item.required_documents.join(', ')}\n`;
-        }
-        formattedOutput += `   Status: ${item.status}\n`;
-      }
-      formattedOutput += "\n";
-    }
-
-    if (parsedOutput.procedural_checks && Array.isArray(parsedOutput.procedural_checks) && parsedOutput.procedural_checks.length > 0) {
-      formattedOutput += "PROCEDURAL CHECKS:\n";
-      for (const check of parsedOutput.procedural_checks) {
-        formattedOutput += `- ${check}\n`;
-      }
-      formattedOutput += "\n";
-    }
-
-    if (parsedOutput.citations && Array.isArray(parsedOutput.citations)) {
-      formattedOutput += "CITATIONS:\n";
-      for (const citation of parsedOutput.citations) {
-        formattedOutput += `- ${citation.text}`;
-        if (citation.source) {
-          formattedOutput += ` (${citation.source})`;
-        }
-        if (citation.url) {
-          formattedOutput += ` ${citation.url}`;
-        }
-        formattedOutput += "\n";
-      }
-      formattedOutput += "\n";
-    }
-
-    if (parsedOutput.local_logistics) {
-      formattedOutput += "---\n\nLOCAL LOGISTICS:\n";
-      formattedOutput += JSON.stringify(parsedOutput.local_logistics, null, 2) + "\n\n";
-    }
-
-    formattedOutput += "---\n\nFILING TEMPLATE:\n";
-    formattedOutput += parsedOutput.filing_template;
-
-    // Apply validation and formatting
-    const finalText = ResponseValidator.validateAndFix(formattedOutput);
-
-    // Prepare the response
-    const legalResult: LegalResult = {
-      text: finalText,
-      sources: sources
-    };
-
-    // Return the response
-    return NextResponse.json(legalResult);
+    // Return the response as a stream
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Transfer-Encoding': 'chunked',
+      },
+    });
   } catch (error: any) {
     console.error("Error in analyze API route:", error);
 
