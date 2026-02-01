@@ -6,11 +6,15 @@ LawSage is an open-source, AI-powered platform designed to empower individuals r
 > **Legal Disclaimer:** I am an AI, not an attorney. This tool provides legal information, not legal advice. Use of this tool does not create an attorney-client relationship.
 
 ## Key Advancements (v2.0)
-LawSage has undergone a major transformation! The latest version is now a **monolithic, Vercel-native application**. This means:
+LawSage has undergone a major transformation! The latest version is now a **proactive legal agent with human-in-the-loop verification**. This means:
 *   **No External Backend Required:** The entire application, including the AI processing, runs within Vercel's Edge Functions. No need to host a separate FastAPI server.
 *   **Multimodal OCR:** Upload images of legal documents (summonses, notices, complaints) for AI-powered text extraction and analysis.
 *   **Professional Court Templates:** Generate filings with built-in, court-standard formatting and caption templates ready for PDF export.
 *   **Simplified Deployment:** Deploy the entire application with a single click on Vercel.
+*   **Citation Verification:** Real-time verification of legal citations against 'good law' using Gemini Web Search tool.
+*   **Export to Word:** Direct export functionality to generate professional .docx documents compatible with legal workflows (Clio/Word).
+*   **Interactive Next Steps Checklist:** Proactive procedural timeline that maps out actionable steps with due dates and status tracking.
+*   **Vercel Hobby Tier Optimized:** Client-side rate limiting and edge runtime optimization to stay within free tier limits.
 
 ## Features
 *   **Voice Input:** Describe your legal situation naturally using your microphone.
@@ -20,11 +24,14 @@ LawSage has undergone a major transformation! The latest version is now a **mono
 *   **Real-Time Grounding:** All responses are grounded in current statutes and legal resources, with direct links to authoritative sources.
 *   **Local & Private:** Your data never leaves your browser. Your API key is stored securely in your browser's `localStorage`.
 *   **Comprehensive History:** Save and revisit your past cases with a full audit trail. Import and export your history as JSON.
-*   **Export & Share:** Copy all content to your clipboard or download your filings as a Markdown (.md) file or PDF.
+*   **Export & Share:** Copy all content to your clipboard or download your filings as a Markdown (.md) file, PDF, or Word (.docx) document.
 *   **OCR for Evidence:** Upload images of legal documents to extract text and analyze them alongside your description.
 *   **Court-Standard Formatting:** Automatically generate filings with professional court captions and formatting for PDF printing.
 *   **Structured Output:** AI responses are validated for reliability, ensuring mandatory disclaimers, legal citations, and a clear procedural roadmap.
 *   **Robust Reliability Layer:** A multi-layered system ensures safety, accuracy, and structural completeness of every output.
+*   **Citation Verification:** Verify legal citations in real-time to ensure they are still 'good law' using the Verify Citation button.
+*   **Interactive Next Steps Checklist:** Track your legal progress with a proactive checklist featuring due dates and status indicators.
+*   **Human-in-the-Loop Verification:** Proactive legal agent with verification layers to prevent hallucinations and ensure accuracy.
 
 ## Technology Stack
 LawSage is built on a modern, performant full-stack architecture:
@@ -32,6 +39,8 @@ LawSage is built on a modern, performant full-stack architecture:
 *   **AI Engine:** Google Gemini 2.5 Flash (via the Google AI Python SDK) with web search grounding for real-time legal research.
 *   **AI Safety & Structure:** A multi-layered Reliability Layer ensures consistent, safe output with mandatory disclaimers, citation validation, and structural hardening.
 *   **State Management:** Local browser storage (`localStorage`) for user preferences and case history.
+*   **Document Generation:** Docx library for professional Word (.docx) export functionality.
+*   **Rate Limiting:** Client-side rate limiting utility for Vercel Hobby Tier compliance.
 *   **Deployment:** Optimized for seamless deployment on Vercel.
 
 ## Getting Started
@@ -74,7 +83,11 @@ Open your browser and navigate to [http://localhost:3000](http://localhost:3000)
     *   Creates a draft, court-admissible legal filing (e.g., an Answer or Motion).
     *   Provides direct links to the legal sources used for grounding.
     *   *(For OCR)* Extracts text from your uploaded image and performs the same analysis.
-5.  **Action:** Review, edit, and copy the generated content to use in your case. You can also download it as a `.md` file or PDF.
+5.  **Verification & Action:**
+    *   **Citation Verification:** Use the "Verify Citation" button to check if legal citations are still 'good law' using real-time web search.
+    *   **Interactive Checklist:** Track your progress with the Next Steps checklist featuring due dates and status indicators.
+    *   **Export Options:** Download your analysis as a `.md` file, PDF, or Word (.docx) document.
+    *   **Review & Edit:** Review, edit, and copy the generated content to use in your case.
 
 ## Deployment (Vercel)
 The easiest and recommended way to deploy LawSage is on **Vercel**. The entire application, including the AI backend, is designed to run on Vercel's Edge Functions.
@@ -86,6 +99,15 @@ The easiest and recommended way to deploy LawSage is on **Vercel**. The entire a
     *   Go to your Vercel project's **Settings** > **Environment Variables**.
     *   Add a new variable named `GEMINI_API_KEY` and paste your API key as the value.
 5.  Click "Deploy". Your application will be live!
+
+## API Routes
+The application includes several API routes optimized for Vercel Edge Functions:
+*   **/api/analyze:** Main analysis endpoint for legal situation processing with grounding.
+*   **/api/ocr:** Multimodal OCR endpoint for legal document image analysis.
+*   **/api/health:** Health check endpoint.
+*   **/api/verify-citation:** Real-time citation verification endpoint using Gemini Web Search.
+
+All API routes are configured to run on Vercel's Edge Runtime for optimal performance and cost efficiency within Hobby Tier limits.
 
 ## AI Safety & Structure
 LawSage employs a multi-layered Reliability Layer to ensure that AI-generated content is safe, accurate, and structurally complete:
