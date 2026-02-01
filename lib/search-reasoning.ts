@@ -1,4 +1,5 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
+import type { FunctionDeclarationSchemaProperty } from '@google/generative-ai';
 
 /**
  * Generates 3 targeted legal search queries using Gemini for deeper grounding
@@ -107,12 +108,12 @@ export async function executeSearchQueries(
       name: "google_search",
       description: "Search the web for information",
       parameters: {
-        type: "object",
+        type: SchemaType.OBJECT,
         properties: {
           query: {
-            type: "string",
+            type: SchemaType.STRING,
             description: "The search query"
-          }
+          } satisfies FunctionDeclarationSchemaProperty
         },
         required: ["query"]
       }
@@ -133,9 +134,10 @@ export async function executeSearchQueries(
 
       // Extract the search results
       const response = result.response;
-      if (response && response.functionCalls) {
+      const functionCalls = response.functionCalls();
+      if (functionCalls && functionCalls.length > 0) {
         // Process function calls to get search results
-        for (const functionCall of response.functionCalls) {
+        for (const functionCall of functionCalls) {
           if (functionCall.name === 'google_search') {
             // Note: Actual search results would come back in the function response,
             // but since we're simulating this, we'll return the query for now

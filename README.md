@@ -1,4 +1,5 @@
 # LawSage: The Universal Public Defender
+
 **Democratizing Legal Access for Everyone**
 
 LawSage is an open-source, AI-powered platform designed to empower individuals representing themselves in court (Pro Se litigants). By leveraging advanced AI models and real-time legal grounding, LawSage analyzes your unique legal situation and generates a personalized, court-admissible roadmap and legal filings.
@@ -6,7 +7,9 @@ LawSage is an open-source, AI-powered platform designed to empower individuals r
 > **Legal Disclaimer:** I am an AI, not an attorney. This tool provides legal information, not legal advice. Use of this tool does not create an attorney-client relationship.
 
 ## Key Advancements (v4.0)
-LawSage has undergone another major transformation! The latest version is now a **resilient, high-performance 'zero-infrastructure' platform with enhanced capabilities**. This means:
+
+LawSage has undergone a transformative evolution! The latest version is now a **resilient, high-performance 'zero-infrastructure' platform** with enhanced capabilities. This means:
+
 *   **URL-Based State Persistence:** Zero-DB state synchronization using lz-string compression to store Virtual Case Folder metadata and summaries directly in the URL hash, enabling persistent sessions without external storage.
 *   **API Request Consolidation:** Unified 'Structural Hardening' suite combining Adversarial Strategy, Procedural Roadmap, and Local Logistics into a single batch request to minimize Gemini API latency and token usage.
 *   **Optimized Document Processing:** Client-side image downscaling and grayscaling before transmission to OCR endpoints, preventing Vercel Hobby tier timeouts and improving performance.
@@ -25,6 +28,7 @@ LawSage has undergone another major transformation! The latest version is now a 
 *   **Vercel Hobby Tier Optimized:** Client-side rate limiting and edge runtime optimization to stay within free tier limits.
 
 ## Features
+
 *   **Voice Input:** Describe your legal situation naturally using your microphone.
 *   **Virtual Case Folder:** Upload and analyze multiple legal documents simultaneously for comprehensive cross-document analysis.
 *   **Adversarial Strategy:** Automatic generation of opposition arguments and 'red-team' analysis to identify potential weaknesses in your case.
@@ -51,7 +55,9 @@ LawSage has undergone another major transformation! The latest version is now a 
 *   **Human-in-the-Loop Verification:** Proactive legal agent with verification layers to prevent hallucinations and ensure accuracy.
 
 ## Technology Stack
+
 LawSage is built on a modern, performant full-stack architecture:
+
 *   **Frontend & Backend:** Next.js 16 (React 19) with Tailwind CSS and Lucide Icons. The entire backend logic now runs on Vercel Edge Functions.
 *   **AI Engine:** Google Gemini 2.5 Flash (via the Google AI Python SDK) with web search grounding for real-time legal research.
 *   **AI Safety & Structure:** A multi-layered Reliability Layer ensures consistent, safe output with mandatory disclaimers, citation validation, and structural hardening.
@@ -62,35 +68,43 @@ LawSage is built on a modern, performant full-stack architecture:
 *   **Deployment:** Optimized for seamless deployment on Vercel.
 
 ## Getting Started
+
 ### Prerequisites
+
 *   Node.js (v18+ recommended)
 *   A Google Gemini API Key (Get one from the [Google AI Studio](https://aistudio.google.com/))
 
 ### Installation
+
 1.  **Clone the Repository**
-```bash
-git clone https://github.com/tomwolfe/lawsage.git
-cd lawsage
-```
+    ```bash
+    git clone https://github.com/tomwolfe/lawsage.git
+    cd lawsage
+    ```
+
 2.  **Install Frontend Dependencies**
-```bash
-npm install
-```
+    ```bash
+    npm install
+    ```
 
 ### Running the Application Locally
+
 Start the Next.js development server:
 ```bash
 npm run dev
 ```
+
 Open your browser and navigate to [http://localhost:3000](http://localhost:3000) to begin.
 
 ### Setting Your API Key
+
 1.  Open the application in your browser (`http://localhost:3000`).
 2.  Click the "Settings" button in the top right corner.
 3.  Enter your Google Gemini API Key and click "Save Settings".
 *   **Important:** Your key is stored securely in your browser's `localStorage` and is only sent to Google's API when you request an analysis. It is never sent to any other server.
 
 ## How It Works
+
 1.  **Input:** Describe your legal issue in plain language (e.g., "I was evicted from my apartment without notice") or upload multiple legal documents to your Virtual Case Folder.
 2.  **Jurisdiction:** Select your relevant state or "Federal" from the dropdown.
 3.  **Analyze:** Click "Analyze Case" or use the voice input button.
@@ -113,6 +127,7 @@ Open your browser and navigate to [http://localhost:3000](http://localhost:3000)
     *   **Review & Edit:** Review, edit, and copy the generated content to use in your case.
 
 ## Deployment (Vercel)
+
 The easiest and recommended way to deploy LawSage is on **Vercel**. The entire application, including the AI backend, is designed to run on Vercel's Edge Functions.
 
 1.  Push your code to a public GitHub repository.
@@ -124,6 +139,7 @@ The easiest and recommended way to deploy LawSage is on **Vercel**. The entire a
 5.  Click "Deploy". Your application will be live!
 
 ## API Routes
+
 The application includes several API routes optimized for Vercel Edge Functions:
 *   **/api/analyze:** Main analysis endpoint for legal situation processing with grounding. Consolidated response includes adversarial strategy, procedural roadmap, and local logistics.
 *   **/api/ocr:** Multimodal OCR endpoint for legal document image analysis with optimized image processing.
@@ -132,6 +148,7 @@ The application includes several API routes optimized for Vercel Edge Functions:
 All API routes are configured to run on Vercel's Edge Runtime for optimal performance and cost efficiency within Hobby Tier limits.
 
 ## AI Safety & Structure
+
 LawSage employs a multi-layered Reliability Layer to ensure that AI-generated content is safe, accurate, and structurally complete:
 *   **Red-Team Auditing:** Every user request is audited for safety violations and jurisdictional clarity before being processed.
 *   **Static Grounding Layer:** Checks the embedded procedural rules database for common queries before making API calls, providing instant zero-latency research.
@@ -148,18 +165,23 @@ LawSage employs a multi-layered Reliability Layer to ensure that AI-generated co
     *   **Structured Output:** The AI is prompted to return a JSON schema, which is validated server-side for completeness and safety before being presented to the user.
 
 ## Contributing
+
 LawSage is an open-source project dedicated to legal democratization. Contributions are welcome!
+
 1.  Fork the repository.
 2.  Create a feature branch (`git checkout -b feature/your-feature-name`).
 3.  Commit your changes (`git commit -m 'Add some feature'`).
 4.  Push to the branch (`git push origin feature/your-feature-name`).
 5.  Open a pull request.
+
 Please ensure your code adheres to the existing style and includes tests for new features.
 
 ## License
+
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
+
 *   [Next.js](https://nextjs.org/)
 *   [Google AI Studio](https://aistudio.google.com/)
 *   [Tailwind CSS](https://tailwindcss.com/)

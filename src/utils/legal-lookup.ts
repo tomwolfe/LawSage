@@ -1,7 +1,15 @@
 // utils/legal-lookup.ts
 // Utility for checking legal lookup database before making API calls
 
-import { LegalResult } from '../app/api/analyze/route';
+interface Source {
+  title: string | null;
+  uri: string | null;
+}
+
+interface LegalResult {
+  text: string;
+  sources: Source[];
+}
 
 interface LegalRule {
   id: number;
@@ -33,9 +41,10 @@ async function loadLegalLookupDb(): Promise<LegalLookupDatabase> {
     if (!response.ok) {
       throw new Error(`Failed to load legal lookup database: ${response.statusText}`);
     }
-    
-    legalLookupDb = await response.json();
-    return legalLookupDb;
+
+    const data = await response.json();
+    legalLookupDb = data;
+    return data;
   } catch (error) {
     console.error('Error loading legal lookup database:', error);
     // Return an empty database to prevent crashes

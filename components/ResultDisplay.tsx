@@ -661,11 +661,13 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
     return new Document({
       sections: [{
         properties: {
-          margins: {
-            top: 1440, // 1 inch in points
-            bottom: 1440,
-            left: 1440,
-            right: 1440,
+          page: {
+            margin: {
+              top: 1440, // 1 inch in points
+              bottom: 1440,
+              left: 1440,
+              right: 1440,
+            },
           },
         },
         children,
