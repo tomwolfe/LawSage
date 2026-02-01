@@ -89,6 +89,7 @@ class LawSageWorkflow:
                 tools=[search_tool],
                 system_instruction=system_instruction,
                 max_output_tokens=4096,
+                response_mime_type='application/json',  # Use structured JSON output
                 response_schema=LegalOutput  # Use structured output
             )
         )
