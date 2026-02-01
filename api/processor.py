@@ -320,8 +320,8 @@ class ResponseValidator:
                 "filings": parts[1].strip()
             }
         else:
-            # If it's in the new format, return as is
+            # If it's in the new format, return as is with default message for filings
             return {
                 "strategy": text,
-                "filings": ""
+                "filings": cls.NO_FILINGS_MSG
             }

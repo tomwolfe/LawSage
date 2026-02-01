@@ -13,18 +13,20 @@ client = TestClient(app, raise_server_exceptions=False)
 def test_global_handler_internal_error():
     with patch("api.workflow.genai.Client") as mock_client:
         mock_client.side_effect = Exception("System failure")
-        
+
         response = client.post(
             "/api/generate",
             json={"user_input": "test", "jurisdiction": "California"},
             headers={"X-Gemini-API-Key": "AIza-test-key-with-enough-length"}
         )
-        
+
         assert response.status_code == 500
         data = response.json()
         assert data["error"] is True
         assert data["type"] == "InternalServerError"
-        assert "System failure" in data["detail"]
+        # Verify that internal error details are not exposed (security requirement)
+        assert "System failure" not in data["detail"]
+        assert "internal server error occurred" in data["detail"]
 
 def test_global_handler_app_exception():
     """Verify that AppException returns custom status and type."""

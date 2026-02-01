@@ -12,17 +12,17 @@ def test_health_check():
 
 @patch("api.workflow.LawSageWorkflow.step_2_generate")
 def test_generate_endpoint_success(mock_generate):
-    # Mock successful generation
-    mock_generate.return_value = ("According to 12 U.S.C. § 345 and Rule 12(b)(6). Procedural Roadmap: Step 1.\n\n---\n\nFiling text", [])
-    
+    # Mock successful generation with 3 citations to pass validation
+    mock_generate.return_value = ("According to 12 U.S.C. § 345, Rule 12(b)(6), and Cal. Civ. Code § 1708. Procedural Roadmap: Step 1. Step 2. Step 3.\n\n---\n\nFiling text", [])
+
     payload = {
         "user_input": "I need help with a traffic ticket",
         "jurisdiction": "New York"
     }
     headers = {"X-Gemini-API-Key": "AIzaTestKey1234567890"}
-    
+
     response = client.post("/generate", json=payload, headers=headers)
-    
+
     assert response.status_code == 200
     data = response.json()
     assert "LEGAL DISCLAIMER" in data["text"]

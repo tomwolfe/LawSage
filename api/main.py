@@ -81,38 +81,9 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
             media_type="application/json",
             headers={"X-Vercel-Streaming": "true"}
         )
-    except AppException as e:
-        return JSONResponse(
-            status_code=e.status_code,
-            content=StandardErrorResponse(
-                type=e.type,
-                detail=e.detail
-            ).model_dump()
-        )
-    except (errors.ClientError, google_exceptions.GoogleAPICallError) as e:
-        status_code = 400
-        error_type = "AIClientError"
-        detail = str(e)
-        if "429" in str(e).lower() or "quota" in str(e).lower():
-            status_code = 429
-            error_type = "RateLimitError"
-            detail = "AI service rate limit exceeded. Please try again in a few minutes."
-
-        return JSONResponse(
-            status_code=status_code,
-            content=StandardErrorResponse(
-                type=error_type,
-                detail=detail
-            ).model_dump()
-        )
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content=StandardErrorResponse(
-                type="InternalServerError",
-                detail=str(e)
-            ).model_dump()
-        )
+    except:
+        # Let all exceptions bubble up to the global exception handler
+        raise
 
 if __name__ == "__main__":
     import uvicorn
