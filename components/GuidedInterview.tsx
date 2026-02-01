@@ -117,12 +117,15 @@ export default function GuidedInterview({ onComplete }: GuidedInterviewProps) {
       });
 
       if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('API Key is invalid or expired.');
-        } else if (response.status === 504) {
-          throw new Error('Server timeout. The case is being processed in the background.');
+        const errorText = await response.text();
+        let errorMessage = `API Error (${response.status})`;
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.detail || errorJson.error || errorMessage;
+        } catch (e) {
+          errorMessage = `${errorMessage}: ${errorText.slice(0, 100)}`;
         }
-        throw new Error(`Failed to process case (${response.status})`);
+        throw new Error(errorMessage);
       }
 
       const reader = response.body?.getReader();
