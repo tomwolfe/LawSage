@@ -13,8 +13,7 @@ from api.exceptions import global_exception_handler, AppException
 
 # Mandatory safety disclosure hardcoded for the response stream
 LEGAL_DISCLAIMER = (
-    "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. "
-    "This is legal information, not legal advice. Always consult with a qualified attorney.\n\n"
+    "Legal Disclaimer: I am an AI, not an attorney.\n\n"
 )
 
 app = FastAPI()

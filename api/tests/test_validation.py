@@ -26,15 +26,18 @@ def test_legal_output_schema_creation():
     )
     
     output = LegalOutput(
-        disclaimer="LEGAL DISCLAIMER: This is legal information...",
+        disclaimer="Legal Disclaimer: I am an AI, not an attorney.",
         strategy="Based on your situation, here is the recommended strategy...",
+        adversarial_strategy="Consider the opposing party's potential arguments...",
         roadmap=[strategy_item],
         filing_template="Court Form ABC-123...",
         citations=[citation],
-        sources=["https://example.com/source1", "https://example.com/source2"]
+        sources=["https://example.com/source1", "https://example.com/source2"],
+        local_logistics={"address": "123 Court St", "filing_fee": "$400"},
+        procedural_checks=["Check Local Rules of Court for filing deadlines"]
     )
     
-    assert output.disclaimer.startswith("LEGAL DISCLAIMER")
+    assert "Legal Disclaimer: I am an AI, not an attorney." in output.disclaimer
     assert len(output.strategy) > 0
     assert len(output.roadmap) == 1  # This should be roadmap
     assert len(output.citations) == 1
@@ -75,9 +78,9 @@ def test_response_validator_validate_and_fix():
     """Test the ResponseValidator.validate_and_fix method."""
     sample_text = "This is a sample strategy.\n\n---\n\nThis is a filing template."
     result = ResponseValidator.validate_and_fix(sample_text)
-    
+
     # Should contain the standard disclaimer
-    assert "LEGAL DISCLAIMER" in result
+    assert "Legal Disclaimer: I am an AI, not an attorney." in result
     # Should contain the delimiter
     assert "---" in result
 
@@ -86,41 +89,76 @@ def test_response_validator_validate_legal_output():
     """Test the ResponseValidator.validate_legal_output method."""
     # Valid content with 3 citations and roadmap (should pass)
     valid_content = """
+    Legal Disclaimer: I am an AI, not an attorney.
+
+    STRATEGY:
     This is a legal strategy with citations.
 
-    Citations:
+    ADVERSARIAL STRATEGY:
+    The opposition may argue that...
+
+    PROCEDURAL ROADMAP:
+    1. File initial paperwork
+    2. Serve opposing party
+    3. Attend hearing
+
+    LOCAL COURT INFORMATION:
+    Address: 123 Court Street
+    Filing Fee: $400
+
+    CITATIONS:
     - 12 U.S.C. § 345
     - Cal. Civ. Code § 1708
     - Rule 12(b)(6)
 
-    Next Steps:
-    1. File initial paperwork
-    2. Serve opposing party
+    PROCEDURAL CHECKS AGAINST LOCAL RULES OF COURT:
+    - Check local filing deadlines
+
+    ---
     """
 
     assert ResponseValidator.validate_legal_output(valid_content) is True
 
     # Content with only 2 citations (should fail now - needs 3)
     two_citations_content = """
+    Legal Disclaimer: I am an AI, not an attorney.
+
+    STRATEGY:
     This is a legal strategy with citations.
 
-    Citations:
+    ADVERSARIAL STRATEGY:
+    The opposition may argue that...
+
+    PROCEDURAL ROADMAP:
+    1. File initial paperwork
+    2. Serve opposing party
+
+    LOCAL COURT INFORMATION:
+    Address: 123 Court Street
+
+    CITATIONS:
     - 12 U.S.C. § 345
     - Cal. Civ. Code § 1708
 
-    Next Steps:
-    1. File initial paperwork
-    2. Serve opposing party
+    PROCEDURAL CHECKS AGAINST LOCAL RULES OF COURT:
+    - Check local filing deadlines
+
+    ---
     """
 
     assert ResponseValidator.validate_legal_output(two_citations_content) is False
 
     # Invalid content without sufficient citations
     invalid_content = """
+    Legal Disclaimer: I am an AI, not an attorney.
+
+    STRATEGY:
     This is a legal strategy without enough citations.
 
-    Next Steps:
+    PROCEDURAL ROADMAP:
     1. File initial paperwork
+
+    ---
     """
 
     assert ResponseValidator.validate_legal_output(invalid_content) is False
@@ -166,12 +204,15 @@ def test_legal_output_with_multiple_citations():
     ]
     
     output = LegalOutput(
-        disclaimer="LEGAL DISCLAIMER: This is legal information...",
+        disclaimer="Legal Disclaimer: I am an AI, not an attorney.",
         strategy="Strategy content...",
+        adversarial_strategy="Consider the opposing party's potential arguments...",
         roadmap=roadmap_items,
         filing_template="Filing template content...",
         citations=citations,
-        sources=["https://example.com/src1", "https://example.com/src2"]
+        sources=["https://example.com/src1", "https://example.com/src2"],
+        local_logistics={"address": "123 Court St", "filing_fee": "$400"},
+        procedural_checks=["Check Local Rules of Court for filing deadlines"]
     )
     
     assert len(output.citations) == 3
@@ -182,12 +223,15 @@ def test_legal_output_with_multiple_citations():
 def test_empty_fields_handling():
     """Test handling of empty fields in models."""
     output = LegalOutput(
-        disclaimer="LEGAL DISCLAIMER: This is legal information...",
+        disclaimer="Legal Disclaimer: I am an AI, not an attorney.",
         strategy="Strategy content...",
+        adversarial_strategy="Consider the opposing party's potential arguments...",
         roadmap=[],
         filing_template="Filing template content...",
         citations=[],
-        sources=[]
+        sources=[],
+        local_logistics={},
+        procedural_checks=[]
     )
     
     assert output.disclaimer is not None

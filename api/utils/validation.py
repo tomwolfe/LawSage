@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from api.schemas import LegalOutput, Citation
 from api.models import Source
+from api.utils.citation_verifier import CitationVerifier
 
 
 class ResponseValidator:
@@ -117,44 +118,31 @@ class ResponseValidator:
         """
         Validates string content against Mission Contract requirements using regex patterns.
         """
-        # Check for standard disclaimer at the beginning
-        has_disclaimer = "LEGAL DISCLAIMER:" in content
+        # Check for the exact legal disclaimer required by the mission contract
+        has_disclaimer = "Legal Disclaimer: I am an AI, not an attorney." in content
 
-        # Check for citations using regex patterns
-        citation_patterns = [
-            r"\b\d+\s+[A-Z]\.[A-Z]\.[A-Z]\.?\s+§?\s*\d+",  # e.g., "12 U.S.C. § 345"
-            r"[A-Z][a-z]+\.?\s+[Cc]ode\s+§?\s*\d+",         # e.g., "Cal. Civ. Code § 1708"
-            r"[Rr]ule\s+\d+\(?[a-z]?\)?",                   # e.g., "Rule 12(b)(6)"
-            r"§\s*\d+",                                     # e.g., "§ 345"
-            r"section\s+\d+",                                # e.g., "section 123"
-        ]
-
-        total_citations = 0
-        for pattern in citation_patterns:
-            matches = re.findall(pattern, content, re.IGNORECASE)
-            total_citations += len(matches)
-
-        has_citations = total_citations >= 3
+        # Use the citation verifier to count valid citations
+        has_citations = CitationVerifier.validate_minimum_citations(content, 3)
 
         # Check for roadmap section
         roadmap_patterns = [
-            r"(?i)(ROADMAP|Next Steps|Procedural Roadmap|Step-by-step|What to do next):"
+            r"(?i)(ROADMAP|Next Steps|Procedural Roadmap|Step-by-step|What to do next|PROCEDURAL ROADMAP):"
         ]
 
         has_roadmap = any(re.search(pattern, content) for pattern in roadmap_patterns)
 
         # Check for adversarial strategy section
         adversarial_patterns = [
-            r"(?i)(Adversarial Strategy|Opposition Arguments|Red-Team Analysis|Counter-Arguments|Opposition Strategy):"
+            r"(?i)(Adversarial Strategy|Opposition Arguments|Red-Team Analysis|Counter-Arguments|Opposition Strategy|ADVERSARIAL STRATEGY):"
         ]
 
         has_adversarial_strategy = any(
             re.search(pattern, content) for pattern in adversarial_patterns
         )
 
-        # Check for local court logistics
+        # Check for local court information
         logistics_patterns = [
-            r"(?i)(Local Court Logistics|Court Address|Filing Fees|Dress Code|Court Hours|Local Rules):"
+            r"(?i)(Local Court Information|Local Court Logistics|Court Address|Filing Fees|Dress Code|Court Hours|Local Rules|LOCAL COURT INFORMATION|LOCAL COURT LOGISTICS):"
         ]
 
         has_local_logistics = any(
@@ -163,7 +151,7 @@ class ResponseValidator:
 
         # Check for procedural checks
         procedural_patterns = [
-            r"(?i)(Procedural Checks|Procedural technicality|Local Rules of Court)"
+            r"(?i)(Procedural Checks|Procedural technicality|Local Rules of Court|LOCAL RULES OF COURT)"
         ]
 
         has_procedural_checks = any(
@@ -360,32 +348,33 @@ class SafetyValidator:
         """
         Validates that the final output contains at least 3 verifiable citations
         from the grounding metadata.
-        
+
         Args:
             final_output: The final AI-generated output
             grounding_data: List of sources used for grounding
-            
+
         Returns:
             bool: True if output contains at least 3 citations from grounding data
         """
         if not grounding_data:
             return False  # Require grounding data to be present
-        
+
         if len(grounding_data) < 3:
-            return False  # Need at least 3 sources for 3 citations
-        
+            # If we have fewer than 3 sources, we can't possibly have 3 citations from them
+            return False
+
         # Count how many grounding sources are referenced in the output
         citation_count = 0
         text_lower = final_output.lower()
-        
+
         for source in grounding_data:
             cited = False
             if source.title and source.title.lower() in text_lower:
                 cited = True
             elif source.uri and source.uri.lower() in text_lower:
                 cited = True
-            
+
             if cited:
                 citation_count += 1
-        
+
         return citation_count >= 3

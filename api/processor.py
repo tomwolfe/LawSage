@@ -1,13 +1,13 @@
 import json
 from typing import Dict, Union
 from api.schemas import LegalOutput
+from api.utils.citation_verifier import CitationVerifier
 
 class ResponseValidator:
     """Utility to verify and fix AI output for legal safety and structure."""
 
     STANDARD_DISCLAIMER = (
-        "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. "
-        "This is legal information, not legal advice. Always consult with a qualified attorney.\n\n"
+        "Legal Disclaimer: I am an AI, not an attorney.\n\n"
     )
 
     NO_FILINGS_MSG = "No filings generated. Please try a more specific request or check the strategy tab."
@@ -16,7 +16,7 @@ class ResponseValidator:
     def validate_and_fix(cls, content: Union[str, dict]) -> str:
         """
         Validates and fixes JSON output from AI model.
-        Ensures the standard disclaimer is present at the root level.
+        Ensures the standard disclaimer is present at the root level and all mission contract requirements are met.
         """
         # Parse the content if it's a string
         if isinstance(content, str):
@@ -35,10 +35,13 @@ class ResponseValidator:
 
                     # Construct the final output with the standard disclaimer at the top
                     final_output = cls.STANDARD_DISCLAIMER
-                    final_output += f"STRATEGY:\n{cleaned_strategy}\n\n"
+                    final_output += f"\nSTRATEGY:\n{cleaned_strategy}\n\n"
+
+                    # Add adversarial strategy
+                    final_output += f"ADVERSARIAL STRATEGY:\n{parsed_data.adversarial_strategy}\n\n"
 
                     # Format roadmap items
-                    final_output += "ROADMAP:\n"
+                    final_output += "PROCEDURAL ROADMAP:\n"
                     for item in parsed_data.roadmap:
                         final_output += f"{item.step}. {item.title}: {item.description}\n"
                         if item.estimated_time:
@@ -46,8 +49,21 @@ class ResponseValidator:
                         if item.required_documents:
                             final_output += f"   Required Documents: {', '.join(item.required_documents)}\n"
 
-                    final_output += f"\nFILING TEMPLATE:\n{parsed_data.filing_template}\n\n"
+                    final_output += "\n"
 
+                    # Add local court information
+                    final_output += "LOCAL COURT INFORMATION:\n"
+                    for key, value in parsed_data.local_logistics.items():
+                        final_output += f"{key}: {value}\n"
+                    final_output += "\n"
+
+                    # Add procedural checks
+                    final_output += "PROCEDURAL CHECKS AGAINST LOCAL RULES OF COURT:\n"
+                    for check in parsed_data.procedural_checks:
+                        final_output += f"- {check}\n"
+                    final_output += "\n"
+
+                    # Add citations
                     final_output += "CITATIONS:\n"
                     for citation in parsed_data.citations:
                         final_output += f"- {citation.text}"
@@ -56,6 +72,11 @@ class ResponseValidator:
                         if citation.url:
                             final_output += f" {citation.url}"
                         final_output += "\n"
+
+                    final_output += "\n---\n\n"
+
+                    # Add filing template
+                    final_output += f"FILING TEMPLATE:\n{parsed_data.filing_template}\n\n"
 
                     # Add sources if any
                     if parsed_data.sources:
@@ -82,10 +103,13 @@ class ResponseValidator:
 
             # Construct the final output with the standard disclaimer at the top
             final_output = cls.STANDARD_DISCLAIMER
-            final_output += f"STRATEGY:\n{cleaned_strategy}\n\n"
+            final_output += f"\nSTRATEGY:\n{cleaned_strategy}\n\n"
+
+            # Add adversarial strategy
+            final_output += f"ADVERSARIAL STRATEGY:\n{parsed_data.adversarial_strategy}\n\n"
 
             # Format roadmap items
-            final_output += "ROADMAP:\n"
+            final_output += "PROCEDURAL ROADMAP:\n"
             for item in parsed_data.roadmap:
                 final_output += f"{item.step}. {item.title}: {item.description}\n"
                 if item.estimated_time:
@@ -93,8 +117,21 @@ class ResponseValidator:
                 if item.required_documents:
                     final_output += f"   Required Documents: {', '.join(item.required_documents)}\n"
 
-            final_output += f"\nFILING TEMPLATE:\n{parsed_data.filing_template}\n\n"
+            final_output += "\n"
 
+            # Add local court information
+            final_output += "LOCAL COURT INFORMATION:\n"
+            for key, value in parsed_data.local_logistics.items():
+                final_output += f"{key}: {value}\n"
+            final_output += "\n"
+
+            # Add procedural checks
+            final_output += "PROCEDURAL CHECKS AGAINST LOCAL RULES OF COURT:\n"
+            for check in parsed_data.procedural_checks:
+                final_output += f"- {check}\n"
+            final_output += "\n"
+
+            # Add citations
             final_output += "CITATIONS:\n"
             for citation in parsed_data.citations:
                 final_output += f"- {citation.text}"
@@ -103,6 +140,11 @@ class ResponseValidator:
                 if citation.url:
                     final_output += f" {citation.url}"
                 final_output += "\n"
+
+            final_output += "\n---\n\n"
+
+            # Add filing template
+            final_output += f"FILING TEMPLATE:\n{parsed_data.filing_template}\n\n"
 
             # Add sources if any
             if parsed_data.sources:
@@ -212,6 +254,20 @@ class ResponseValidator:
 
         # Filter out empty lines at the beginning/end, but preserve internal ones
         strategy_content = "\n".join(cleaned_lines).strip()
+
+        # Ensure the content follows the mission contract format
+        # Check if it already has the required sections
+        if "STRATEGY:" not in strategy_content:
+            strategy_content = f"STRATEGY:\n{strategy_content}"
+        if "ADVERSARIAL STRATEGY:" not in strategy_content:
+            strategy_content += f"\n\nADVERSARIAL STRATEGY:\n[No adversarial strategy provided]"
+        if "PROCEDURAL ROADMAP:" not in strategy_content:
+            strategy_content += f"\n\nPROCEDURAL ROADMAP:\n[No procedural roadmap provided]"
+        if "LOCAL COURT INFORMATION:" not in strategy_content:
+            strategy_content += f"\n\nLOCAL COURT INFORMATION:\n[No local court information provided]"
+        if "CITATIONS:" not in strategy_content:
+            strategy_content += f"\n\nCITATIONS:\n[No citations provided]"
+
         final_strategy = cls.STANDARD_DISCLAIMER + strategy_content
 
         # 3. Re-assemble
@@ -227,6 +283,9 @@ class ResponseValidator:
         b) A 'Next Steps' or 'Roadmap' section.
         c) Adversarial strategy section
         d) Procedural checks against Local Rules of Court
+        e) Mandatory legal disclaimer
+        f) Local court logistics information
+        g) Proper '---' delimiter separation
         """
         # Parse the content if it's a string
         if isinstance(content, str):
@@ -248,7 +307,13 @@ class ResponseValidator:
                     # Check that we have procedural checks
                     has_procedural_checks = len(parsed_data.procedural_checks) > 0
 
-                    return has_citations and has_roadmap and has_adversarial and has_procedural_checks
+                    # Check that we have a disclaimer
+                    has_disclaimer = bool(parsed_data.disclaimer and "Legal Disclaimer: I am an AI, not an attorney." in parsed_data.disclaimer)
+
+                    # Check that we have local logistics
+                    has_local_logistics = bool(parsed_data.local_logistics and len(parsed_data.local_logistics) > 0)
+
+                    return has_citations and has_roadmap and has_adversarial and has_procedural_checks and has_disclaimer and has_local_logistics
                 except json.JSONDecodeError:
                     # If it's not valid JSON, try to parse it as the old format
                     return cls._validate_legal_output_legacy(content)
@@ -270,7 +335,13 @@ class ResponseValidator:
             # Check that we have procedural checks
             has_procedural_checks = len(parsed_data.procedural_checks) > 0
 
-            return has_citations and has_roadmap and has_adversarial and has_procedural_checks
+            # Check that we have a disclaimer
+            has_disclaimer = bool(parsed_data.disclaimer and "Legal Disclaimer: I am an AI, not an attorney." in parsed_data.disclaimer)
+
+            # Check that we have local logistics
+            has_local_logistics = bool(parsed_data.local_logistics and len(parsed_data.local_logistics) > 0)
+
+            return has_citations and has_roadmap and has_adversarial and has_procedural_checks and has_disclaimer and has_local_logistics
         else:
             raise ValueError("Content must be a string or dictionary")
 
@@ -281,53 +352,32 @@ class ResponseValidator:
         """
         import re
 
-        # Check for citations: Look for common legal citation patterns
-        # e.g., "12 U.S.C. § 345", "Cal. Civ. Code § 1708", "Rule 12(b)(6)"
-        citation_patterns = [
-            r"\d+\s+[A-Z]\.[A-Z]\.[A-Z]\.?\s+§?\s*\d+", # Federal/State statutes
-            r"[A-Z][a-z]+\.?\s+[Cc]ode\s+§?\s*\d+",     # Named codes
-            r"[Rr]ule\s+\d+\(?[a-z]?\)?",                # Rules of procedure
-            r"Section\s+\d+",                            # Section keyword
-        ]
+        # Check for the exact legal disclaimer required by the mission contract
+        has_disclaimer = "Legal Disclaimer: I am an AI, not an attorney." in content
 
-        # Find all citations using all patterns
-        all_matches = set()  # Use a set to avoid duplicates
-        for pattern in citation_patterns:
-            matches = re.findall(pattern, content)
-            for match in matches:
-                all_matches.add(match.lower().strip())  # Normalize to lowercase for comparison
-
-        # Also look for standalone section symbols but only if they're not already captured in other patterns
-        section_matches = re.findall(r"§\s*\d+", content)
-        for match in section_matches:
-            # Only add if this section reference is not already part of a more specific citation
-            match_normalized = match.lower().strip()
-            # Check if this section is already part of a more specific citation we found
-            already_found = False
-            for existing_match in all_matches:
-                if match_normalized.replace("§", "").strip() in existing_match:
-                    already_found = True
-                    break
-            if not already_found:
-                all_matches.add(match_normalized)
-
-        citation_count = len(all_matches)
-
-        has_citations = citation_count >= 3
+        # Use the citation verifier to count valid citations
+        has_citations = CitationVerifier.validate_minimum_citations(content, 3)
 
         # Check for Roadmap/Next Steps
-        roadmap_keywords = ["Next Steps", "Roadmap", "Procedural Roadmap", "What to do next", "Step-by-step", "ROADMAP:", "NEXT STEPS:"]
+        roadmap_keywords = ["Next Steps", "Roadmap", "Procedural Roadmap", "What to do next", "Step-by-step", "ROADMAP:", "NEXT STEPS:", "PROCEDURAL ROADMAP:"]
         has_roadmap = any(kw.lower() in content.lower() for kw in roadmap_keywords)
 
         # Check for Adversarial Strategy
-        adversarial_keywords = ["Adversarial Strategy", "Opposition View", "Red-Team Analysis", "Opposition arguments"]
+        adversarial_keywords = ["Adversarial Strategy", "Opposition View", "Red-Team Analysis", "Opposition arguments", "ADVERSARIAL STRATEGY:"]
         has_adversarial = any(kw.lower() in content.lower() for kw in adversarial_keywords)
 
         # Check for Procedural Checks
-        procedural_keywords = ["Procedural Checks", "Local Rules of Court", "Procedural technicality"]
+        procedural_keywords = ["Procedural Checks", "Local Rules of Court", "Procedural technicality", "LOCAL RULES OF COURT"]
         has_procedural = any(kw.lower() in content.lower() for kw in procedural_keywords)
 
-        return has_citations and has_roadmap and has_adversarial and has_procedural
+        # Check for Local Court Information
+        local_info_keywords = ["Local Court Information", "Local Court Logistics", "Courthouse address", "Filing fees", "LOCAL COURT INFORMATION:", "LOCAL COURT LOGISTICS:"]
+        has_local_info = any(kw.lower() in content.lower() for kw in local_info_keywords)
+
+        # Check for proper delimiter
+        has_delimiter = "---" in content
+
+        return has_citations and has_roadmap and has_adversarial and has_procedural and has_disclaimer and has_local_info and has_delimiter
 
     @classmethod
     def parse_to_dict(cls, text: str) -> Dict[str, str]:

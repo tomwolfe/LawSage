@@ -17,13 +17,11 @@ class SafetyValidator:
         """
         # If no grounding data is available, we can't validate grounding
         if not grounding_data:
-            return True  # Allow the response to proceed without grounding validation
+            return False  # Require grounding data to be present
 
-        # If we have fewer than 3 sources, we still proceed but log the issue
-        # The requirement of 3 citations is checked in the response validator
+        # If we have fewer than 3 sources, we can't possibly have 3 citations from them
         if len(grounding_data) < 3:
-            print(f"INFO: Found {len(grounding_data)} sources (less than 3), proceeding anyway.")
-            return True
+            return False
 
         citation_count = 0
         text_lower = final_output.lower()

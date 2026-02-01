@@ -105,12 +105,32 @@ def test_validate_legal_output_logic():
 
     # Case 1: Valid content with 3 citations (should pass)
     valid_content = """
+    Legal Disclaimer: I am an AI, not an attorney.
+
+    STRATEGY:
     Here is your strategy:
     According to 12 U.S.C. § 345, Cal. Civ. Code § 1708, and Rule 12(b)(6), you have rights.
 
-    Procedural Roadmap:
+    ADVERSARIAL STRATEGY:
+    The opposition may argue that...
+
+    PROCEDURAL ROADMAP:
     1. File the form.
     2. Serve the papers.
+    3. Attend the hearing.
+
+    LOCAL COURT INFORMATION:
+    Address: 123 Court Street
+    Filing Fee: $400
+
+    CITATIONS:
+    - 12 U.S.C. § 345
+    - Cal. Civ. Code § 1708
+    - Rule 12(b)(6)
+
+    PROCEDURAL CHECKS AGAINST LOCAL RULES OF COURT:
+    - Check local filing deadlines
+    - Verify required forms
 
     ---
     Template document here.

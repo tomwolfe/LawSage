@@ -284,7 +284,7 @@ def test_validate_legal_output_missing_disclaimer():
 def test_validate_string_content_with_valid_format():
     """Test validation of valid string content with proper sections."""
     valid_content = """
-    LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. This is legal information, not legal advice.
+    Legal Disclaimer: I am an AI, not an attorney.
 
     STRATEGY:
     Your legal strategy goes here.
@@ -292,21 +292,21 @@ def test_validate_string_content_with_valid_format():
     ADVERSARIAL STRATEGY:
     Anticipate opposition arguments about...
 
-    ROADMAP:
+    PROCEDURAL ROADMAP:
     1. First step
     2. Second step
     3. Third step
+
+    LOCAL COURT INFORMATION:
+    Address: 123 Court St
+    Filing Fee: $400
 
     CITATIONS:
     - 12 U.S.C. § 345
     - Cal. Civ. Code § 1708
     - Rule 12(b)(6)
 
-    LOCAL COURT LOGISTICS:
-    Address: 123 Court St
-    Filing Fee: $400
-
-    PROCEDURAL CHECKS:
+    PROCEDURAL CHECKS AGAINST LOCAL RULES OF COURT:
     - Check Local Rules of Court for filing deadlines
     - Verify procedural technicality requirements
 
@@ -699,7 +699,7 @@ def test_validate_legal_output_unsupported_type():
 def test_validate_string_content_different_citation_formats():
     """Test validation recognizes different citation formats."""
     content_with_different_formats = """
-    LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. This is legal information, not legal advice.
+    Legal Disclaimer: I am an AI, not an attorney.
 
     STRATEGY:
     Your legal strategy goes here.
@@ -707,20 +707,20 @@ def test_validate_string_content_different_citation_formats():
     ADVERSARIAL STRATEGY:
     Anticipate opposition arguments about...
 
-    ROADMAP:
+    PROCEDURAL ROADMAP:
     1. First step
     2. Second step
     3. Third step
 
+    LOCAL COURT INFORMATION:
+    Address: 123 Court St
+
     CITATIONS:
     - 12 U.S.C. § 345 (federal statute)
     - Cal. Civ. Code § 1708 (state code)
-    - section 123 of the local ordinance
+    - 42 U.S.C. § 1983 (civil rights statute)
 
-    LOCAL COURT LOGISTICS:
-    Address: 123 Court St
-
-    PROCEDURAL CHECKS:
+    PROCEDURAL CHECKS AGAINST LOCAL RULES OF COURT:
     - Check Local Rules of Court for filing deadlines
 
     ---
@@ -732,7 +732,7 @@ def test_validate_string_content_different_citation_formats():
 def test_validate_string_content_case_insensitive_sections():
     """Test validation recognizes sections regardless of case."""
     content_with_uppercase = """
-    LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. This is legal information, not legal advice.
+    Legal Disclaimer: I am an AI, not an attorney.
 
     STRATEGY:
     Your legal strategy goes here.
@@ -740,20 +740,20 @@ def test_validate_string_content_case_insensitive_sections():
     ADVERSARIAL STRATEGY:
     Anticipate opposition arguments about...
 
-    roadmap:
+    PROCEDURAL ROADMAP:
     1. First step
     2. Second step
     3. Third step
 
-    citations:
+    LOCAL COURT INFORMATION:
+    Address: 123 Court St
+
+    CITATIONS:
     - 12 U.S.C. § 345
     - Cal. Civ. Code § 1708
     - Rule 12(b)(6)
 
-    LOCAL COURT LOGISTICS:
-    Address: 123 Court St
-
-    PROCEDURAL CHECKS:
+    PROCEDURAL CHECKS AGAINST LOCAL RULES OF COURT:
     - Check Local Rules of Court for filing deadlines
 
     ---
