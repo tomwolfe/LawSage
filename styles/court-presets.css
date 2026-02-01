@@ -1,0 +1,432 @@
+/* Court-standard formatting presets for top 10 US jurisdictions */
+
+/* New York jurisdiction styles */
+.jurisdiction-ny {
+  /* General document styling */
+  font-family: "Times New Roman", serif;
+  font-size: 14pt;
+  line-height: 2;
+  margin: 1in;
+}
+
+.jurisdiction-ny .header {
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 0.5in;
+}
+
+.jurisdiction-ny .court-name {
+  font-size: 16pt;
+  font-weight: bold;
+  text-align: center;
+}
+
+.jurisdiction-ny .case-title {
+  font-weight: bold;
+  text-align: center;
+  margin-top: 0.25in;
+  margin-bottom: 0.25in;
+}
+
+.jurisdiction-ny .body-text {
+  text-indent: 0.5in;
+  margin-bottom: 0.125in;
+}
+
+.jurisdiction-ny .section-header {
+  font-weight: bold;
+  margin-top: 0.25in;
+  margin-bottom: 0.125in;
+}
+
+.jurisdiction-ny .footnote {
+  font-size: 12pt;
+  margin-top: 0.5in;
+}
+
+/* California jurisdiction styles */
+.jurisdiction-ca {
+  font-family: "Times New Roman", serif;
+  font-size: 14pt;
+  line-height: 2;
+  margin: 1in;
+}
+
+.jurisdiction-ca .header {
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 0.5in;
+}
+
+.jurisdiction-ca .court-name {
+  font-size: 16pt;
+  font-weight: bold;
+  text-align: center;
+}
+
+.jurisdiction-ca .case-title {
+  font-weight: bold;
+  text-align: center;
+  margin-top: 0.25in;
+  margin-bottom: 0.25in;
+}
+
+.jurisdiction-ca .body-text {
+  text-indent: 0.5in;
+  margin-bottom: 0.125in;
+}
+
+.jurisdiction-ca .section-header {
+  font-weight: bold;
+  margin-top: 0.25in;
+  margin-bottom: 0.125in;
+}
+
+.jurisdiction-ca .footnote {
+  font-size: 12pt;
+  margin-top: 0.5in;
+}
+
+/* Texas jurisdiction styles */
+.jurisdiction-tx {
+  font-family: "Times New Roman", serif;
+  font-size: 14pt;
+  line-height: 2;
+  margin: 1in;
+}
+
+.jurisdiction-tx .header {
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 0.5in;
+}
+
+.jurisdiction-tx .court-name {
+  font-size: 16pt;
+  font-weight: bold;
+  text-align: center;
+}
+
+.jurisdiction-tx .case-title {
+  font-weight: bold;
+  text-align: center;
+  margin-top: 0.25in;
+  margin-bottom: 0.25in;
+}
+
+.jurisdiction-tx .body-text {
+  text-indent: 0.5in;
+  margin-bottom: 0.125in;
+}
+
+.jurisdiction-tx .section-header {
+  font-weight: bold;
+  margin-top: 0.25in;
+  margin-bottom: 0.125in;
+}
+
+.jurisdiction-tx .footnote {
+  font-size: 12pt;
+  margin-top: 0.5in;
+}
+
+/* Florida jurisdiction styles */
+.jurisdiction-fl {
+  font-family: "Times New Roman", serif;
+  font-size: 14pt;
+  line-height: 2;
+  margin: 1in;
+}
+
+.jurisdiction-fl .header {
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 0.5in;
+}
+
+.jurisdiction-fl .court-name {
+  font-size: 16pt;
+  font-weight: bold;
+  text-align: center;
+}
+
+.jurisdiction-fl .case-title {
+  font-weight: bold;
+  text-align: center;
+  margin-top: 0.25in;
+  margin-bottom: 0.25in;
+}
+
+.jurisdiction-fl .body-text {
+  text-indent: 0.5in;
+  margin-bottom: 0.125in;
+}
+
+.jurisdiction-fl .section-header {
+  font-weight: bold;
+  margin-top: 0.25in;
+  margin-bottom: 0.125in;
+}
+
+.jurisdiction-fl .footnote {
+  font-size: 12pt;
+  margin-top: 0.5in;
+}
+
+/* Illinois jurisdiction styles */
+.jurisdiction-il {
+  font-family: "Times New Roman", serif;
+  font-size: 14pt;
+  line-height: 2;
+  margin: 1in;
+}
+
+.jurisdiction-il .header {
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 0.5in;
+}
+
+.jurisdiction-il .court-name {
+  font-size: 16pt;
+  font-weight: bold;
+  text-align: center;
+}
+
+.jurisdiction-il .case-title {
+  font-weight: bold;
+  text-align: center;
+  margin-top: 0.25in;
+  margin-bottom: 0.25in;
+}
+
+.jurisdiction-il .body-text {
+  text-indent: 0.5in;
+  margin-bottom: 0.125in;
+}
+
+.jurisdiction-il .section-header {
+  font-weight: bold;
+  margin-top: 0.25in;
+  margin-bottom: 0.125in;
+}
+
+.jurisdiction-il .footnote {
+  font-size: 12pt;
+  margin-top: 0.5in;
+}
+
+/* Pennsylvania jurisdiction styles */
+.jurisdiction-pa {
+  font-family: "Times New Roman", serif;
+  font-size: 14pt;
+  line-height: 2;
+  margin: 1in;
+}
+
+.jurisdiction-pa .header {
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 0.5in;
+}
+
+.jurisdiction-pa .court-name {
+  font-size: 16pt;
+  font-weight: bold;
+  text-align: center;
+}
+
+.jurisdiction-pa .case-title {
+  font-weight: bold;
+  text-align: center;
+  margin-top: 0.25in;
+  margin-bottom: 0.25in;
+}
+
+.jurisdiction-pa .body-text {
+  text-indent: 0.5in;
+  margin-bottom: 0.125in;
+}
+
+.jurisdiction-pa .section-header {
+  font-weight: bold;
+  margin-top: 0.25in;
+  margin-bottom: 0.125in;
+}
+
+.jurisdiction-pa .footnote {
+  font-size: 12pt;
+  margin-top: 0.5in;
+}
+
+/* Ohio jurisdiction styles */
+.jurisdiction-oh {
+  font-family: "Times New Roman", serif;
+  font-size: 14pt;
+  line-height: 2;
+  margin: 1in;
+}
+
+.jurisdiction-oh .header {
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 0.5in;
+}
+
+.jurisdiction-oh .court-name {
+  font-size: 16pt;
+  font-weight: bold;
+  text-align: center;
+}
+
+.jurisdiction-oh .case-title {
+  font-weight: bold;
+  text-align: center;
+  margin-top: 0.25in;
+  margin-bottom: 0.25in;
+}
+
+.jurisdiction-oh .body-text {
+  text-indent: 0.5in;
+  margin-bottom: 0.125in;
+}
+
+.jurisdiction-oh .section-header {
+  font-weight: bold;
+  margin-top: 0.25in;
+  margin-bottom: 0.125in;
+}
+
+.jurisdiction-oh .footnote {
+  font-size: 12pt;
+  margin-top: 0.5in;
+}
+
+/* Georgia jurisdiction styles */
+.jurisdiction-ga {
+  font-family: "Times New Roman", serif;
+  font-size: 14pt;
+  line-height: 2;
+  margin: 1in;
+}
+
+.jurisdiction-ga .header {
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 0.5in;
+}
+
+.jurisdiction-ga .court-name {
+  font-size: 16pt;
+  font-weight: bold;
+  text-align: center;
+}
+
+.jurisdiction-ga .case-title {
+  font-weight: bold;
+  text-align: center;
+  margin-top: 0.25in;
+  margin-bottom: 0.25in;
+}
+
+.jurisdiction-ga .body-text {
+  text-indent: 0.5in;
+  margin-bottom: 0.125in;
+}
+
+.jurisdiction-ga .section-header {
+  font-weight: bold;
+  margin-top: 0.25in;
+  margin-bottom: 0.125in;
+}
+
+.jurisdiction-ga .footnote {
+  font-size: 12pt;
+  margin-top: 0.5in;
+}
+
+/* North Carolina jurisdiction styles */
+.jurisdiction-nc {
+  font-family: "Times New Roman", serif;
+  font-size: 14pt;
+  line-height: 2;
+  margin: 1in;
+}
+
+.jurisdiction-nc .header {
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 0.5in;
+}
+
+.jurisdiction-nc .court-name {
+  font-size: 16pt;
+  font-weight: bold;
+  text-align: center;
+}
+
+.jurisdiction-nc .case-title {
+  font-weight: bold;
+  text-align: center;
+  margin-top: 0.25in;
+  margin-bottom: 0.25in;
+}
+
+.jurisdiction-nc .body-text {
+  text-indent: 0.5in;
+  margin-bottom: 0.125in;
+}
+
+.jurisdiction-nc .section-header {
+  font-weight: bold;
+  margin-top: 0.25in;
+  margin-bottom: 0.125in;
+}
+
+.jurisdiction-nc .footnote {
+  font-size: 12pt;
+  margin-top: 0.5in;
+}
+
+/* Michigan jurisdiction styles */
+.jurisdiction-mi {
+  font-family: "Times New Roman", serif;
+  font-size: 14pt;
+  line-height: 2;
+  margin: 1in;
+}
+
+.jurisdiction-mi .header {
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 0.5in;
+}
+
+.jurisdiction-mi .court-name {
+  font-size: 16pt;
+  font-weight: bold;
+  text-align: center;
+}
+
+.jurisdiction-mi .case-title {
+  font-weight: bold;
+  text-align: center;
+  margin-top: 0.25in;
+  margin-bottom: 0.25in;
+}
+
+.jurisdiction-mi .body-text {
+  text-indent: 0.5in;
+  margin-bottom: 0.125in;
+}
+
+.jurisdiction-mi .section-header {
+  font-weight: bold;
+  margin-top: 0.25in;
+  margin-bottom: 0.125in;
+}
+
+.jurisdiction-mi .footnote {
+  font-size: 12pt;
+  margin-top: 0.5in;
+}

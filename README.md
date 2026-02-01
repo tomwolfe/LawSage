@@ -7,7 +7,11 @@ LawSage is an open-source, AI-powered platform designed to empower individuals r
 
 ## Key Advancements (v3.0)
 LawSage has undergone a major transformation! The latest version is now a **comprehensive legal assistant with Virtual Case Folder architecture and adversarial strategy capabilities**. This means:
-*   **Virtual Case Folder Architecture:** Leverages Gemini 2.5 Flash's long context to analyze multiple documents simultaneously, enabling cross-document reasoning without external vector databases.
+*   **Multi-Step Checkpointing:** Persistent serverless state management for complex multi-step legal analysis, allowing for longer and more comprehensive legal reasoning while staying under execution limits.
+*   **Shadow Vector Search:** Scalable hybrid RAG system using a lightweight serverless database (Supabase) to extend the Virtual Case Folder beyond Gemini's context limits, enabling analysis of large document collections.
+*   **Advanced Shepardizing Agent:** Automated citation verification system that checks each legal citation for subsequent negative treatment (overruled/distinguished) via Gemini Search, ensuring only current "good law" is relied upon.
+*   **Jurisdictional Style Presets:** Professional court-standard formatting for the top 10 US jurisdictions (NY, CA, TX, FL, IL, PA, OH, GA, NC, MI) with CSS/Markdown rules for proper margins and line spacing in exports.
+*   **Virtual Case Folder Architecture:** Leverages Gemini 2.5 Flash's long context to analyze multiple documents simultaneously, enhanced with vector search capabilities for larger document sets.
 *   **Adversarial Strategy Component:** Automatically generates opposition arguments and 'red-teams' your case to identify potential weaknesses and counterarguments.
 *   **Procedural Grounding Enhancement:** Retrieves and validates Local Rules of Court (county/district level) in addition to general statutes for comprehensive procedural compliance.
 *   **Pro Se Survival Guide UI:** Displays hyper-local logistical data (courthouse addresses, filing fees, and dress codes) fetched via real-time search in a dedicated tab.
@@ -47,8 +51,10 @@ LawSage is built on a modern, performant full-stack architecture:
 *   **Frontend & Backend:** Next.js 16 (React 19) with Tailwind CSS and Lucide Icons. The entire backend logic now runs on Vercel Edge Functions.
 *   **AI Engine:** Google Gemini 2.5 Flash (via the Google AI Python SDK) with web search grounding for real-time legal research.
 *   **AI Safety & Structure:** A multi-layered Reliability Layer ensures consistent, safe output with mandatory disclaimers, citation validation, and structural hardening.
-*   **State Management:** Local browser storage (`localStorage`) for user preferences and case history.
-*   **Document Generation:** Docx library for professional Word (.docx) export functionality.
+*   **State Management:** Serverless checkpointing for multi-step analysis and local browser storage (`localStorage`) for user preferences and case history.
+*   **Vector Storage:** Lightweight serverless database integration (Supabase) for scalable document indexing and retrieval.
+*   **Citation Verification:** Advanced Shepardizing agent for automated legal citation status verification.
+*   **Document Generation:** Docx library for professional Word (.docx) export functionality with jurisdictional formatting presets.
 *   **Rate Limiting:** Client-side rate limiting utility for Vercel Hobby Tier compliance.
 *   **Deployment:** Optimized for seamless deployment on Vercel.
 
@@ -120,6 +126,7 @@ The application includes several API routes optimized for Vercel Edge Functions:
 *   **/api/ocr:** Multimodal OCR endpoint for legal document image analysis.
 *   **/api/health:** Health check endpoint.
 *   **/api/verify-citation:** Real-time citation verification endpoint using Gemini Web Search.
+*   **/api/checkpoint:** Multi-step state persistence endpoint for complex legal analysis workflows.
 
 All API routes are configured to run on Vercel's Edge Runtime for optimal performance and cost efficiency within Hobby Tier limits.
 
@@ -127,6 +134,7 @@ All API routes are configured to run on Vercel's Edge Runtime for optimal perfor
 LawSage employs a multi-layered Reliability Layer to ensure that AI-generated content is safe, accurate, and structurally complete:
 *   **Red-Team Auditing:** Every user request is audited for safety violations and jurisdictional clarity before being processed.
 *   **Grounded Generation:** Gemini 2.5 Flash is utilized with real-time Google Search grounding to ensure information is based on current statutes and Local Rules of Court.
+*   **Advanced Citation Verification:** The Shepardizing agent automatically verifies each legal citation for subsequent negative treatment (overruled/distinguished) to ensure only current "good law" is relied upon.
 *   **Reliability Validation:**
     *   **Citations Validation:** Ensures every response contains at least three verifiable legal citations (e.g., U.S.C., State Codes).
     *   **Procedural Completeness:** Verifies the presence of a 'Procedural Roadmap' section to guide the pro se litigant.
@@ -135,6 +143,8 @@ LawSage employs a multi-layered Reliability Layer to ensure that AI-generated co
     *   **Logistics Data Validation:** Ensures hyper-local courthouse information is included in responses.
     *   **Mandatory Disclaimers:** Every response is prepended with a legal disclaimer to clearly distinguish legal information from legal advice.
     *   **Structural Hardening:** A custom validator enforces a strict delimiter system ('---') to separate legal strategy from filing templates.
+*   **Multi-Step Analysis:** Serverless checkpointing enables complex multi-step legal reasoning while staying under execution limits.
+*   **Scalable Context:** Shadow vector search extends the Virtual Case Folder beyond Gemini's context limits using lightweight serverless databases.
 *   **Retry Mechanism:** Built-in exponential backoff for AI service rate limits ensures high availability.
 *   **Structured Output:** The AI is prompted to return a JSON schema, which is validated server-side for completeness and safety before being presented to the user.
 
