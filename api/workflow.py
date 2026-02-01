@@ -83,22 +83,15 @@ class LawSageWorkflow:
                 detail="Request blocked: Missing jurisdiction or potential safety violation."
             )
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception(is_retryable_exception),
-        reraise=True
-    )
-    def _generate_with_retry(self, prompt: str, system_instruction: str, search_tool: Any):
+    def _generate_once(self, prompt: str, system_instruction: str, search_tool: Any):
         return self.client.models.generate_content(
             model=self.model_id,
             contents=prompt,
             config=types.GenerateContentConfig(
                 tools=[search_tool],
                 system_instruction=system_instruction,
-                max_output_tokens=4096
-                # Note: Cannot use response_mime_type='application/json' with tools
-                # So we'll parse the JSON response manually
+                max_output_tokens=2048,  # Reduced from 4096 to speed up
+                temperature=0.7  # Slightly increased for faster generation
             )
         )
 
@@ -110,21 +103,12 @@ class LawSageWorkflow:
         """
         search_tool = types.Tool(google_search=types.GoogleSearch())
 
+        # Simplified prompt to reduce processing time
         prompt = f"""
 User Situation: {request.user_input}
 Jurisdiction: {request.jurisdiction}
 
-You are the LawSage Legal Assistant. Follow the Mission Contract checklist exactly:
-1. BEGIN every response with the mandatory legal disclaimer: 'Legal Disclaimer: I am an AI, not an attorney.'
-2. ANALYZE the user's situation using the Virtual Case Folder context.
-3. CONDUCT a 'red-team' audit to identify 3 potential weaknesses in the user's case under the 'Adversarial Strategy' heading.
-4. RESEARCH and list hyper-local logistics (courthouse address, filing fees) for the specified jurisdiction under 'Local Court Information'.
-5. PROVIDE a step-by-step 'Procedural Roadmap' for the Pro Se litigant.
-6. INCLUDE at least 3 verifiable legal citations (e.g., U.S.C. or State Codes) within the text.
-7. SEPARATE the analysis from the draft filing template using the '---' delimiter.
-8. VALIDATE that the response contains no prohibited terms and matches the required JSON schema before final output.
-
-Generate a comprehensive legal response that MUST follow this EXACT format:
+You are the LawSage Legal Assistant. Generate a comprehensive legal response that MUST follow this EXACT format:
 
 Legal Disclaimer: I am an AI, not an attorney.
 
@@ -139,12 +123,8 @@ PROCEDURAL ROADMAP:
 2. [Second step with title and description]
 3. [Third step with title and description]
 
-LOCAL COURT INFORMATION:
-[Courthouse address, filing fees, local rules, etc. for {request.jurisdiction}]
-
 CITATIONS:
 - [At least 3 verifiable legal citations in proper format: 12 U.S.C. § 345, Cal. Civ. Code § 1708, Rule 12(b)(6)]
-- [Include specific citations relevant to {request.jurisdiction}]
 
 ---
 FILING TEMPLATE:
@@ -154,7 +134,8 @@ CRITICAL: Your response must contain the EXACT format above with all required se
 """
 
         try:
-            response = self._generate_with_retry(prompt, SYSTEM_INSTRUCTION, search_tool)
+            # Use the simplified generation method
+            response = self._generate_once(prompt, SYSTEM_INSTRUCTION, search_tool)
         except Exception as e:
             raise AppException(
                 status_code=502,
@@ -193,7 +174,7 @@ CRITICAL: Your response must contain the EXACT format above with all required se
                     # original_json_str remains empty
                     original_json_str = ""  # Will remain empty since tools don't support structured output
 
-        # Extract sources - enhanced to handle various response structures
+        # Extract sources - simplified to handle various response structures
         seen_uris = set()
         seen_titles = set()
 

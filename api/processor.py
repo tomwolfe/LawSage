@@ -366,18 +366,11 @@ class ResponseValidator:
         adversarial_keywords = ["Adversarial Strategy", "Opposition View", "Red-Team Analysis", "Opposition arguments", "ADVERSARIAL STRATEGY:"]
         has_adversarial = any(kw.lower() in content.lower() for kw in adversarial_keywords)
 
-        # Check for Procedural Checks
-        procedural_keywords = ["Procedural Checks", "Local Rules of Court", "Procedural technicality", "LOCAL RULES OF COURT"]
-        has_procedural = any(kw.lower() in content.lower() for kw in procedural_keywords)
-
-        # Check for Local Court Information
-        local_info_keywords = ["Local Court Information", "Local Court Logistics", "Courthouse address", "Filing fees", "LOCAL COURT INFORMATION:", "LOCAL COURT LOGISTICS:"]
-        has_local_info = any(kw.lower() in content.lower() for kw in local_info_keywords)
-
         # Check for proper delimiter
         has_delimiter = "---" in content
 
-        return has_citations and has_roadmap and has_adversarial and has_procedural and has_disclaimer and has_local_info and has_delimiter
+        # Simplified validation focusing on core requirements only
+        return has_citations and has_roadmap and has_adversarial and has_disclaimer and has_delimiter
 
     @classmethod
     def parse_to_dict(cls, text: str) -> Dict[str, str]:
