@@ -275,9 +275,6 @@ CRITICAL: Your response must be valid JSON with all required fields. Include at 
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          // Send a heartbeat message to keep the connection alive
-          controller.enqueue(encoder.encode(`{"status":"processing","message":"Starting legal analysis..."}\n`));
-
           // Stream content using the model
           const result = await model.generateContentStream(prompt);
 
@@ -315,10 +312,14 @@ CRITICAL: Your response must be valid JSON with all required fields. Include at 
 
             // Send error response
             const errorMessage = `ERROR: Failed to parse structured response from AI. Raw response: ${rawOutput}`;
-            controller.enqueue(encoder.encode(JSON.stringify({
+
+            const errorResult: LegalResult = {
               text: errorMessage,
               sources: []
-            })));
+            };
+
+            // Send the complete response as a single JSON object
+            controller.enqueue(encoder.encode(JSON.stringify(errorResult)));
             controller.close();
             return;
           }
@@ -406,7 +407,7 @@ CRITICAL: Your response must be valid JSON with all required fields. Include at 
             sources: sources
           };
 
-          // Send the complete response
+          // Send the complete response as a single JSON object
           controller.enqueue(encoder.encode(JSON.stringify(legalResult)));
         } finally {
           controller.close();
