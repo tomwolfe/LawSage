@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Upload, FileText } from 'lucide-react';
 import { processImageForOCR } from '../src/utils/image-processor';
-import { updateUrlWithState, getStateFromUrl, watchStateAndSyncToUrl, createVirtualCaseFolderState } from '../src/utils/state-sync';
+import { useUrlState } from '../hooks/useUrlState';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ResultDisplay from './ResultDisplay';
@@ -68,88 +68,19 @@ const US_STATES = [
 
 
 export default function LegalInterface() {
-  const [userInput, setUserInput] = useState('');
-  const [jurisdiction, setJurisdiction] = useState('California');
+  const [userInput, setUserInput] = useUrlState<string>('userInput', { defaultValue: '' });
+  const [jurisdiction, setJurisdiction] = useUrlState<string>('jurisdiction', { defaultValue: 'California' });
   const [isListening, setIsListening] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<LegalResult | null>(null);
-  const [activeTab, setActiveTab] = useState<'strategy' | 'filings' | 'sources' | 'survival-guide' | 'opposition-view'>('strategy');
+  const [result, setResult] = useUrlState<LegalResult | null>('result', { defaultValue: null });
+  const [activeTab, setActiveTab] = useUrlState<'strategy' | 'filings' | 'sources' | 'survival-guide' | 'opposition-view'>('activeTab', { defaultValue: 'strategy' });
   const [error, setError] = useState('');
-  const [history, setHistory] = useState<CaseHistoryItem[]>([]);
-  const [selectedHistoryItem, setSelectedHistoryItem] = useState<string | null>(null);
+  const [history, setHistory] = useUrlState<CaseHistoryItem[]>('history', { defaultValue: [] });
+  const [selectedHistoryItem, setSelectedHistoryItem] = useUrlState<string | null>('selectedHistoryItem', { defaultValue: null });
   const [backendUnreachable, setBackendUnreachable] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [caseLedger, setCaseLedger] = useState<CaseLedgerEntry[]>([]);
-
-  // Initialize state from URL fragment on component mount
-  useEffect(() => {
-    const savedState = getStateFromUrl();
-    if (savedState) {
-      // Check if this is the enhanced Virtual Case Folder state format
-      if (savedState.caseFolder && savedState.analysisResult) {
-        // Restore from Virtual Case Folder state
-        const caseFolder = savedState.caseFolder;
-        const analysisResult = savedState.analysisResult;
-
-        if (caseFolder.userInput !== undefined) setUserInput(caseFolder.userInput);
-        if (caseFolder.jurisdiction !== undefined) setJurisdiction(caseFolder.jurisdiction);
-        if (caseFolder.activeTab !== undefined) setActiveTab(caseFolder.activeTab);
-        if (caseFolder.history !== undefined) setHistory(caseFolder.history);
-        if (caseFolder.selectedHistoryItem !== undefined) setSelectedHistoryItem(caseFolder.selectedHistoryItem);
-        if (caseFolder.backendUnreachable !== undefined) setBackendUnreachable(caseFolder.backendUnreachable);
-
-        if (analysisResult !== undefined) setResult(analysisResult);
-
-        // Restore case ledger if present
-        if (savedState.ledger !== undefined) {
-          // Convert timestamp strings back to Date objects if needed
-          const ledgerWithDates = savedState.ledger.map((entry: any) => ({
-            ...entry,
-            timestamp: new Date(entry.timestamp),
-            dueDate: entry.dueDate ? new Date(entry.dueDate) : undefined
-          }));
-          setCaseLedger(ledgerWithDates);
-        }
-      } else {
-        // Restore from legacy state format
-        if (savedState.userInput !== undefined) setUserInput(savedState.userInput);
-        if (savedState.jurisdiction !== undefined) setJurisdiction(savedState.jurisdiction);
-        if (savedState.result !== undefined) setResult(savedState.result);
-        if (savedState.activeTab !== undefined) setActiveTab(savedState.activeTab);
-        if (savedState.history !== undefined) setHistory(savedState.history);
-        if (savedState.selectedHistoryItem !== undefined) setSelectedHistoryItem(savedState.selectedHistoryItem);
-        if (savedState.backendUnreachable !== undefined) setBackendUnreachable(savedState.backendUnreachable);
-      }
-
-      // Note: We don't restore file selection as that would require re-reading the file
-    }
-  }, []);
-
-  // Set up URL state synchronization
-  useEffect(() => {
-    const getStateToSync = () => createVirtualCaseFolderState({
-      userInput,
-      jurisdiction,
-      activeTab,
-      history,
-      selectedHistoryItem,
-      backendUnreachable
-    }, result, caseLedger);
-
-    // Update URL immediately with current state
-    updateUrlWithState(getStateToSync());
-
-    // Set up watcher for ongoing state changes
-    const stopWatching = watchStateAndSyncToUrl(getStateToSync, 1000);
-
-    // Return cleanup function
-    return () => {
-      // Call stopWatching if it exists
-      // In this implementation, we just ensure the latest state is saved when component unmounts
-      updateUrlWithState(getStateToSync());
-    };
-  }, [userInput, jurisdiction, result, activeTab, history, selectedHistoryItem, backendUnreachable, caseLedger]);
+  const [caseLedger, setCaseLedger] = useUrlState<CaseLedgerEntry[]>('caseLedger', { defaultValue: [] });
 
   useEffect(() => {
     const checkHealth = async (retries = 3, delay = 1000) => {
@@ -171,9 +102,9 @@ export default function LegalInterface() {
   }, []);
 
   useEffect(() => {
-    // Load history from localStorage on component mount
+    // Load history from localStorage on component mount if not already loaded from URL
     const savedHistory = localStorage.getItem('lawsage_history');
-    if (savedHistory) {
+    if (savedHistory && history.length === 0) { // Only load from localStorage if history is empty
       try {
         const parsedHistory: unknown = JSON.parse(savedHistory);
         // Convert timestamp strings back to Date objects
@@ -193,7 +124,12 @@ export default function LegalInterface() {
         console.error('Failed to parse history from localStorage:', error);
       }
     }
-  }, []);
+  }, [history.length]); // Add history.length as dependency to only run once
+
+  // Sync history to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('lawsage_history', JSON.stringify(history));
+  }, [history]);
 
   const handleVoice = () => {
     if (!('webkitSpeechRecognition' in window)) {
@@ -307,7 +243,6 @@ export default function LegalInterface() {
 
       const updatedHistory = [newHistoryItem, ...history];
       setHistory(updatedHistory);
-      localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
 
       // Add to case ledger
       addToCaseLedger('complaint_filed', `OCR analysis of document: ${selectedFile.name}`);
@@ -440,7 +375,6 @@ export default function LegalInterface() {
 
         const updatedHistory = [newHistoryItem, ...history];
         setHistory(updatedHistory);
-        localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
 
         // Add to case ledger
         addToCaseLedger('complaint_filed', `Initial analysis submitted for: ${userInput.substring(0, 50)}${userInput.length > 50 ? '...' : ''}`);

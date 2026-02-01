@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 import { SafetyValidator, ResponseValidator, Source } from '../../../lib/validation';
-import { ContractValidator } from '../../../src/lib/reliability/ContractValidator';
+import { ReliabilityLayer } from '../../../src/lib/reliability/ReliabilityLayer';
 
 // Mandatory safety disclosure hardcoded for the response stream
 const LEGAL_DISCLAIMER = (
@@ -399,16 +399,16 @@ CRITICAL: Your response must be valid JSON with all required fields. Include at 
           formattedOutput += "---\n\nFILING TEMPLATE:\n";
           formattedOutput += parsedOutput.filing_template;
 
-          // Apply Mission Contract validation - enforce closed-loop control
+          // Apply Reliability Layer validation - enforce closed-loop control
           try {
-            // First validate against the contract
-            const contractValidation = ContractValidator.validate(JSON.stringify(parsedOutput));
+            // First validate against the reliability requirements
+            const reliabilityValidation = ReliabilityLayer.comprehensiveValidation(JSON.stringify(parsedOutput));
 
-            if (!contractValidation.isValid) {
-              console.error("Contract validation failed:", contractValidation.errors);
+            if (!reliabilityValidation.isValid) {
+              console.error("Reliability validation failed:", reliabilityValidation.errors);
 
-              // Attempt to fix the output according to the contract
-              const fixedOutput = ContractValidator.validateAndFix(JSON.stringify(parsedOutput));
+              // Attempt to fix the output according to the reliability requirements
+              const fixedOutput = ReliabilityLayer.validateAndFix(JSON.stringify(parsedOutput));
 
               // Reformat the fixed output as text for compatibility with existing frontend
               formattedOutput = `${fixedOutput.disclaimer}\n\n`;
@@ -465,9 +465,9 @@ CRITICAL: Your response must be valid JSON with all required fields. Include at 
               formattedOutput += "---\n\nFILING TEMPLATE:\n";
               formattedOutput += fixedOutput.filing_template;
             }
-          } catch (contractError) {
-            console.error("Contract validation error (continuing with original output):", contractError);
-            // Continue with original output if contract validation fails critically
+          } catch (reliabilityError) {
+            console.error("Reliability validation error (continuing with original output):", reliabilityError);
+            // Continue with original output if reliability validation fails critically
           }
 
           // Apply validation and formatting
