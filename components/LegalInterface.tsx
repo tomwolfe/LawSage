@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Upload, FileText } from 'lucide-react';
+import { processImageForOCR } from '../src/utils/image-processor';
+import { updateUrlWithState, getStateFromUrl, watchStateAndSyncToUrl } from '../src/utils/state-sync';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ResultDisplay from './ResultDisplay';
@@ -69,6 +71,47 @@ export default function LegalInterface() {
   const [backendUnreachable, setBackendUnreachable] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // Initialize state from URL fragment on component mount
+  useEffect(() => {
+    const savedState = getStateFromUrl();
+    if (savedState) {
+      if (savedState.userInput !== undefined) setUserInput(savedState.userInput);
+      if (savedState.jurisdiction !== undefined) setJurisdiction(savedState.jurisdiction);
+      if (savedState.result !== undefined) setResult(savedState.result);
+      if (savedState.activeTab !== undefined) setActiveTab(savedState.activeTab);
+      if (savedState.history !== undefined) setHistory(savedState.history);
+      if (savedState.selectedHistoryItem !== undefined) setSelectedHistoryItem(savedState.selectedHistoryItem);
+      if (savedState.backendUnreachable !== undefined) setBackendUnreachable(savedState.backendUnreachable);
+      // Note: We don't restore file selection as that would require re-reading the file
+    }
+  }, []);
+
+  // Set up URL state synchronization
+  useEffect(() => {
+    const getStateToSync = () => ({
+      userInput,
+      jurisdiction,
+      result,
+      activeTab,
+      history,
+      selectedHistoryItem,
+      backendUnreachable
+    });
+
+    // Update URL immediately with current state
+    updateUrlWithState(getStateToSync());
+
+    // Set up watcher for ongoing state changes
+    const stopWatching = watchStateAndSyncToUrl(getStateToSync, 1000);
+
+    // Return cleanup function
+    return () => {
+      // Call stopWatching if it exists
+      // In this implementation, we just ensure the latest state is saved when component unmounts
+      updateUrlWithState(getStateToSync());
+    };
+  }, [userInput, jurisdiction, result, activeTab, history, selectedHistoryItem, backendUnreachable]);
 
   useEffect(() => {
     const checkHealth = async (retries = 3, delay = 1000) => {
@@ -182,60 +225,56 @@ export default function LegalInterface() {
     setLoading(true);
     setError('');
 
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const base64Image = e.target?.result as string;
+    try {
+      // Process the image to resize and compress it before sending to OCR
+      const processedImage = await processImageForOCR(selectedFile);
 
-        const response = await fetch('/api/ocr', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Gemini-API-Key': apiKey,
-          },
-          body: JSON.stringify({
-            image: base64Image,
-            jurisdiction
-          }),
-        });
+      const response = await fetch('/api/ocr', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Gemini-API-Key': apiKey,
+        },
+        body: JSON.stringify({
+          image: processedImage,
+          jurisdiction
+        }),
+      });
 
-        if (!response.ok) {
-          if (response.status === 429) {
-            setError('Rate limit exceeded. Please check your API quota or try again later.');
-            return;
-          } else if (response.status === 401) {
-            setError('Invalid API key. Please update your key in Settings.');
-            return;
-          } else {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Failed to process image');
-          }
+      if (!response.ok) {
+        if (response.status === 429) {
+          setError('Rate limit exceeded. Please check your API quota or try again later.');
+          return;
+        } else if (response.status === 401) {
+          setError('Invalid API key. Please update your key in Settings.');
+          return;
+        } else {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Failed to process image');
         }
-
-        const data: LegalResult = await response.json();
-        setResult(data);
-        setActiveTab('strategy');
-
-        // Add to history
-        const newHistoryItem: CaseHistoryItem = {
-          id: Date.now().toString(),
-          timestamp: new Date(),
-          jurisdiction,
-          userInput: `OCR Analysis of: ${selectedFile.name}`,
-          result: data
-        };
-
-        const updatedHistory = [newHistoryItem, ...history];
-        setHistory(updatedHistory);
-        localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred during OCR processing');
-      } finally {
-        setLoading(false);
       }
-    };
 
-    reader.readAsDataURL(selectedFile);
+      const data: LegalResult = await response.json();
+      setResult(data);
+      setActiveTab('strategy');
+
+      // Add to history
+      const newHistoryItem: CaseHistoryItem = {
+        id: Date.now().toString(),
+        timestamp: new Date(),
+        jurisdiction,
+        userInput: `OCR Analysis of: ${selectedFile.name}`,
+        result: data
+      };
+
+      const updatedHistory = [newHistoryItem, ...history];
+      setHistory(updatedHistory);
+      localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred during OCR processing');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -256,74 +295,55 @@ export default function LegalInterface() {
 
     try {
       if (selectedFile) {
-        // Process uploaded image with OCR
-        const reader = new FileReader();
+        // Process uploaded image with OCR using the image processor
+        try {
+          // Process the image to resize and compress it before sending to OCR
+          const processedImage = await processImageForOCR(selectedFile);
 
-        // Create a promise to handle the FileReader asynchronously
-        const fileReaderPromise = new Promise<LegalResult>((resolve, reject) => {
-          reader.onload = async (e) => {
-            try {
-              const base64Image = e.target?.result as string;
+          const response = await fetch('/api/ocr', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Gemini-API-Key': apiKey,
+            },
+            body: JSON.stringify({
+              image: processedImage,
+              jurisdiction
+            }),
+          });
 
-              const response = await fetch('/api/ocr', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'X-Gemini-API-Key': apiKey,
-                },
-                body: JSON.stringify({
-                  image: base64Image,
-                  jurisdiction
-                }),
-              });
-
-              if (!response.ok) {
-                if (response.status === 429) {
-                  setError('Rate limit exceeded. Please check your API quota or try again later.');
-                  reject(new Error('Rate limit exceeded'));
-                  return;
-                } else if (response.status === 401) {
-                  setError('Invalid API key. Please update your key in Settings.');
-                  reject(new Error('Invalid API key'));
-                  return;
-                } else {
-                  const errorData = await response.json();
-                  throw new Error(errorData.detail || 'Failed to process image');
-                }
-              }
-
-              const data: LegalResult = await response.json();
-              resolve(data);
-            } catch (err) {
-              reject(err);
+          if (!response.ok) {
+            if (response.status === 429) {
+              setError('Rate limit exceeded. Please check your API quota or try again later.');
+              return;
+            } else if (response.status === 401) {
+              setError('Invalid API key. Please update your key in Settings.');
+              return;
+            } else {
+              const errorData = await response.json();
+              throw new Error(errorData.detail || 'Failed to process image');
             }
+          }
+
+          const data: LegalResult = await response.json();
+          setResult(data);
+          setActiveTab('strategy');
+
+          // Add to history
+          const newHistoryItem: CaseHistoryItem = {
+            id: Date.now().toString(),
+            timestamp: new Date(),
+            jurisdiction,
+            userInput: `OCR Analysis of: ${selectedFile.name}`,
+            result: data
           };
 
-          reader.onerror = () => {
-            reject(new Error('Failed to read file'));
-          };
-        });
-
-        reader.readAsDataURL(selectedFile);
-
-        // Wait for the FileReader to complete and get the result
-        const ocrResult = await fileReaderPromise;
-
-        setResult(ocrResult);
-        setActiveTab('strategy');
-
-        // Add to history
-        const newHistoryItem: CaseHistoryItem = {
-          id: Date.now().toString(),
-          timestamp: new Date(),
-          jurisdiction,
-          userInput: `OCR Analysis of: ${selectedFile.name}`,
-          result: ocrResult
-        };
-
-        const updatedHistory = [newHistoryItem, ...history];
-        setHistory(updatedHistory);
-        localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
+          const updatedHistory = [newHistoryItem, ...history];
+          setHistory(updatedHistory);
+          localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'An unknown error occurred during OCR processing');
+        }
       } else {
         // Process text input normally
         const response = await fetch('/api/analyze', {

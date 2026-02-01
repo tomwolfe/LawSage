@@ -1,0 +1,31 @@
+{
+  "state": "Florida",
+  "filing_deadlines": {
+    "complaint": "4 years for contract, 2 years for personal injury",
+    "answer_to_complaint": "20 days from service of process",
+    "motion_to_dismiss": "20 days from service of process",
+    "discovery_deadlines": {
+      "depositions": "Must be noticed at least 5 days before the deposition date",
+      "disclosures": "Automatic disclosures required within 45 days of service",
+      "requests_for_admission": "30 days to respond",
+      "interrogatories": "30 days to respond",
+      "production_requests": "30 days to respond"
+    },
+    "trial_deadlines": "Depends on court docket, typically 12-18 months",
+    "appeal_deadlines": "30 days from entry of final judgment"
+  },
+  "court_procedures": {
+    "mandatory_arbitration": "Cases under $15,000 may be subject to mandatory arbitration",
+    "case_management_conferences": "Scheduled within 30 days of filing",
+    "pre_trial_conferences": "Scheduled 30 days before trial"
+  },
+  "filing_requirements": {
+    "fee_schedule": {
+      "filing_fee": "$300-400 depending on county",
+      "service_fee": "$25-40 per service",
+      "miscellaneous_fees": "Varies by county and specific requirements"
+    },
+    "document_format": "12-point font, double-spaced, standard margins",
+    "page_limits": "Limited by local rules, typically 10-15 pages for motions"
+  }
+}

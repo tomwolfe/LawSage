@@ -1,0 +1,31 @@
+{
+  "state": "New York",
+  "filing_deadlines": {
+    "complaint": "3 years for personal injury, 6 years for contract disputes",
+    "answer_to_complaint": "20 days from service of summons and complaint",
+    "motion_to_dismiss": "May be filed with or after answer",
+    "discovery_deadlines": {
+      "depositions": "Must be noticed at least 7 days before the deposition date",
+      "disclosures": "Automatic disclosures required within 120 days of appearance",
+      "requests_for_admission": "30 days to respond",
+      "interrogatories": "30 days to respond",
+      "production_requests": "30 days to respond"
+    },
+    "trial_deadlines": "Depends on court docket, typically 12-24 months",
+    "appeal_deadlines": "30 days from notice of entry of judgment"
+  },
+  "court_procedures": {
+    "mandatory_arbitration": "Cases under $50,000 may be subject to mandatory arbitration",
+    "case_management_conferences": "Scheduled within 60 days of filing",
+    "pre_trial_conferences": "Scheduled 45 days before trial"
+  },
+  "filing_requirements": {
+    "fee_schedule": {
+      "filing_fee": "$210-405 depending on county and case type",
+      "service_fee": "$15-35 per service",
+      "miscellaneous_fees": "Varies by county and specific requirements"
+    },
+    "document_format": "14-point font minimum for signatures, standard legal formatting",
+    "page_limits": "Limited by local rules, typically 10-25 pages for motions"
+  }
+}

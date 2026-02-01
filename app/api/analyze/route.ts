@@ -30,64 +30,52 @@ const SYSTEM_INSTRUCTION = `
 You are a legal assistant helping pro se litigants (people representing themselves).
 You must perform a comprehensive analysis that includes adversarial strategy and procedural checks.
 
-Your response MUST include:
-- A legal disclaimer at the beginning
-- A strategy section with legal analysis
-- An adversarial strategy section with opposition arguments and 'red-team' analysis of the user's case
-- A roadmap with step-by-step procedural instructions (clearly labeled as "ROADMAP:" or "NEXT STEPS:")
-- Procedural checks against Local Rules of Court
-- A filing template section with actual legal documents
-- At least 3 proper legal citations supporting your recommendations in these EXACT formats:
-  * Federal statutes: "12 U.S.C. § 345" (number, space, U.S.C., space, §, number)
-  * State codes: "Cal. Civ. Code § 1708" (state abbreviation, space, code name, space, §, number)
-  * Court rules: "Rule 12(b)(6)" (Rule, space, number with parentheses)
-- Local logistics information in JSON format (courthouse address, filing fees, dress code, etc.)
+Your response MUST be in valid JSON format with the following structure:
+{
+  "disclaimer": "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. This is legal information, not legal advice. Always consult with a qualified attorney.",
+  "strategy": "Your legal strategy and analysis here",
+  "adversarial_strategy": "Opposition arguments and 'red-team' analysis of the user's case",
+  "roadmap": [
+    {
+      "step": 1,
+      "title": "First step title",
+      "description": "Detailed description of what to do",
+      "estimated_time": "Timeframe for completion",
+      "required_documents": ["List of documents needed"],
+      "status": "pending"
+    }
+  ],
+  "filing_template": "Actual legal filing template here",
+  "citations": [
+    {
+      "text": "12 U.S.C. § 345",
+      "source": "federal statute",
+      "url": "optional URL to citation source",
+      "is_verified": false,
+      "verification_source": "optional source used to verify"
+    }
+  ],
+  "sources": ["Additional sources referenced in the response"],
+  "local_logistics": {
+    "courthouse_address": "Complete address of the courthouse",
+    "filing_fees": "Specific filing fees for this case type",
+    "dress_code": "Courthouse dress code requirements",
+    "parking_info": "Parking information near courthouse",
+    "hours_of_operation": "Courthouse hours of operation",
+    "local_rules_url": "URL to local rules of court"
+  },
+  "procedural_checks": ["Results of procedural technicality checks against Local Rules of Court"]
+}
 
 CRITICAL INSTRUCTIONS:
 1. Perform a 'red-team' analysis of the user's claims - identify weaknesses and potential opposition arguments
 2. Use the Google Search tool to find 'Local Rules of Court' for the user's specific county/district
 3. Extract courthouse location, filing fees, and procedural requirements from these local rules
 4. If Local Rules search fails, fall back to general state rules with a warning flag
-
-Format your response as follows:
-LEGAL DISCLAIMER: [Your disclaimer here]
-
-STRATEGY:
-[Your legal strategy and analysis here]
-
-ADVERSARIAL STRATEGY:
-[Opposition arguments and 'red-team' analysis of the user's case]
-
-ROADMAP:
-1. [First step with title and description]
-2. [Second step with title and description]
-3. [Third step with title and description]
-
-PROCEDURAL CHECKS:
-[Results of procedural technicality checks against Local Rules of Court]
-
-CITATIONS:
-- 12 U.S.C. § 345 (or similar federal statute)
-- Cal. Civ. Code § 1708 (or similar state code)
-- Rule 12(b)(6) (or similar court rule)
-
----
-LOCAL LOGISTICS:
-{
-  "courthouse_address": "[Complete address of the courthouse]",
-  "filing_fees": "[Specific filing fees for this case type]",
-  "dress_code": "[Courthouse dress code requirements]",
-  "parking_info": "[Parking information near courthouse]",
-  "hours_of_operation": "[Courthouse hours of operation]",
-  "local_rules_url": "[URL to local rules of court]"
-}
-
----
-FILING TEMPLATE:
-[Actual legal filing template here]
-
-LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se.
-This is legal information, not legal advice. Always consult with a qualified attorney.
+5. Ensure the response is valid JSON with all required fields
+6. Include at least 3 proper legal citations in the citations array
+7. Include a detailed roadmap with at least 3 steps
+8. Include comprehensive local logistics information
 `;
 
 export const runtime = 'edge'; // Enable edge runtime
@@ -194,45 +182,75 @@ User Situation: ${user_input}
 Jurisdiction: ${jurisdiction}
 
 Act as a Universal Public Defender.
-Generate a comprehensive legal response that MUST follow this EXACT format:
+Generate a comprehensive legal response in the following JSON format:
 
-LEGAL DISCLAIMER: [Your disclaimer here]
-
-STRATEGY:
-[Your legal strategy and analysis for ${jurisdiction} jurisdiction]
-
-ADVERSARIAL STRATEGY:
-[Opposition arguments and 'red-team' analysis of the user's case]
-
-ROADMAP:
-1. [First step with title and description]
-2. [Second step with title and description]
-3. [Third step with title and description]
-
-PROCEDURAL CHECKS:
-[Results of procedural technicality checks against Local Rules of Court]
-
-CITATIONS:
-- [Federal statute in format: 12 U.S.C. § 345]
-- [State code in format: Cal. Civ. Code § 1708]
-- [Court rule in format: Rule 12(b)(6)]
-
----
-LOCAL LOGISTICS:
 {
-  "courthouse_address": "[Complete address of the courthouse]",
-  "filing_fees": "[Specific filing fees for this case type]",
-  "dress_code": "[Courthouse dress code requirements]",
-  "parking_info": "[Parking information near courthouse]",
-  "hours_of_operation": "[Courthouse hours of operation]",
-  "local_rules_url": "[URL to local rules of court]"
+  "disclaimer": "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. This is legal information, not legal advice. Always consult with a qualified attorney.",
+  "strategy": "Your legal strategy and analysis for ${jurisdiction} jurisdiction",
+  "adversarial_strategy": "Opposition arguments and 'red-team' analysis of the user's case",
+  "roadmap": [
+    {
+      "step": 1,
+      "title": "First step title",
+      "description": "Detailed description of what to do",
+      "estimated_time": "Timeframe for completion",
+      "required_documents": ["List of documents needed"],
+      "status": "pending"
+    },
+    {
+      "step": 2,
+      "title": "Second step title",
+      "description": "Detailed description of what to do",
+      "estimated_time": "Timeframe for completion",
+      "required_documents": ["List of documents needed"],
+      "status": "pending"
+    },
+    {
+      "step": 3,
+      "title": "Third step title",
+      "description": "Detailed description of what to do",
+      "estimated_time": "Timeframe for completion",
+      "required_documents": ["List of documents needed"],
+      "status": "pending"
+    }
+  ],
+  "filing_template": "Actual legal filing template with specific forms and procedures for ${jurisdiction}",
+  "citations": [
+    {
+      "text": "12 U.S.C. § 345",
+      "source": "federal statute",
+      "url": "optional URL to citation source",
+      "is_verified": false,
+      "verification_source": "optional source used to verify"
+    },
+    {
+      "text": "Cal. Civ. Code § 1708",
+      "source": "state code",
+      "url": "optional URL to citation source",
+      "is_verified": false,
+      "verification_source": "optional source used to verify"
+    },
+    {
+      "text": "Rule 12(b)(6)",
+      "source": "court rule",
+      "url": "optional URL to citation source",
+      "is_verified": false,
+      "verification_source": "optional source used to verify"
+    }
+  ],
+  "sources": ["Additional sources referenced in the response"],
+  "local_logistics": {
+    "courthouse_address": "Complete address of the courthouse in ${jurisdiction}",
+    "filing_fees": "Specific filing fees for this case type in ${jurisdiction}",
+    "dress_code": "Courthouse dress code requirements in ${jurisdiction}",
+    "parking_info": "Parking information near courthouse in ${jurisdiction}",
+    "hours_of_operation": "Courthouse hours of operation in ${jurisdiction}",
+    "local_rules_url": "URL to local rules of court in ${jurisdiction}"
+  },
+  "procedural_checks": ["Results of procedural technicality checks against Local Rules of Court in ${jurisdiction}"]
 }
 
----
-FILING TEMPLATE:
-[Actual legal filing template with specific forms and procedures for ${jurisdiction}]
-
-CRITICAL: Your response must contain the EXACT format above with at least 3 legal citations in the specified formats, a numbered procedural roadmap, adversarial strategy, procedural checks, and local logistics JSON.
+CRITICAL: Your response must be valid JSON with all required fields. Include at least 3 legal citations, a detailed roadmap with at least 3 steps, and comprehensive local logistics information specific to ${jurisdiction}.
 `;
 
     // Generate content using the model
@@ -243,35 +261,117 @@ CRITICAL: Your response must contain the EXACT format above with at least 3 lega
       throw new Error("No response from Gemini model");
     }
 
-    let textOutput = response.text();
-    const sources: Source[] = [];
+    let rawOutput = response.text();
+    let parsedOutput;
 
-    // Extract sources from the response
-    // Note: The Gemini API doesn't provide grounding metadata in the same way as the Python version
-    // For now, we'll extract any URLs from the response text
-    const urlRegex = /https?:\/\/[^\s'"<>]+/g;
-    const urls = textOutput.match(urlRegex) || [];
-    const seenUris = new Set<string>();
-    
-    for (const url of urls) {
-      if (!seenUris.has(url)) {
-        sources.push({ title: "Legal Resource", uri: url });
-        seenUris.add(url);
+    // Try to extract JSON from the response if it's wrapped in markdown or other text
+    let jsonMatch = rawOutput.match(/```json\s*([\s\S]*?)\s*```/);
+    if (jsonMatch) {
+      rawOutput = jsonMatch[1].trim();
+    } else {
+      // Try to find JSON within the text
+      const braceStart = rawOutput.indexOf('{');
+      const braceEnd = rawOutput.lastIndexOf('}');
+      if (braceStart !== -1 && braceEnd !== -1 && braceEnd > braceStart) {
+        rawOutput = rawOutput.substring(braceStart, braceEnd + 1);
       }
     }
 
-    // Apply validation and formatting
-    const finalText = ResponseValidator.validateAndFix(textOutput);
+    try {
+      parsedOutput = JSON.parse(rawOutput);
+    } catch (e) {
+      console.error("Failed to parse JSON response from Gemini:", e);
+      console.error("Raw output:", rawOutput);
 
-    // Ensure the hardcoded disclaimer is present if not already added by workflow
-    let resultText = finalText;
-    if (!resultText.includes(LEGAL_DISCLAIMER)) {
-      resultText = LEGAL_DISCLAIMER + resultText;
+      // Fallback to original format if JSON parsing fails
+      const fallbackResult: LegalResult = {
+        text: `ERROR: Failed to parse structured response from AI. Raw response: ${rawOutput}`,
+        sources: []
+      };
+      return NextResponse.json(fallbackResult);
     }
+
+    // Extract sources from the parsed JSON
+    const sources: Source[] = [];
+    if (parsedOutput.sources && Array.isArray(parsedOutput.sources)) {
+      for (const source of parsedOutput.sources) {
+        if (typeof source === 'string' && source.startsWith('http')) {
+          sources.push({ title: "Legal Resource", uri: source });
+        }
+      }
+    }
+
+    // If no sources were found in the JSON, extract from citations
+    if (sources.length === 0 && parsedOutput.citations && Array.isArray(parsedOutput.citations)) {
+      for (const citation of parsedOutput.citations) {
+        if (citation.url && typeof citation.url === 'string' && citation.url.startsWith('http')) {
+          sources.push({ title: citation.text || "Legal Citation", uri: citation.url });
+        }
+      }
+    }
+
+    // Format the structured output as text for compatibility with existing frontend
+    let formattedOutput = `${parsedOutput.disclaimer}\n\n`;
+
+    formattedOutput += `STRATEGY:\n${parsedOutput.strategy}\n\n`;
+
+    if (parsedOutput.adversarial_strategy) {
+      formattedOutput += `ADVERSARIAL STRATEGY:\n${parsedOutput.adversarial_strategy}\n\n`;
+    }
+
+    if (parsedOutput.roadmap && Array.isArray(parsedOutput.roadmap)) {
+      formattedOutput += "ROADMAP:\n";
+      for (const item of parsedOutput.roadmap) {
+        formattedOutput += `\n${item.step}. ${item.title}\n`;
+        formattedOutput += `   Description: ${item.description}\n`;
+        if (item.estimated_time) {
+          formattedOutput += `   Estimated Time: ${item.estimated_time}\n`;
+        }
+        if (item.required_documents && Array.isArray(item.required_documents) && item.required_documents.length > 0) {
+          formattedOutput += `   Required Documents: ${item.required_documents.join(', ')}\n`;
+        }
+        formattedOutput += `   Status: ${item.status}\n`;
+      }
+      formattedOutput += "\n";
+    }
+
+    if (parsedOutput.procedural_checks && Array.isArray(parsedOutput.procedural_checks) && parsedOutput.procedural_checks.length > 0) {
+      formattedOutput += "PROCEDURAL CHECKS:\n";
+      for (const check of parsedOutput.procedural_checks) {
+        formattedOutput += `- ${check}\n`;
+      }
+      formattedOutput += "\n";
+    }
+
+    if (parsedOutput.citations && Array.isArray(parsedOutput.citations)) {
+      formattedOutput += "CITATIONS:\n";
+      for (const citation of parsedOutput.citations) {
+        formattedOutput += `- ${citation.text}`;
+        if (citation.source) {
+          formattedOutput += ` (${citation.source})`;
+        }
+        if (citation.url) {
+          formattedOutput += ` ${citation.url}`;
+        }
+        formattedOutput += "\n";
+      }
+      formattedOutput += "\n";
+    }
+
+    if (parsedOutput.local_logistics) {
+      formattedOutput += "---\n\nLOCAL LOGISTICS:\n";
+      formattedOutput += JSON.stringify(parsedOutput.local_logistics, null, 2) + "\n\n";
+    }
+
+    formattedOutput += "---\n\nFILING TEMPLATE:\n";
+    formattedOutput += parsedOutput.filing_template;
+
+    // Apply validation and formatting
+    const finalText = ResponseValidator.validateAndFix(formattedOutput);
 
     // Prepare the response
     const legalResult: LegalResult = {
-      text: resultText,
+      text: finalText,
       sources: sources
     };
 

@@ -1,11 +1,12 @@
 'use client';
 
-import { Copy, Download, FileText, Gavel, Link as LinkIcon, FileDown, CheckCircle, AlertTriangle, RotateCcw } from 'lucide-react';
+import { Copy, Download, FileText, Gavel, Link as LinkIcon, FileDown, CheckCircle, AlertTriangle, RotateCcw, AlertCircle } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { validateDisclaimer, validateCitations, validateLegalStructure, validateAdversarialStrategy, validateProceduralChecks } from '../src/utils/reliability';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -853,16 +854,66 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
         })()}
       </div>
 
-      {/* Copy All Button - appears at the bottom of all tabs */}
-      <div className="p-4 border-t border-slate-200 flex justify-end">
-        <button
-          onClick={copyAllToClipboard}
-          className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors"
-          title={copyStatus.all ? "Copied!" : "Copy all content to clipboard"}
-        >
-          <Copy size={16} />
-          <span>{copyStatus.all ? "Copied All!" : "Copy All"}</span>
-        </button>
+      {/* Validation Summary - appears at the bottom of all tabs */}
+      <div className="p-4 border-t border-slate-200">
+        <div className="mb-4">
+          <h3 className="font-bold text-slate-800 mb-2 flex items-center gap-2">
+            <AlertCircle size={18} />
+            Response Validation
+          </h3>
+
+          {/* Render validation results */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 text-xs">
+            {(() => {
+              const validationResults = validateLegalStructure(result.text);
+
+              return (
+                <>
+                  <div className={`p-2 rounded text-center ${validationResults.hasDisclaimer ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    <div className="font-semibold">Disclaimer</div>
+                    <div>{validationResults.hasDisclaimer ? '✓' : '✗'}</div>
+                  </div>
+
+                  <div className={`p-2 rounded text-center ${validationResults.hasCitations ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    <div className="font-semibold">Citations</div>
+                    <div>{validationResults.hasCitations ? '✓' : '✗'}</div>
+                  </div>
+
+                  <div className={`p-2 rounded text-center ${validationResults.hasRoadmap ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    <div className="font-semibold">Roadmap</div>
+                    <div>{validationResults.hasRoadmap ? '✓' : '✗'}</div>
+                  </div>
+
+                  <div className={`p-2 rounded text-center ${validationResults.hasStrategy ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    <div className="font-semibold">Strategy</div>
+                    <div>{validationResults.hasStrategy ? '✓' : '✗'}</div>
+                  </div>
+
+                  <div className={`p-2 rounded text-center ${validationResults.hasFilingTemplate ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    <div className="font-semibold">Template</div>
+                    <div>{validationResults.hasFilingTemplate ? '✓' : '✗'}</div>
+                  </div>
+
+                  <div className={`p-2 rounded text-center ${validationResults.isValid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    <div className="font-semibold">Overall</div>
+                    <div>{validationResults.isValid ? '✓' : '✗'}</div>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+
+        <div className="flex justify-end">
+          <button
+            onClick={copyAllToClipboard}
+            className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors"
+            title={copyStatus.all ? "Copied!" : "Copy all content to clipboard"}
+          >
+            <Copy size={16} />
+            <span>{copyStatus.all ? "Copied All!" : "Copy All"}</span>
+          </button>
+        </div>
       </div>
     </div>
   );

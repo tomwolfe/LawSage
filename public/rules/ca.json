@@ -1,0 +1,31 @@
+{
+  "state": "California",
+  "filing_deadlines": {
+    "complaint": "3 years from discovery of injury or 1 year from discovery of wrongdoing",
+    "answer_to_complaint": "30 days from service of summons",
+    "motion_to_dismiss": "60 days from service of summons or 30 days after answer is served",
+    "discovery_deadlines": {
+      "depositions": "Must be noticed at least 15 days before the deposition date",
+      "disclosures": "Automatic disclosures required within 30 days of appearance",
+      "requests_for_admission": "30 days to respond",
+      "interrogatories": "30 days to respond",
+      "production_requests": "30 days to respond"
+    },
+    "trial_deadlines": "Generally within 12 months of filing complaint",
+    "appeal_deadlines": "60 days from notice of entry of judgment"
+  },
+  "court_procedures": {
+    "mandatory_arbitration": "Cases valued under $50,000 may be subject to mandatory arbitration",
+    "case_management_conferences": "Typically scheduled within 60 days of answer",
+    "pre_trial_conferences": "Usually scheduled 30-45 days before trial"
+  },
+  "filing_requirements": {
+    "fee_schedule": {
+      "filing_fee": "$435 for civil cases",
+      "service_fee": "$15-20 per service",
+      "miscellaneous_fees": "Varies by county and specific requirements"
+    },
+    "document_format": "12-point font, double-spaced, 8.5\" x 11\" paper",
+    "page_limits": "Points and authorities limited to 10 pages unless leave granted"
+  }
+}
