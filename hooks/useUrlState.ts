@@ -18,10 +18,17 @@ export function useUrlState<T>(
   options: UrlStateOptions<T> = {}
 ): [T, (value: T | ((prevState: T) => T)) => void] {
   const { defaultValue, compress = true, debounceMs = 1000 } = options;
+
+  // Initialize state with defaultValue during SSR, then hydrate on client
   const [state, setState] = useState<T>(() => {
-    // Initialize state from URL on component mount
-    const urlState = getUrlState(compress);
-    return urlState?.[key] ?? defaultValue;
+    // Check if we're on the client side
+    if (typeof window !== 'undefined') {
+      // Initialize state from URL on component mount
+      const urlState = getUrlState(compress);
+      return urlState?.[key] ?? defaultValue;
+    }
+    // During SSR, return default value
+    return defaultValue;
   });
 
   // Debounce function to limit URL updates
@@ -29,6 +36,9 @@ export function useUrlState<T>(
 
   // Function to get current state from URL
   const getUrlState = useCallback((shouldCompress: boolean) => {
+    // Only run on client side
+    if (typeof window === 'undefined') return null;
+
     try {
       const hash = window.location.hash.substring(1); // Remove the '#' character
       if (!hash) return null;
@@ -50,6 +60,9 @@ export function useUrlState<T>(
   // Function to update URL with current state
   const updateUrlState = useCallback(
     (newState: any) => {
+      // Only run on client side
+      if (typeof window === 'undefined') return;
+
       try {
         const currentState = getUrlState(compress);
         const updatedState = {
@@ -76,8 +89,11 @@ export function useUrlState<T>(
     [compress, getUrlState, key]
   );
 
-  // Update URL when state changes
+  // Update URL when state changes (only on client side)
   useEffect(() => {
+    // Only run on client side
+    if (typeof window === 'undefined') return;
+
     if (debouncedUpdate) {
       clearTimeout(debouncedUpdate);
     }
@@ -100,7 +116,10 @@ export function useUrlState<T>(
     (value: T | ((prevState: T) => T)) => {
       setState(prev => {
         const newValue = value instanceof Function ? value(prev) : value;
-        updateUrlState(newValue);
+        // Only update URL on client side
+        if (typeof window !== 'undefined') {
+          updateUrlState(newValue);
+        }
         return newValue;
       });
     },
@@ -117,6 +136,9 @@ export function useUrlStateObject(compress: boolean = true) {
   const [state, setState] = useState<any>(null);
 
   useEffect(() => {
+    // Only run on client side
+    if (typeof window === 'undefined') return;
+
     const getUrlState = () => {
       try {
         const hash = window.location.hash.substring(1); // Remove the '#' character

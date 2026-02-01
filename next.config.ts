@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  reactCompiler: true,
+  reactCompiler: false, // Disabled due to build error: "Cannot access 'k' before initialization"
   experimental: {
     serverActions: {},
   },
