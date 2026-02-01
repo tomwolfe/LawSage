@@ -41,6 +41,15 @@ interface LegalResult {
   sources: Source[];
 }
 
+interface CaseLedgerEntry {
+  id: string;
+  timestamp: Date;
+  eventType: 'complaint_filed' | 'answer_due' | 'motion_submitted' | 'discovery_served' | 'trial_date_set' | 'other';
+  description: string;
+  status: 'pending' | 'completed' | 'overdue';
+  dueDate?: Date;
+}
+
 interface CaseHistoryItem {
   id: string;
   timestamp: Date;
@@ -71,6 +80,7 @@ export default function LegalInterface() {
   const [backendUnreachable, setBackendUnreachable] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [caseLedger, setCaseLedger] = useState<CaseLedgerEntry[]>([]);
 
   // Initialize state from URL fragment on component mount
   useEffect(() => {
@@ -90,6 +100,17 @@ export default function LegalInterface() {
         if (caseFolder.backendUnreachable !== undefined) setBackendUnreachable(caseFolder.backendUnreachable);
 
         if (analysisResult !== undefined) setResult(analysisResult);
+
+        // Restore case ledger if present
+        if (savedState.ledger !== undefined) {
+          // Convert timestamp strings back to Date objects if needed
+          const ledgerWithDates = savedState.ledger.map((entry: any) => ({
+            ...entry,
+            timestamp: new Date(entry.timestamp),
+            dueDate: entry.dueDate ? new Date(entry.dueDate) : undefined
+          }));
+          setCaseLedger(ledgerWithDates);
+        }
       } else {
         // Restore from legacy state format
         if (savedState.userInput !== undefined) setUserInput(savedState.userInput);
@@ -114,7 +135,7 @@ export default function LegalInterface() {
       history,
       selectedHistoryItem,
       backendUnreachable
-    }, result);
+    }, result, caseLedger);
 
     // Update URL immediately with current state
     updateUrlWithState(getStateToSync());
@@ -128,7 +149,7 @@ export default function LegalInterface() {
       // In this implementation, we just ensure the latest state is saved when component unmounts
       updateUrlWithState(getStateToSync());
     };
-  }, [userInput, jurisdiction, result, activeTab, history, selectedHistoryItem, backendUnreachable]);
+  }, [userInput, jurisdiction, result, activeTab, history, selectedHistoryItem, backendUnreachable, caseLedger]);
 
   useEffect(() => {
     const checkHealth = async (retries = 3, delay = 1000) => {
@@ -287,6 +308,9 @@ export default function LegalInterface() {
       const updatedHistory = [newHistoryItem, ...history];
       setHistory(updatedHistory);
       localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
+
+      // Add to case ledger
+      addToCaseLedger('complaint_filed', `OCR analysis of document: ${selectedFile.name}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred during OCR processing');
     } finally {
@@ -417,6 +441,9 @@ export default function LegalInterface() {
         const updatedHistory = [newHistoryItem, ...history];
         setHistory(updatedHistory);
         localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
+
+        // Add to case ledger
+        addToCaseLedger('complaint_filed', `Initial analysis submitted for: ${userInput.substring(0, 50)}${userInput.length > 50 ? '...' : ''}`);
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
@@ -454,6 +481,29 @@ export default function LegalInterface() {
       hour: '2-digit',
       minute: '2-digit'
     }).format(date);
+  };
+
+  // Function to add an entry to the case ledger
+  const addToCaseLedger = (eventType: CaseLedgerEntry['eventType'], description: string, dueDate?: Date) => {
+    const newEntry: CaseLedgerEntry = {
+      id: Date.now().toString(),
+      timestamp: new Date(),
+      eventType,
+      description,
+      status: dueDate && dueDate < new Date() ? 'overdue' : 'pending',
+      dueDate
+    };
+
+    setCaseLedger(prev => [...prev, newEntry]);
+  };
+
+  // Function to update the status of a ledger entry
+  const updateLedgerEntryStatus = (id: string, status: CaseLedgerEntry['status']) => {
+    setCaseLedger(prev =>
+      prev.map(entry =>
+        entry.id === id ? { ...entry, status } : entry
+      )
+    );
   };
 
   return (

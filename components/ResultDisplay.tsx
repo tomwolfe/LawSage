@@ -7,6 +7,7 @@ import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { validateDisclaimer, validateCitations, validateLegalStructure, validateAdversarialStrategy, validateProceduralChecks } from '../src/utils/reliability';
+import { LegalMotion, MotionToDismiss, MotionForDiscovery, validateLegalMotion } from '../lib/schemas/motions';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -358,17 +359,57 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
 
   // Function to download as Word document
   const handleExportToWord = async () => {
-    // Dynamically import the docx library
-    const { Document, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType } = await import('docx');
+    // Check if the result contains a structured motion
+    let doc;
+    if (structured && structured.filing_template) {
+      // Try to parse the filing template as a motion schema
+      try {
+        const parsedMotion = JSON.parse(structured.filing_template) as LegalMotion;
+        const validation = validateLegalMotion(parsedMotion);
 
-    // Create a document with the legal content
-    const doc = new Document({
+        if (validation.isValid) {
+          // Create a document based on the motion schema
+          doc = await createMotionDocument(parsedMotion);
+        } else {
+          // If parsing fails, fall back to the original approach
+          doc = await createStandardDocument();
+        }
+      } catch (e) {
+        // If parsing fails, fall back to the original approach
+        doc = await createStandardDocument();
+      }
+    } else {
+      // Create a document with the legal content using the standard approach
+      doc = await createStandardDocument();
+    }
+
+    // Export the document
+    const { Packer } = await import('docx');
+    const blob = await Packer.toBlob(doc);
+    const url = URL.createObjectURL(blob);
+
+    // Create a download link
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `legal_analysis_${jurisdiction.toLowerCase()}_${new Date().toISOString().slice(0, 10)}.docx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Helper function to create a standard document
+  const createStandardDocument = async () => {
+    const { Document, Paragraph, TextRun, HeadingLevel, AlignmentType } = await import('docx');
+
+    return new Document({
       sections: [{
         properties: {},
         children: [
           new Paragraph({
             text: "LEGAL ANALYSIS AND FILINGS",
             heading: HeadingLevel.HEADING_1,
+            alignment: AlignmentType.CENTER,
           }),
           new Paragraph({
             text: "Disclaimer: This document contains legal information, not legal advice. Consult with a qualified attorney.",
@@ -404,20 +445,232 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
         ],
       }],
     });
+  };
 
-    // Export the document
-    const { Packer } = await import('docx');
-    const blob = await Packer.toBlob(doc);
-    const url = URL.createObjectURL(blob);
+  // Helper function to create a motion document based on the schema
+  const createMotionDocument = async (motion: LegalMotion) => {
+    const { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType } = await import('docx');
 
-    // Create a download link
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `legal_analysis_${jurisdiction.toLowerCase()}_${new Date().toISOString().slice(0, 10)}.docx`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // Create the main document structure
+    const children = [
+      // Title page
+      new Paragraph({
+        text: motion.caseInfo.courtName,
+        heading: HeadingLevel.HEADING_1,
+        alignment: AlignmentType.CENTER,
+      }),
+      new Paragraph({
+        text: `${motion.caseInfo.jurisdiction.toUpperCase()}, ${motion.caseInfo.caseNumber}`,
+        alignment: AlignmentType.CENTER,
+      }),
+      new Paragraph({
+        text: "",
+      }),
+      new Paragraph({
+        text: `${motion.filingParty},`,
+        alignment: AlignmentType.LEFT,
+      }),
+      new Paragraph({
+        text: "                       Plaintiff/Petitioner",
+        alignment: AlignmentType.LEFT,
+      }),
+      new Paragraph({
+        text: "",
+      }),
+      new Paragraph({
+        text: `vs.`,
+        alignment: AlignmentType.CENTER,
+      }),
+      new Paragraph({
+        text: "",
+      }),
+      new Paragraph({
+        text: `${motion.opposingParty},`,
+        alignment: AlignmentType.LEFT,
+      }),
+      new Paragraph({
+        text: "                       Defendant/Respondent",
+        alignment: AlignmentType.LEFT,
+      }),
+      new Paragraph({
+        text: "",
+      }),
+      new Paragraph({
+        text: `_________________________________`,
+        alignment: AlignmentType.CENTER,
+      }),
+      new Paragraph({
+        text: "",
+      }),
+
+      // Motion title
+      new Paragraph({
+        text: motion.title,
+        heading: HeadingLevel.HEADING_1,
+        alignment: AlignmentType.CENTER,
+      }),
+      new Paragraph({
+        text: "",
+      }),
+
+      // Description
+      new Paragraph({
+        text: motion.description,
+      }),
+      new Paragraph({
+        text: "",
+      }),
+
+      // Factual basis
+      new Paragraph({
+        text: "I. FACTUAL BASIS",
+        heading: HeadingLevel.HEADING_2,
+      }),
+      new Paragraph({
+        text: motion.factualBasis,
+      }),
+      new Paragraph({
+        text: "",
+      }),
+
+      // Legal authority
+      new Paragraph({
+        text: "II. LEGAL AUTHORITY",
+        heading: HeadingLevel.HEADING_2,
+      }),
+      ...motion.legalAuthority.map(auth => new Paragraph({
+        children: [
+          new TextRun("• "),
+          new TextRun(auth),
+        ]
+      })),
+      new Paragraph({
+        text: "",
+      }),
+
+      // Relief requested
+      new Paragraph({
+        text: "III. RELIEF REQUESTED",
+        heading: HeadingLevel.HEADING_2,
+      }),
+      new Paragraph({
+        text: motion.reliefRequested,
+      }),
+      new Paragraph({
+        text: "",
+      }),
+    ];
+
+    // Add motion-specific sections based on type
+    switch (motion.type) {
+      case 'motion_to_dismiss':
+        const dismissMotion = motion as MotionToDismiss;
+        children.push(
+          new Paragraph({
+            text: "IV. GROUNDS FOR DISMISSAL",
+            heading: HeadingLevel.HEADING_2,
+          }),
+          new Paragraph({
+            children: [
+              new TextRun(dismissMotion.dismissalFacts),
+            ]
+          }),
+          new Paragraph({
+            text: "",
+          }),
+          new Paragraph({
+            text: "V. ANTICIPATED OPPOSITION ARGUMENTS",
+            heading: HeadingLevel.HEADING_2,
+          }),
+          new Paragraph({
+            children: [
+              new TextRun(dismissMotion.anticipatedOpposition),
+            ]
+          }),
+          new Paragraph({
+            text: "",
+          })
+        );
+        break;
+
+      case 'motion_for_discovery':
+        const discoveryMotion = motion as MotionForDiscovery;
+        children.push(
+          new Paragraph({
+            text: "IV. DISCOVERY REQUESTS",
+            heading: HeadingLevel.HEADING_2,
+          }),
+          ...discoveryMotion.discoveryRequests.map(req => new Paragraph({
+            children: [
+              new TextRun("• "),
+              new TextRun(`${req.itemDescription} - ${req.relevanceExplanation}`),
+            ]
+          })),
+          new Paragraph({
+            text: "",
+          })
+        );
+        break;
+
+      // Add cases for other motion types as needed
+    }
+
+    // Add signature block
+    children.push(
+      new Paragraph({
+        text: "",
+      }),
+      new Paragraph({
+        text: "",
+      }),
+      new Paragraph({
+        text: "",
+      }),
+      new Paragraph({
+        children: [
+          new TextRun(`${motion.signatureBlock.attorneyName}`),
+        ],
+        alignment: AlignmentType.RIGHT,
+      }),
+      new Paragraph({
+        children: [
+          new TextRun(`Attorney for ${motion.filingParty}`),
+        ],
+        alignment: AlignmentType.RIGHT,
+      }),
+      new Paragraph({
+        children: [
+          new TextRun(`Bar No. ${motion.signatureBlock.attorneyBarNumber}`),
+        ],
+        alignment: AlignmentType.RIGHT,
+      }),
+      new Paragraph({
+        children: [
+          new TextRun(motion.signatureBlock.firmName || ""),
+        ],
+        alignment: AlignmentType.RIGHT,
+      }),
+      new Paragraph({
+        children: [
+          new TextRun(motion.signatureBlock.date),
+        ],
+        alignment: AlignmentType.RIGHT,
+      })
+    );
+
+    return new Document({
+      sections: [{
+        properties: {
+          margins: {
+            top: 1440, // 1 inch in points
+            bottom: 1440,
+            left: 1440,
+            right: 1440,
+          },
+        },
+        children,
+      }],
+    });
   };
 
   // Function to aggregate all content for copying

@@ -88,12 +88,14 @@ export function getStateFromUrl(): any {
  * Enhanced state synchronization that handles Virtual Case Folder metadata and summaries
  * @param caseFolder The Virtual Case Folder state to sync
  * @param analysisResult The analysis result to sync
- * @returns A combined state object with both case folder and analysis result
+ * @param ledger The case ledger containing chronological case events
+ * @returns A combined state object with both case folder, analysis result, and ledger
  */
-export function createVirtualCaseFolderState(caseFolder: any, analysisResult: any): any {
+export function createVirtualCaseFolderState(caseFolder: any, analysisResult: any, ledger?: any[]): any {
   return {
     caseFolder,
     analysisResult,
+    ledger: ledger || [],
     timestamp: Date.now(),
     version: '1.0'
   };
