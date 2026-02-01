@@ -47,7 +47,7 @@ export default function GuidedInterview({ onComplete }: GuidedInterviewProps) {
   const [proceduralChecklist, setProceduralChecklist] = useState<string[]>([]);
   const [result, setResult] = useState<any>(null);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'strategy' | 'filings' | 'sources' | 'analysis' | 'audit'>('strategy');
+  const [activeTab, setActiveTab] = useState<'strategy' | 'filings' | 'sources' | 'analysis' | 'audit' | 'evidence'>('strategy');
 
   const nextStep = () => setStep(prev => Math.min(prev + 1, 4));
   const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
