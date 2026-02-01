@@ -65,7 +65,8 @@ def test_system_instruction_constant_exists():
     """Test that the SYSTEM_INSTRUCTION constant exists in the module."""
     import api.workflow
     assert hasattr(api.workflow, 'SYSTEM_INSTRUCTION')
-    assert 'delimiter' in api.workflow.SYSTEM_INSTRUCTION.lower()
+    # Check that it mentions structured output instead of delimiters
+    assert 'structured' in api.workflow.SYSTEM_INSTRUCTION.lower() or 'json' in api.workflow.SYSTEM_INSTRUCTION.lower()
 
 
 if __name__ == "__main__":

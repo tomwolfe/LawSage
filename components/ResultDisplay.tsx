@@ -1,6 +1,6 @@
 'use client';
 
-import { Copy, Download, FileText, Gavel, Link as LinkIcon } from 'lucide-react';
+import { Copy, Download, FileText, Gavel, Link as LinkIcon, FileDown } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useState } from 'react';
@@ -9,6 +9,30 @@ import remarkGfm from 'remark-gfm';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+interface Citation {
+  text: string;
+  source?: string;
+  url?: string;
+}
+
+interface StrategyItem {
+  step: number;
+  title: string;
+  description: string;
+  estimated_time?: string;
+  required_documents?: string[];
+}
+
+// Define the structured output interface
+interface StructuredLegalOutput {
+  disclaimer: string;
+  strategy: string;
+  roadmap: StrategyItem[];
+  filing_template: string;
+  citations: Citation[];
+  sources: string[];
 }
 
 interface Source {
@@ -28,12 +52,58 @@ interface ResultDisplayProps {
   jurisdiction: string;
 }
 
-function parseLegalOutput(text: string): { strategy: string; filings: string } {
+// Enhanced parsing function to handle both legacy and structured formats
+function parseLegalOutput(text: string): { strategy: string; filings: string; structured?: StructuredLegalOutput } {
   if (!text || typeof text !== 'string') {
     return {
       strategy: 'No content available.',
       filings: 'No filings generated.'
     };
+  }
+
+  // Try to parse as structured JSON first
+  try {
+    const parsed = JSON.parse(text) as StructuredLegalOutput;
+    if (parsed.disclaimer && parsed.strategy && parsed.filing_template) {
+      // Format the structured output for display
+      let strategyText = `${parsed.disclaimer}\n\n${parsed.strategy}\n\n`;
+
+      if (parsed.roadmap && parsed.roadmap.length > 0) {
+        strategyText += "## Procedural Roadmap:\n";
+        for (const item of parsed.roadmap) {
+          strategyText += `\n### ${item.step}. ${item.title}\n`;
+          strategyText += `${item.description}\n`;
+          if (item.estimated_time) {
+            strategyText += `*Estimated Time: ${item.estimated_time}*\n`;
+          }
+          if (item.required_documents && item.required_documents.length > 0) {
+            strategyText += `*Required Documents: ${item.required_documents.join(', ')}*\n`;
+          }
+        }
+      }
+
+      if (parsed.citations && parsed.citations.length > 0) {
+        strategyText += "\n## Legal Citations:\n";
+        for (const citation of parsed.citations) {
+          strategyText += `- ${citation.text}`;
+          if (citation.source) {
+            strategyText += ` (${citation.source})`;
+          }
+          if (citation.url) {
+            strategyText += ` ${citation.url}`;
+          }
+          strategyText += "\n";
+        }
+      }
+
+      return {
+        strategy: strategyText,
+        filings: parsed.filing_template,
+        structured: parsed
+      };
+    }
+  } catch (e) {
+    // If JSON parsing fails, fall back to delimiter-based parsing
   }
 
   // Regex to match ---, ***, or ___ with optional spaces, on their own line if possible
@@ -44,7 +114,7 @@ function parseLegalOutput(text: string): { strategy: string; filings: string } {
     // Fallback to simple index check if regex doesn't match a dedicated line
     const fallbackDelimiter = '---';
     const index = text.indexOf(fallbackDelimiter);
-    
+
     if (index === -1) {
       return {
         strategy: text.trim(),
@@ -86,7 +156,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
     }
   };
 
-  const downloadFilings = () => {
+  const downloadFilingsAsMarkdown = () => {
     if (!result) return;
     const { filings } = parseLegalOutput(result.text);
     const blob = new Blob([filings], { type: 'text/markdown' });
@@ -98,7 +168,44 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
     URL.revokeObjectURL(url);
   };
 
-  const { strategy: strategyText, filings: filingsText } = parseLegalOutput(result.text);
+  // Function to download filings as PDF
+  const downloadFilingsAsPDF = async () => {
+    if (!result) return;
+    const { filings } = parseLegalOutput(result.text);
+
+    // Create a temporary HTML document for PDF conversion
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Legal Filing Template - ${jurisdiction}</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+            h1, h2, h3 { color: #333; }
+            .disclaimer { background-color: #f0f0f0; padding: 15px; border-left: 4px solid #ccc; margin: 20px 0; }
+          </style>
+        </head>
+        <body>
+          <h1>Legal Filing Template</h1>
+          <p><strong>Jurisdiction:</strong> ${jurisdiction}</p>
+          <div class="content">${filings.replace(/\n/g, '<br>')}</div>
+        </body>
+      </html>
+    `;
+
+    // Create a Blob with the HTML content
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+
+    // Open in a new tab for printing/PDF saving
+    window.open(url, '_blank');
+
+    // Clean up the URL object
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const { strategy: strategyText, filings: filingsText, structured } = parseLegalOutput(result.text);
 
   // Function to aggregate all content for copying
   const copyAllToClipboard = async () => {
@@ -185,11 +292,18 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                     <span>{copyStatus.filings ? "Copied!" : "Copy"}</span>
                   </button>
                   <button
-                    onClick={downloadFilings}
+                    onClick={downloadFilingsAsMarkdown}
                     className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors"
                   >
                     <Download size={16} />
                     Download .md
+                  </button>
+                  <button
+                    onClick={downloadFilingsAsPDF}
+                    className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors"
+                  >
+                    <FileDown size={16} />
+                    Download PDF
                   </button>
                   <button
                     onClick={() => window.print()}

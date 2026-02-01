@@ -5,19 +5,22 @@ from api.processor import ResponseValidator
 from api.safety_validator import SafetyValidator
 from api.config_loader import get_settings
 from api.exceptions import AppException
+from api.schemas import LegalOutput
 from typing import List, Tuple, Any
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 
 SYSTEM_INSTRUCTION = """
 You are a legal assistant helping pro se litigants (people representing themselves).
-Always format your response with a clear delimiter '---' separating strategy/advice from legal filings.
+Provide your response in a structured JSON format that includes all required fields.
 
-BEFORE the '---': Provide legal strategy, analysis, and step-by-step procedural roadmap.
-AFTER the '---': Provide actual legal filing templates and documents.
+Your response must include:
+- A legal disclaimer
+- A strategy section with legal analysis
+- A roadmap with step-by-step procedural instructions
+- A filing template section with actual legal documents
+- Proper legal citations supporting your recommendations
 
-CRITICAL: The '---' delimiter MUST appear in your response.
-
-LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. 
+LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se.
 This is legal information, not legal advice. Always consult with a qualified attorney.
 """
 
@@ -62,26 +65,29 @@ class LawSageWorkflow:
                 tools=[search_tool],
                 system_instruction=system_instruction,
                 max_output_tokens=4096,
+                response_schema=LegalOutput  # Use structured output
             )
         )
 
     def step_2_generate(self, request: LegalRequest) -> Tuple[str, List[Source]]:
         """
         Step 2: Grounded Generation.
-        Calls Gemini with Google Search tool.
+        Calls Gemini with Google Search tool and structured output.
         """
         search_tool = types.Tool(google_search=types.GoogleSearch())
-        
+
         prompt = f"""
 User Situation: {request.user_input}
 Jurisdiction: {request.jurisdiction}
 
 Act as a Universal Public Defender.
-1. Search for current statutes and local court procedures relevant to this situation.
-2. Provide a breakdown of the situation in plain English.
-3. Generate a procedural roadmap (step-by-step instructions).
----
-4. Generate the text for necessary legal filings that are court-admissible in the specified jurisdiction.
+Generate a structured legal response with the following fields:
+- disclaimer: Include the mandatory legal disclaimer
+- strategy: Legal strategy and analysis for the user's situation
+- roadmap: Step-by-step procedural roadmap with numbered steps
+- filing_template: Template for legal filings that can be used in court
+- citations: Legal citations supporting the strategy and filings
+- sources: Additional sources referenced in the response
 """
 
         try:
@@ -98,7 +104,7 @@ Act as a Universal Public Defender.
 
         if response.candidates and len(response.candidates) > 0:
             candidate = GeminiCandidate.model_validate(response.candidates[0])
-            
+
             if candidate.finish_reason in ["SAFETY", "RECITATION", "OTHER"]:
                  raise AppException(
                     status_code=400,
@@ -107,8 +113,51 @@ Act as a Universal Public Defender.
                 )
 
             if candidate.content and candidate.content.parts:
-                text_output = "\n".join([p.text for p in candidate.content.parts if p.text and not p.thought])
-            
+                # Extract the structured output
+                for part in candidate.content.parts:
+                    if part.text and not part.thought:
+                        # Parse the structured output from JSON
+                        import json
+                        try:
+                            parsed_output = LegalOutput.model_validate_json(part.text)
+                            # Combine all sections into a single text output
+                            text_output = (
+                                f"{parsed_output.disclaimer}\n\n"
+                                f"STRATEGY:\n{parsed_output.strategy}\n\n"
+                                f"ROADMAP:\n"
+                            )
+
+                            # Format roadmap items
+                            for item in parsed_output.roadmap:
+                                text_output += f"{item.step}. {item.title}: {item.description}\n"
+                                if item.estimated_time:
+                                    text_output += f"   Estimated Time: {item.estimated_time}\n"
+                                if item.required_documents:
+                                    text_output += f"   Required Documents: {', '.join(item.required_documents)}\n"
+
+                            text_output += f"\nFILING TEMPLATE:\n{parsed_output.filing_template}\n\n"
+                            text_output += "CITATIONS:\n"
+                            for citation in parsed_output.citations:
+                                text_output += f"- {citation.text}"
+                                if citation.source:
+                                    text_output += f" ({citation.source})"
+                                if citation.url:
+                                    text_output += f" {citation.url}"
+                                text_output += "\n"
+
+                            # Add sources
+                            if parsed_output.sources:
+                                text_output += "\nSOURCES:\n"
+                                for source in parsed_output.sources:
+                                    text_output += f"- {source}\n"
+
+                        except json.JSONDecodeError:
+                            # Fallback if parsing fails
+                            text_output = part.text
+                        except Exception:
+                            # Fallback if validation fails
+                            text_output = part.text
+
             # Extract sources
             seen_uris = set()
             seen_titles = set()
@@ -123,7 +172,7 @@ Act as a Universal Public Defender.
                         elif not uri and title and title not in seen_titles:
                             sources.append(Source(title=title, uri=None))
                             seen_titles.add(title)
-        
+
         if not text_output:
             text_output = "No content was generated by the model."
 

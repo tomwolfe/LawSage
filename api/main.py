@@ -1,8 +1,8 @@
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 import os
-from typing import Any, Callable
+from typing import Any, Callable, AsyncGenerator
 from google.genai import errors
 from google.api_core import exceptions as google_exceptions
 
@@ -47,7 +47,7 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
                 detail="Gemini API Key is missing."
             ).model_dump()
         )
-    
+
     # Basic validation
     if not x_gemini_api_key.startswith("AIza") or len(x_gemini_api_key) < 20:
         return JSONResponse(
@@ -61,12 +61,26 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
     try:
         workflow = LawSageWorkflow(api_key=x_gemini_api_key)
         result = workflow.invoke(request)
-        
+
         # Ensure the hardcoded disclaimer is present if not already added by workflow
         if LegalDisclaimer.strip() not in result.text:
             result.text = LegalDisclaimer + result.text
 
-        return result
+        # Prepare the JSON response content
+        response_content = result.model_dump()
+        import json
+        json_str = json.dumps(response_content)
+
+        # Stream the JSON response to prevent Vercel timeout
+        async def generate_stream():
+            # Send the entire JSON as one chunk since it's already structured
+            yield json_str.encode('utf-8')
+
+        return StreamingResponse(
+            generate_stream(),
+            media_type="application/json",
+            headers={"X-Vercel-Streaming": "true"}
+        )
     except AppException as e:
         return JSONResponse(
             status_code=e.status_code,
@@ -83,7 +97,7 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
             status_code = 429
             error_type = "RateLimitError"
             detail = "AI service rate limit exceeded. Please try again in a few minutes."
-        
+
         return JSONResponse(
             status_code=status_code,
             content=StandardErrorResponse(
