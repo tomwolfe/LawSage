@@ -9,7 +9,7 @@ def test_get_settings_success():
     assert "model" in settings
     assert "id" in settings["model"]
     # Based on config/settings.yaml content seen earlier
-    assert settings["model"]["id"] == "gemini-2.5-flash"
+    assert settings["model"]["id"] == "gemini-2.5-flash-preview-09-2025"
 
 def test_get_settings_structure():
     """Verify the structure of the returned settings dictionary."""

@@ -14,15 +14,15 @@ export async function generateSearchQueries(
   geminiApiKey: string
 ): Promise<string[]> {
   const genAI = new GoogleGenerativeAI(geminiApiKey);
-  const model = genAI.getGenerativeModel({ 
-    model: 'gemini-2.5-flash',
-    systemInstruction: `You are a legal research specialist. Given a user's legal situation and jurisdiction, 
-    generate exactly 3 targeted search queries that would help find relevant legal precedents, 
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.5-flash-preview-09-2025',
+    systemInstruction: `You are a legal research specialist. Given a user's legal situation and jurisdiction,
+    generate exactly 3 targeted search queries that would help find relevant legal precedents,
     statutory law, and local court rules. Focus on queries that would find:
     1. Local Rules of Court specific to the jurisdiction
     2. Statutory precedents relevant to the legal issue
     3. Case law or procedural requirements for the specific type of case
-    
+
     Return ONLY an array of 3 search queries as a JSON array, nothing else.`
   });
 
@@ -99,8 +99,8 @@ export async function executeSearchQueries(
   const genAI = new GoogleGenerativeAI(geminiApiKey);
   
   // Using the same model but without system instruction to allow tool usage
-  const model = genAI.getGenerativeModel({ 
-    model: 'gemini-2.5-flash',
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.5-flash-preview-09-2025',
   });
 
   const searchTool = {

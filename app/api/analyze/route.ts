@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
     // Initialize the Google Generative AI client
     const genAI = new GoogleGenerativeAI(xGeminiApiKey);
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-flash-preview-09-2025",
       systemInstruction: SYSTEM_INSTRUCTION,
       safetySettings: [
         {
