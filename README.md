@@ -53,7 +53,6 @@ LawSage is built on a modern, performant full-stack architecture:
 *   **Deployment:** Optimized for seamless deployment on Vercel.
 
 ## Getting Started
-
 ### Prerequisites
 *   Node.js (v18+ recommended)
 *   A Google Gemini API Key (Get one from the [Google AI Studio](https://aistudio.google.com/))
@@ -120,7 +119,6 @@ The application includes several API routes optimized for Vercel Edge Functions:
 *   **/api/ocr:** Multimodal OCR endpoint for legal document image analysis.
 *   **/api/health:** Health check endpoint.
 *   **/api/verify-citation:** Real-time citation verification endpoint using Gemini Web Search.
-
 All API routes are configured to run on Vercel's Edge Runtime for optimal performance and cost efficiency within Hobby Tier limits.
 
 ## AI Safety & Structure
@@ -135,8 +133,8 @@ LawSage employs a multi-layered Reliability Layer to ensure that AI-generated co
     *   **Logistics Data Validation:** Ensures hyper-local courthouse information is included in responses.
     *   **Mandatory Disclaimers:** Every response is prepended with a legal disclaimer to clearly distinguish legal information from legal advice.
     *   **Structural Hardening:** A custom validator enforces a strict delimiter system ('---') to separate legal strategy from filing templates.
-*   **Retry Mechanism:** Built-in exponential backoff for AI service rate limits ensures high availability.
-*   **Structured Output:** The AI is prompted to return a JSON schema, which is validated server-side for completeness and safety before being presented to the user.
+    *   **Retry Mechanism:** Built-in exponential backoff for AI service rate limits ensures high availability.
+    *   **Structured Output:** The AI is prompted to return a JSON schema, which is validated server-side for completeness and safety before being presented to the user.
 
 ## Contributing
 LawSage is an open-source project dedicated to legal democratization. Contributions are welcome!
