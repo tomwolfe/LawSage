@@ -13,11 +13,8 @@ client = TestClient(app)
 
 def test_process_case_get_not_allowed() -> None:
     response = client.get("/api/process-case")
-    # In the code, it returns a 200 with a JSON body saying 405
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == 405
-    assert "Method Not Allowed" in data["error"]
+    # Now that we removed the custom GET handler, FastAPI returns a real 405
+    assert response.status_code == 405
 
 @patch("api.index.LegalWorkflowManager")
 def test_process_case_post_success(mock_manager_class: MagicMock) -> None:

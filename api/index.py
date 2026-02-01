@@ -90,11 +90,6 @@ async def process_case(
         headers={"X-Accel-Buffering": "no"}
     )
 
-@app.get("/process-case")
-@app.get("/api/process-case")
-async def process_case_get():
-    raise HTTPException(status_code=405, detail="Method Not Allowed. Please use POST with multipart/form-data.")
-
 # Standard routes
 @app.get("/")
 @app.get("/health")
