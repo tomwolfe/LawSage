@@ -62,7 +62,7 @@ export default function LegalInterface() {
   const [isListening, setIsListening] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<LegalResult | null>(null);
-  const [activeTab, setActiveTab] = useState<'strategy' | 'filings' | 'sources'>('strategy');
+  const [activeTab, setActiveTab] = useState<'strategy' | 'filings' | 'sources' | 'survival-guide' | 'opposition-view'>('strategy');
   const [error, setError] = useState('');
   const [history, setHistory] = useState<CaseHistoryItem[]>([]);
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<string | null>(null);

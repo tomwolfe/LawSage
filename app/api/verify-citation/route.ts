@@ -85,9 +85,6 @@ export async function POST(req: NextRequest) {
       contents: [{
         role: 'user',
         parts: [{ text: verificationPrompt }]
-      }],
-      tools: [{
-        googleSearch: {} // Enable web search tool
       }]
     });
 

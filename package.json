@@ -14,6 +14,7 @@
     "@google/generative-ai": "^0.24.1",
     "@tailwindcss/typography": "^0.5.19",
     "clsx": "^2.1.1",
+    "docx": "^9.0.3",
     "lucide-react": "^0.563.0",
     "next": "16.1.6",
     "react": "19.2.3",

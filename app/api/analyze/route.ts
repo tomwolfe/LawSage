@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Parse the request body
-    const { user_input, jurisdiction }: LegalRequest = await req.json();
+    const { user_input, jurisdiction, documents }: LegalRequest = await req.json();
 
     // Validate inputs
     if (!user_input?.trim()) {
