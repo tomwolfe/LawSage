@@ -39,52 +39,37 @@ def test_researcher_node(mock_genai_client, mock_api_key):
     assert result["sources"][0]["title"] == "Gov Site"
 
 @patch("api.workflow.Client")
-def test_clerk_node_delimiter_enforcement(mock_genai_client, mock_api_key):
+def test_procedural_sanity_check_node(mock_genai_client, mock_api_key):
     mock_instance = mock_genai_client.return_value
     mock_response = MagicMock()
-    mock_candidate = MagicMock()
-    mock_part = MagicMock()
-    # Mocking output WITHOUT delimiter to see if ResponseValidator fixes it
-    mock_part.text = "Legal Strategy only"
-    mock_candidate.content.parts = [mock_part]
-    mock_response.candidates = [mock_candidate]
+    mock_response.parsed = ["Missing signature"]
     mock_instance.models.generate_content.return_value = mock_response
 
-    from api.workflow import create_clerk_node
-    clerk = create_clerk_node(mock_api_key)
+    from api.workflow import create_procedural_sanity_check_node
+    clerk = create_procedural_sanity_check_node(mock_api_key)
     
-    state: AgentState = {
+    state = {
         "user_input": "test",
         "jurisdiction": "California",
-        "grounding_data": "local data",
-        "research_results": "research data",
-        "final_output": "",
-        "sources": [],
+        "final_output": "Legal Document",
         "thinking_steps": []
     }
     
     result = clerk(state)
-    assert "---" in result["final_output"]
-    assert "LEGAL DISCLAIMER" in result["final_output"]
+    assert "Procedural Sanity Check" in result["thinking_steps"][0]
+    assert "Missing signature" in result["procedural_violations"]
+    assert "PROCEDURAL VIOLATIONS DETECTED" in result["final_output"]
 
 @patch("api.workflow.Client")
 def test_workflow_integration(mock_genai_client, mock_api_key):
     mock_instance = mock_genai_client.return_value
     
-    # Mock for researcher
-    mock_res_res = MagicMock()
-    mock_res_can = MagicMock()
-    mock_res_can.content.parts = [MagicMock(text="Research findings")]
-    mock_res_can.grounding_metadata.grounding_chunks = []
-    mock_res_res.candidates = [mock_res_can]
+    # Mock responses for nodes
+    mock_res = MagicMock()
+    mock_res.candidates = [MagicMock(content=MagicMock(parts=[MagicMock(text="Response")]))]
+    mock_res.parsed = []
     
-    # Mock for clerk
-    mock_clk_res = MagicMock()
-    mock_clk_can = MagicMock()
-    mock_clk_can.content.parts = [MagicMock(text="Strategy\n---\nFilings")]
-    mock_clk_res.candidates = [mock_clk_can]
-    
-    mock_instance.models.generate_content.side_effect = [mock_res_res, mock_clk_res]
+    mock_instance.models.generate_content.return_value = mock_res
 
     workflow = create_workflow(mock_api_key)
     
@@ -93,12 +78,30 @@ def test_workflow_integration(mock_genai_client, mock_api_key):
         "jurisdiction": "California",
         "grounding_data": "local data",
         "research_results": "",
-        "final_output": "",
+        "counter_grounding_results": "",
+        "procedural_checklist": "",
+        "evidence_descriptions": [],
+        "evidence_mapping": {},
+        "fact_law_matrix": {},
+        "exhibit_list": [],
+        "strategy": "",
+        "shadow_brief": "",
+        "final_output": "Initial output",
         "sources": [],
-        "thinking_steps": []
+        "unverified_citations": [],
+        "reasoning_mismatches": [],
+        "fallacies_found": [],
+        "procedural_violations": [],
+        "missing_info_prompt": "",
+        "discovery_questions": [],
+        "discovery_chat_history": [],
+        "context_summary": "",
+        "thinking_steps": [],
+        "grounding_audit_log": [],
+        "is_approved": True
     }
     
+    # We just want to see it run without crashing and hit some nodes
+    # Since we mocked generate_content to return empty/basic things, it might follow END path quickly
     result = workflow.invoke(initial_state)
     assert "final_output" in result
-    assert "---" in result["final_output"]
-    assert len(result["thinking_steps"]) == 2

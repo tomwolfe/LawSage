@@ -67,6 +67,8 @@ class VerificationReport(BaseModel):
     is_approved: bool = True
     exhibit_list: List[str] = Field(default_factory=list)
     grounding_audit_log: List['AuditEntry'] = Field(default_factory=list)
+    fact_law_matrix: Optional[FactLawMatrix] = None
+    shadow_brief: Optional[str] = None
 
 class AuditEntry(BaseModel):
     node: str
@@ -83,6 +85,8 @@ class LegalHelpResponse(BaseModel):
     discovery_questions: Optional[List[str]] = Field(default_factory=list)
     verification_report: Optional[VerificationReport] = None
     grounding_audit_log: List[AuditEntry] = Field(default_factory=list)
+    fact_law_matrix: Optional[FactLawMatrix] = None
+    shadow_brief: Optional[str] = None
 
 class AnalysisResponse(BaseModel):
     model_config = ConfigDict(extra='ignore', from_attributes=True)

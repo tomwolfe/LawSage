@@ -43,10 +43,34 @@ interface AuditEntry {
   timestamp: string;
 }
 
+interface LegalElement {
+  name: string;
+  definition: string;
+  evidence_links: string[];
+  confidence: number;
+}
+
+interface FactLawMatrix {
+  elements: LegalElement[];
+  summary: string;
+}
+
 interface LegalResult {
   text: string;
   sources: Source[];
   grounding_audit_log?: AuditEntry[];
+  verification_report?: {
+    unverified_citations: string[];
+    reasoning_mismatches: string[];
+    fallacies_found: string[];
+    senior_attorney_feedback: string | null;
+    is_approved: boolean;
+    exhibit_list: string[];
+    shadow_brief?: string;
+    fact_law_matrix?: FactLawMatrix;
+  };
+  fact_law_matrix?: FactLawMatrix;
+  shadow_brief?: string;
 }
 
 interface AnalysisResult {
@@ -277,7 +301,10 @@ export default function LegalInterface() {
       setResult({
         text: data.text,
         sources: data.sources,
-        grounding_audit_log: data.grounding_audit_log
+        grounding_audit_log: data.grounding_audit_log,
+        verification_report: data.verification_report,
+        fact_law_matrix: data.fact_law_matrix,
+        shadow_brief: data.shadow_brief
       });
       if (data.thinking_steps) {
         setThinkingSteps(data.thinking_steps);

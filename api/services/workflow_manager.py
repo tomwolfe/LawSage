@@ -165,7 +165,8 @@ class LegalWorkflowManager:
             "senior_attorney_feedback": final_result.get("missing_info_prompt") if not final_result.get("is_approved") else None,
             "is_approved": final_result.get("is_approved", True),
             "exhibit_list": final_result.get("exhibit_list", []),
-            "shadow_brief": final_result.get("shadow_brief", "")
+            "shadow_brief": final_result.get("shadow_brief", ""),
+            "fact_law_matrix": final_result.get("fact_law_matrix", {})
         }
 
         payload = {
@@ -176,6 +177,7 @@ class LegalWorkflowManager:
             "evidence_descriptions": evidence_descriptions,
             "evidence_mapping": evidence_mapping,
             "fact_law_matrix": final_result.get("fact_law_matrix", {}),
+            "shadow_brief": final_result.get("shadow_brief", ""),
             "chat_history": history_out,
             "discovery_questions": final_result.get("discovery_questions", []),
             "verification_report": verification_report
