@@ -2,11 +2,11 @@
 
 **Democratizing Legal Access for Everyone**
 
-LawSage is an open-source, AI-powered platform designed to empower individuals representing themselves in court (Pro Se litigants). By leveraging advanced AI models and real-time legal grounding, LawSage analyzes your unique legal situation and generates a personalized, court-admissible roadmap and legal filings.
+LawSage is a groundbreaking, open-source, AI-powered platform designed to empower individuals representing themselves in court (Pro Se litigants). By leveraging advanced AI models and real-time legal grounding, LawSage analyzes your unique legal situation and generates a personalized, court-admissible roadmap and legal filings—all within your browser.
 
 > **Legal Disclaimer:** I am an AI, not an attorney. This tool provides legal information, not legal advice. Use of this tool does not create an attorney-client relationship.
 
-## Key Advancements (v4.0)
+## Key Advancements (v4.0): A Zero-Infrastructure Revolution
 
 LawSage has undergone a transformative evolution! The latest version is now a **resilient, high-performance 'zero-infrastructure' platform** with enhanced capabilities. This means:
 
@@ -70,25 +70,22 @@ LawSage is built on a modern, performant full-stack architecture:
 ## Getting Started
 
 ### Prerequisites
-
 *   Node.js (v18+ recommended)
 *   A Google Gemini API Key (Get one from the [Google AI Studio](https://aistudio.google.com/))
 
 ### Installation
-
 1.  **Clone the Repository**
-    ```bash
-    git clone https://github.com/tomwolfe/lawsage.git
-    cd lawsage
-    ```
+```bash
+git clone https://github.com/tomwolfe/lawsage.git
+cd lawsage
+```
 
 2.  **Install Frontend Dependencies**
-    ```bash
-    npm install
-    ```
+```bash
+npm install
+```
 
 ### Running the Application Locally
-
 Start the Next.js development server:
 ```bash
 npm run dev
@@ -97,7 +94,6 @@ npm run dev
 Open your browser and navigate to [http://localhost:3000](http://localhost:3000) to begin.
 
 ### Setting Your API Key
-
 1.  Open the application in your browser (`http://localhost:3000`).
 2.  Click the "Settings" button in the top right corner.
 3.  Enter your Google Gemini API Key and click "Save Settings".
@@ -181,7 +177,6 @@ Please ensure your code adheres to the existing style and includes tests for new
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
-
 *   [Next.js](https://nextjs.org/)
 *   [Google AI Studio](https://aistudio.google.com/)
 *   [Tailwind CSS](https://tailwindcss.com/)
