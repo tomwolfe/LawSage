@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
         {
           type: "AuthenticationError",
           detail: "Gemini API Key is missing."
-        } satisfies StandardErrorResponse,
+        } as StandardErrorResponse,
         {
           status: 401,
           headers: { 'X-Vercel-Streaming': 'true' }
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
         {
           type: "ValidationError",
           detail: "Invalid Gemini API Key format."
-        } satisfies StandardErrorResponse,
+        } as StandardErrorResponse,
         {
           status: 400,
           headers: { 'X-Vercel-Streaming': 'true' }
@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
         {
           type: "ValidationError",
           detail: "User input is required."
-        } satisfies StandardErrorResponse,
+        } as StandardErrorResponse,
         {
           status: 400,
           headers: { 'X-Vercel-Streaming': 'true' }
@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
         {
           type: "ValidationError",
           detail: "Jurisdiction is required."
-        } satisfies StandardErrorResponse,
+        } as StandardErrorResponse,
         {
           status: 400,
           headers: { 'X-Vercel-Streaming': 'true' }
@@ -165,7 +165,7 @@ export async function POST(req: NextRequest) {
         {
           type: "SafetyViolation",
           detail: "Request blocked: Missing jurisdiction or potential safety violation."
-        } satisfies StandardErrorResponse,
+        } as StandardErrorResponse,
         {
           status: 400,
           headers: { 'X-Vercel-Streaming': 'true' }
@@ -430,7 +430,101 @@ CRITICAL: The response must be valid JSON that conforms to the schema with at le
         'X-Content-Type-Options': 'nosniff'
       }
     });
-  } catch (error: any) {
+  } catch (structuredOutputError: any) {
+    // Handle errors in structured output generation, fall back to legacy approach
+    console.error("Error in structured output generation, falling back to legacy approach:", structuredOutputError);
+
+    // Use the legacy approach
+    const prompt = `You are an expert legal research assistant. Analyze the following legal matter in the context of ${jurisdiction} law:
+
+User Input: ${user_input}
+
+Provide a comprehensive legal strategy and analysis. Include:
+- Recommended legal strategy
+- Potential adversarial strategies to consider
+- Step-by-step procedural roadmap with timelines
+- Procedural checks and requirements
+- Local court logistics information
+- Relevant legal citations with proper formatting
+- A sample filing template
+
+${documents && documents.length > 0 ? `Additional context from provided documents: ${documents.join(' ')}\n\n` : ''}
+
+Ensure your response includes proper legal citations in formats like "12 U.S.C. § 345", "Cal. Civ. Code § 1708", or "Rule 12(b)(6)".
+Also include a procedural roadmap with numbered steps, adversarial strategy considerations, and local logistics information.`;
+
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+
+    if (!response) {
+      throw new Error("No response from Gemini model");
+    }
+
+    let rawOutput = response.text();
+    let sources: Source[] = [...researchFindings.sources]; // Start with research sources
+
+    // Extract additional sources from the raw output
+    const urlRegex = /https?:\/\/[^\s'"<>]+/g;
+    const urls = rawOutput.match(urlRegex) || [];
+    const seenUris = new Set<string>();
+
+    // Add research sources to the seen URIs to avoid duplication
+    for (const source of sources) {
+      if (source.uri) {
+        seenUris.add(source.uri);
+      }
+    }
+
+    for (const url of urls) {
+      if (!seenUris.has(url)) {
+        sources.push({ title: "Legal Resource", uri: url });
+        seenUris.add(url);
+      }
+    }
+
+    // Apply validation and formatting
+    let finalText = ResponseValidator.validateAndFix(rawOutput);
+
+    // If documents were provided, extract timeline information and add to the response
+    if (documents && documents.length > 0) {
+      try {
+        const timelineResult = TimelineExtractor.extractTimeline(documents);
+
+        // Add timeline information to the response
+        const timelineSection = `\n\n---\nTIMELINE EXTRACTION:\n${timelineResult.summary}\n\nKey Events:\n${timelineResult.events.map(event =>
+          `- ${event.date}: ${event.event} - ${event.description}`).join('\n')}\n\nKey Dates: ${timelineResult.key_dates.join(', ')}`;
+
+        finalText += timelineSection;
+      } catch (timelineError) {
+        console.error("Error extracting timeline:", timelineError);
+        // If timeline extraction fails, continue with the original response
+      }
+    }
+
+    // Apply self-correction layer to verify citations and improve accuracy
+    const correctedResult = await SelfCorrectionLayer.correctResponse(finalText, sources, jurisdiction);
+
+    // Ensure the hardcoded disclaimer is present if not already added by workflow
+    let resultText = correctedResult.text;
+    if (!resultText.includes(LEGAL_DISCLAIMER)) {
+      resultText = LEGAL_DISCLAIMER + resultText;
+    }
+
+    // Prepare the response
+    const legalResult: LegalResult = {
+      text: resultText,
+      sources: correctedResult.sources
+    };
+
+    // Return the response with Vercel streaming headers
+    return NextResponse.json(legalResult, {
+      headers: {
+        'X-Vercel-Streaming': 'true',
+        'X-Content-Type-Options': 'nosniff'
+      }
+    });
+  }
+} catch (error: any) {
     console.error("Error in analyze API route:", error);
 
     // Handle specific error types
@@ -439,7 +533,7 @@ CRITICAL: The response must be valid JSON that conforms to the schema with at le
         {
           type: "RateLimitError",
           detail: "AI service rate limit exceeded. Please try again in a few minutes."
-        } satisfies StandardErrorResponse,
+        } as StandardErrorResponse,
         {
           status: 429,
           headers: { 'X-Vercel-Streaming': 'true' }
@@ -450,7 +544,7 @@ CRITICAL: The response must be valid JSON that conforms to the schema with at le
         {
           type: "AIClientError",
           detail: error.message || "Invalid request to AI service"
-        } satisfies StandardErrorResponse,
+        } as StandardErrorResponse,
         {
           status: 400,
           headers: { 'X-Vercel-Streaming': 'true' }
@@ -462,7 +556,7 @@ CRITICAL: The response must be valid JSON that conforms to the schema with at le
         {
           type: "InternalServerError",
           detail: "An internal server error occurred"
-        } satisfies StandardErrorResponse,
+        } as StandardErrorResponse,
         {
           status: 500,
           headers: { 'X-Vercel-Streaming': 'true' }

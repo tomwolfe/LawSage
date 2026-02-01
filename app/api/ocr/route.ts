@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
         {
           type: "AuthenticationError",
           detail: "Gemini API Key is missing."
-        } satisfies StandardErrorResponse,
+        } as StandardErrorResponse,
         {
           status: 401,
           headers: { 'X-Vercel-Streaming': 'true' }
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
         {
           type: "ValidationError",
           detail: "Invalid Gemini API Key format."
-        } satisfies StandardErrorResponse,
+        } as StandardErrorResponse,
         {
           status: 400,
           headers: { 'X-Vercel-Streaming': 'true' }
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
         {
           type: "ValidationError",
           detail: "Image data is required."
-        } satisfies StandardErrorResponse,
+        } as StandardErrorResponse,
         {
           status: 400,
           headers: { 'X-Vercel-Streaming': 'true' }
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
         {
           type: "ValidationError",
           detail: "Jurisdiction is required."
-        } satisfies StandardErrorResponse,
+        } as StandardErrorResponse,
         {
           status: 400,
           headers: { 'X-Vercel-Streaming': 'true' }
@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
         {
           type: "ValidationError",
           detail: "Invalid base64 image data."
-        } satisfies StandardErrorResponse,
+        } as StandardErrorResponse,
         { status: 400 }
       );
     }
@@ -180,7 +180,7 @@ export async function POST(req: NextRequest) {
         {
           type: "SafetyViolation",
           detail: "Content extracted from image blocked by safety audit."
-        } satisfies StandardErrorResponse,
+        } as StandardErrorResponse,
         {
           status: 400,
           headers: { 'X-Vercel-Streaming': 'true' }
@@ -210,7 +210,7 @@ export async function POST(req: NextRequest) {
         {
           type: "RateLimitError",
           detail: "AI service rate limit exceeded. Please try again in a few minutes."
-        } satisfies StandardErrorResponse,
+        } as StandardErrorResponse,
         {
           status: 429,
           headers: { 'X-Vercel-Streaming': 'true' }
@@ -221,7 +221,7 @@ export async function POST(req: NextRequest) {
         {
           type: "AIClientError",
           detail: error.message || "Invalid request to AI service"
-        } satisfies StandardErrorResponse,
+        } as StandardErrorResponse,
         {
           status: 400,
           headers: { 'X-Vercel-Streaming': 'true' }
@@ -233,7 +233,7 @@ export async function POST(req: NextRequest) {
         {
           type: "InternalServerError",
           detail: "An internal server error occurred during OCR processing"
-        } satisfies StandardErrorResponse,
+        } as StandardErrorResponse,
         {
           status: 500,
           headers: { 'X-Vercel-Streaming': 'true' }

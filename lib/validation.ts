@@ -175,7 +175,7 @@ export class ResponseValidator {
         return formattedOutput;
       } else {
         // Log validation errors for debugging
-        console.log("Zod validation errors:", validated.error.errors);
+        console.log("Zod validation errors:", validated.error.issues);
       }
     } catch (e) {
       // If JSON parsing fails, fall back to legacy approach
@@ -410,7 +410,7 @@ export class ResponseValidator {
 
       return {
         isValid: validationResult.success,
-        errors: validationResult.success ? null : validationResult.error.errors,
+        errors: validationResult.success ? null : validationResult.error.issues,
         data: validationResult.success ? parsed : null
       };
     } catch (e) {

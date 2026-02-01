@@ -61,6 +61,9 @@ export const LegalAnalysisSchema = z.object({
   )
 });
 
+// Export LegalResponseSchema separately
+export { LegalResponseSchema };
+
 // Search plan schema
 export const SearchPlanSchema = z.object({
   queries: z.array(

@@ -150,7 +150,7 @@ export class LocalRulesService {
       let textResponse = response.text();
 
       // Extract JSON from response
-      const jsonMatch = textResponse.match(/\[.*\]/s);
+      const jsonMatch = textResponse.match(/\[.*\]/);
       let jsonArray = '[]';
 
       if (jsonMatch) {

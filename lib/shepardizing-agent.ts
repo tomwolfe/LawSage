@@ -229,4 +229,5 @@ class ShepardizingAgent {
   }
 }
 
-export { ShepardizingAgent, CitationStatus };
+export { ShepardizingAgent };
+export type { CitationStatus };
