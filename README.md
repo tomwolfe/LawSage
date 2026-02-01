@@ -5,21 +5,27 @@ LawSage is an open-source, AI-powered platform designed to empower individuals r
 
 > **Legal Disclaimer:** I am an AI, not an attorney. This tool provides legal information, not legal advice. Use of this tool does not create an attorney-client relationship.
 
-## Key Advancements (v3.0)
-LawSage has undergone a major transformation! The latest version is now a **comprehensive legal assistant with Virtual Case Folder architecture and adversarial strategy capabilities**. This means:
-*   **Multi-Step Checkpointing:** Persistent serverless state management for complex multi-step legal analysis, allowing for longer and more comprehensive legal reasoning while staying under execution limits.
-*   **Shadow Vector Search:** Scalable hybrid RAG system using a lightweight serverless database (Supabase) to extend the Virtual Case Folder beyond Gemini's context limits, enabling analysis of large document collections.
+## Key Advancements (v3.0): The Vercel-Native Revolution
+
+LawSage has undergone a transformative upgrade! Version 3.0 is now a **fully monolithic, serverless application** running entirely on Vercel's Edge Functions. This eliminates the need for any external backend, drastically simplifying deployment and enhancing security and cost-efficiency.
+
+**Major Architectural Shifts:**
+*   **No External Backend Required:** The entire application, including AI processing, is now powered by Vercel Edge Functions. No need to host or manage a separate FastAPI server.
+*   **Seamless Vercel Deployment:** Deploy the entire application with a single click on Vercel. Simply set your `GEMINI_API_KEY` environment variable.
+*   **Edge Runtime Optimized:** All API routes (`/api/analyze`, `/api/ocr`, `/api/verify-citation`, `/api/checkpoint`, `/api/health`) are configured for Vercel's Edge Runtime for optimal performance and cost efficiency within the Hobby Tier.
+*   **Client-Side Rate Limiting:** Built-in client-side rate limiting ensures compliance with Vercel's free tier limits.
+
+**Enhanced Core Capabilities:**
+*   **Multi-Step Checkpointing:** Persistent serverless state management for complex, multi-step legal analysis, allowing for longer and more comprehensive reasoning while staying under execution limits.
+*   **Shadow Vector Search:** Scalable hybrid RAG system using Supabase to extend the Virtual Case Folder beyond Gemini's context limits, enabling analysis of large document collections.
 *   **Advanced Shepardizing Agent:** Automated citation verification system that checks each legal citation for subsequent negative treatment (overruled/distinguished) via Gemini Search, ensuring only current "good law" is relied upon.
 *   **Jurisdictional Style Presets:** Professional court-standard formatting for the top 10 US jurisdictions (NY, CA, TX, FL, IL, PA, OH, GA, NC, MI) with CSS/Markdown rules for proper margins and line spacing in exports.
 *   **Virtual Case Folder Architecture:** Leverages Gemini 2.5 Flash's long context to analyze multiple documents simultaneously, enhanced with vector search capabilities for larger document sets.
 *   **Adversarial Strategy Component:** Automatically generates opposition arguments and 'red-teams' your case to identify potential weaknesses and counterarguments.
 *   **Procedural Grounding Enhancement:** Retrieves and validates Local Rules of Court (county/district level) in addition to general statutes for comprehensive procedural compliance.
 *   **Pro Se Survival Guide UI:** Displays hyper-local logistical data (courthouse addresses, filing fees, and dress codes) fetched via real-time search in a dedicated tab.
-*   **No External Backend Required:** The entire application, including the AI processing, runs within Vercel's Edge Functions. No need to host a separate FastAPI server.
 *   **Multimodal OCR:** Upload images of legal documents (summonses, notices, complaints) for AI-powered text extraction and analysis.
 *   **Professional Court Templates:** Generate filings with built-in, court-standard formatting and caption templates ready for PDF export.
-*   **Simplified Deployment:** Deploy the entire application with a single click on Vercel.
-*   **Citation Verification:** Real-time verification of legal citations against 'good law' using Gemini Web Search tool.
 *   **Export to Word:** Direct export functionality to generate professional .docx documents compatible with legal workflows (Clio/Word).
 *   **Interactive Next Steps Checklist:** Proactive procedural timeline that maps out actionable steps with due dates and status tracking.
 *   **Vercel Hobby Tier Optimized:** Client-side rate limiting and edge runtime optimization to stay within free tier limits.
@@ -70,14 +76,15 @@ LawSage is built on a modern, performant full-stack architecture:
 
 ### Installation
 1.  **Clone the Repository**
-```bash
-git clone https://github.com/tomwolfe/lawsage.git
-cd lawsage
-```
+    ```bash
+    git clone https://github.com/tomwolfe/lawsage.git
+    cd lawsage
+    ```
+
 2.  **Install Frontend Dependencies**
-```bash
-npm install
-```
+    ```bash
+    npm install
+    ```
 
 ### Running the Application Locally
 Start the Next.js development server:
@@ -121,7 +128,7 @@ The easiest and recommended way to deploy LawSage is on **Vercel**. The entire a
 1.  Push your code to a public GitHub repository.
 2.  Go to [https://vercel.com/new](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme).
 3.  Import your repository.
-4.  **Important:** Set the `GEMINI_API_KEY` environment variable in your Vercel project settings.
+4.  **CRITICAL:** Set the `GEMINI_API_KEY` environment variable in your Vercel project settings.
     *   Go to your Vercel project's **Settings** > **Environment Variables**.
     *   Add a new variable named `GEMINI_API_KEY` and paste your API key as the value.
 5.  Click "Deploy". Your application will be live!
@@ -133,7 +140,6 @@ The application includes several API routes optimized for Vercel Edge Functions:
 *   **/api/health:** Health check endpoint.
 *   **/api/verify-citation:** Real-time citation verification endpoint using Gemini Web Search.
 *   **/api/checkpoint:** Multi-step state persistence endpoint for complex legal analysis workflows.
-
 All API routes are configured to run on Vercel's Edge Runtime for optimal performance and cost efficiency within Hobby Tier limits.
 
 ## AI Safety & Structure
@@ -149,8 +155,8 @@ LawSage employs a multi-layered Reliability Layer to ensure that AI-generated co
     *   **Adversarial Strategy Validation:** Ensures the presence of opposition arguments and 'red-team' analysis of the user's case.
     *   **Procedural Checks Validation:** Verifies inclusion of local court rule compliance checks.
     *   **Logistics Data Validation:** Ensures hyper-local courthouse information is included in responses.
-    *   **Mandatory Disclaimers:** Every response is prepended with a legal disclaimer to clearly distinguish legal information from legal advice.
-    *   **Structural Hardening:** A custom validator enforces a strict delimiter system ('---') to separate legal strategy from filing templates.
+*   **Mandatory Disclaimers:** Every response is prepended with a legal disclaimer to clearly distinguish legal information from legal advice.
+*   **Structural Hardening:** A custom validator enforces a strict delimiter system ('---') to separate legal strategy from filing templates.
 *   **Multi-Step Analysis:** Serverless checkpointing enables complex multi-step legal reasoning while staying under execution limits.
 *   **Scalable Context:** Shadow vector search extends the Virtual Case Folder beyond Gemini's context limits using lightweight serverless databases.
 *   **Retry Mechanism:** Built-in exponential backoff for AI service rate limits ensures high availability.
