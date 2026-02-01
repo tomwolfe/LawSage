@@ -13,38 +13,32 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 SYSTEM_INSTRUCTION = """
 You are a legal assistant helping pro se litigants (people representing themselves).
-Provide your response in a structured JSON format that includes all required fields.
+Even though you cannot return structured JSON when using tools, you must format your response to include ALL required elements clearly separated by the '---' delimiter.
 
-Your response must be a valid JSON object matching the LegalOutput schema with these exact fields:
-{
-  "disclaimer": "string",
-  "strategy": "string",
-  "roadmap": [
-    {
-      "step": "integer",
-      "title": "string",
-      "description": "string",
-      "estimated_time": "string (optional)",
-      "required_documents": ["string (optional)"]
-    }
-  ],
-  "filing_template": "string",
-  "citations": [
-    {
-      "text": "string",
-      "source": "string (optional)",
-      "url": "string (optional)"
-    }
-  ],
-  "sources": ["string"]
-}
-
-Your response must include:
-- A legal disclaimer
+Your response MUST include:
+- A legal disclaimer at the beginning
 - A strategy section with legal analysis
-- A roadmap with step-by-step procedural instructions
+- A roadmap with step-by-step procedural instructions (clearly labeled as "ROADMAP:" or "NEXT STEPS:")
 - A filing template section with actual legal documents
-- At least 3 proper legal citations supporting your recommendations
+- At least 3 proper legal citations supporting your recommendations (these should be clearly identifiable, e.g., "12 U.S.C. § 345", "Cal. Civ. Code § 1708", "Rule 12(b)(6)")
+
+Format your response as follows:
+LEGAL DISCLAIMER: [Your disclaimer here]
+
+STRATEGY:
+[Your legal strategy and analysis here]
+
+ROADMAP:
+1. [First step with title and description]
+2. [Second step with title and description]
+3. [Third step with title and description]
+
+CITATIONS:
+- [At least 3 legal citations with sources]
+
+---
+FILING TEMPLATE:
+[Actual legal filing template here]
 
 LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se.
 This is legal information, not legal advice. Always consult with a qualified attorney.
@@ -109,13 +103,15 @@ User Situation: {request.user_input}
 Jurisdiction: {request.jurisdiction}
 
 Act as a Universal Public Defender.
-Generate a structured legal response with the following fields:
-- disclaimer: Include the mandatory legal disclaimer
-- strategy: Legal strategy and analysis for the user's situation
-- roadmap: Step-by-step procedural roadmap with numbered steps
-- filing_template: Template for legal filings that can be used in court
-- citations: Legal citations supporting the strategy and filings
-- sources: Additional sources referenced in the response
+Generate a comprehensive legal response that MUST include:
+1. A clear legal disclaimer at the beginning
+2. Legal strategy and analysis for the user's situation
+3. A numbered procedural roadmap with specific steps (labeled as "ROADMAP:")
+4. A filing template section with actual legal document text
+5. At least 3 specific legal citations (e.g., "12 U.S.C. § 345", "Cal. Civ. Code § 1708", "Rule 12(b)(6)") in a "CITATIONS:" section
+6. Use the '---' delimiter to separate the strategy/advice section from the filing template
+
+CRITICAL: Your response must contain at least 3 legal citations and a procedural roadmap with numbered steps.
 """
 
         try:
@@ -149,63 +145,14 @@ Generate a structured legal response with the following fields:
             )
 
         if candidate.content and candidate.content.parts:
-            # Extract the structured output
+            # Since we can't use structured output with tools, we get raw text
+            # The AI should format this text according to our instructions
             for part in candidate.content.parts:
                 if part.text and not part.thought:
-                    # Since we can't use structured output with tools,
-                    # we need to extract the JSON from the response text
-
-                    # Look for JSON within the response text
-                    # The model should still return JSON within the text even without structured output
-                    json_match = re.search(r'\{[\s\S]*\}', part.text)
-
-                    if json_match:
-                        json_str = json_match.group()
-                        original_json_str = json_str  # Save the original JSON string
-                        try:
-                            parsed_output = LegalOutput.model_validate_json(json_str)
-                            # Combine all sections into a single text output
-                            text_output = (
-                                f"{parsed_output.disclaimer}\n\n"
-                                f"STRATEGY:\n{parsed_output.strategy}\n\n"
-                                f"ROADMAP:\n"
-                            )
-
-                            # Format roadmap items
-                            for item in parsed_output.roadmap:
-                                text_output += f"{item.step}. {item.title}: {item.description}\n"
-                                if item.estimated_time:
-                                    text_output += f"   Estimated Time: {item.estimated_time}\n"
-                                if item.required_documents:
-                                    text_output += f"   Required Documents: {', '.join(item.required_documents)}\n"
-
-                            text_output += f"\nFILING TEMPLATE:\n{parsed_output.filing_template}\n\n"
-                            text_output += "CITATIONS:\n"
-                            for citation in parsed_output.citations:
-                                text_output += f"- {citation.text}"
-                                if citation.source:
-                                    text_output += f" ({citation.source})"
-                                if citation.url:
-                                    text_output += f" {citation.url}"
-                                text_output += "\n"
-
-                            # Add sources
-                            if parsed_output.sources:
-                                text_output += "\nSOURCES:\n"
-                                for source in parsed_output.sources:
-                                    text_output += f"- {source}\n"
-
-                        except json.JSONDecodeError:
-                            # Fallback if parsing fails
-                            text_output = part.text
-                            original_json_str = ""  # Clear the JSON string if parsing fails
-                        except Exception:
-                            # Fallback if validation fails
-                            text_output = part.text
-                            original_json_str = ""  # Clear the JSON string if validation fails
-                    else:
-                        # Fallback if no JSON found in response
-                        text_output = part.text
+                    text_output = part.text
+                    # Since we can't get structured JSON when using tools,
+                    # original_json_str remains empty
+                    original_json_str = ""  # Will remain empty since tools don't support structured output
 
         # Extract sources
         seen_uris = set()
@@ -239,20 +186,9 @@ Generate a structured legal response with the following fields:
             pass
 
         # Reliability Check (Citations and Roadmap)
-        # First try to validate using the original JSON if available, otherwise use text validation
-        is_valid = False
-        if original_json_str:
-            try:
-                # Validate the original JSON structure directly
-                parsed_output = LegalOutput.model_validate_json(original_json_str)
-                # Check that we have at least 3 citations and at least one roadmap item
-                is_valid = len(parsed_output.citations) >= 3 and len(parsed_output.roadmap) > 0
-            except (json.JSONDecodeError, Exception):
-                # If JSON validation fails, fall back to text validation
-                is_valid = ResponseValidator.validate_legal_output(text)
-        else:
-            # If no original JSON is available, use text validation
-            is_valid = ResponseValidator.validate_legal_output(text)
+        # When using tools (like Google Search), Gemini cannot return structured JSON
+        # So we need to rely on text validation for citations and roadmap
+        is_valid = ResponseValidator.validate_legal_output(text)
 
         if not is_valid:
             raise AppException(
