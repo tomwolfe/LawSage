@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 import { SafetyValidator, ResponseValidator, Source } from '../../../lib/validation';
+import { ContractValidator } from '../../../src/lib/reliability/ContractValidator';
 
 // Mandatory safety disclosure hardcoded for the response stream
 const LEGAL_DISCLAIMER = (
@@ -397,6 +398,77 @@ CRITICAL: Your response must be valid JSON with all required fields. Include at 
 
           formattedOutput += "---\n\nFILING TEMPLATE:\n";
           formattedOutput += parsedOutput.filing_template;
+
+          // Apply Mission Contract validation - enforce closed-loop control
+          try {
+            // First validate against the contract
+            const contractValidation = ContractValidator.validate(JSON.stringify(parsedOutput));
+
+            if (!contractValidation.isValid) {
+              console.error("Contract validation failed:", contractValidation.errors);
+
+              // Attempt to fix the output according to the contract
+              const fixedOutput = ContractValidator.validateAndFix(JSON.stringify(parsedOutput));
+
+              // Reformat the fixed output as text for compatibility with existing frontend
+              formattedOutput = `${fixedOutput.disclaimer}\n\n`;
+              formattedOutput += `STRATEGY:\n${fixedOutput.strategy}\n\n`;
+
+              if (fixedOutput.adversarial_strategy) {
+                formattedOutput += `ADVERSARIAL STRATEGY:\n${fixedOutput.adversarial_strategy}\n\n`;
+              }
+
+              if (fixedOutput.procedural_roadmap && Array.isArray(fixedOutput.procedural_roadmap)) {
+                formattedOutput += "PROCEDURAL ROADMAP:\n";
+                for (const item of fixedOutput.procedural_roadmap) {
+                  formattedOutput += `\n${item.step}. ${item.title}\n`;
+                  formattedOutput += `   Description: ${item.description}\n`;
+                  if (item.estimated_time) {
+                    formattedOutput += `   Estimated Time: ${item.estimated_time}\n`;
+                  }
+                  if (item.required_documents && Array.isArray(item.required_documents) && item.required_documents.length > 0) {
+                    formattedOutput += `   Required Documents: ${item.required_documents.join(', ')}\n`;
+                  }
+                  formattedOutput += `   Status: ${item.status}\n`;
+                }
+                formattedOutput += "\n";
+              }
+
+              if (fixedOutput.procedural_checks && Array.isArray(fixedOutput.procedural_checks) && fixedOutput.procedural_checks.length > 0) {
+                formattedOutput += "PROCEDURAL CHECKS:\n";
+                for (const check of fixedOutput.procedural_checks) {
+                  formattedOutput += `- ${check}\n`;
+                }
+                formattedOutput += "\n";
+              }
+
+              if (fixedOutput.citations && Array.isArray(fixedOutput.citations)) {
+                formattedOutput += "CITATIONS:\n";
+                for (const citation of fixedOutput.citations) {
+                  formattedOutput += `- ${citation.text}`;
+                  if (citation.source) {
+                    formattedOutput += ` (${citation.source})`;
+                  }
+                  if (citation.url) {
+                    formattedOutput += ` ${citation.url}`;
+                  }
+                  formattedOutput += "\n";
+                }
+                formattedOutput += "\n";
+              }
+
+              if (fixedOutput.local_logistics) {
+                formattedOutput += "---\n\nLOCAL LOGISTICS:\n";
+                formattedOutput += JSON.stringify(fixedOutput.local_logistics, null, 2) + "\n\n";
+              }
+
+              formattedOutput += "---\n\nFILING TEMPLATE:\n";
+              formattedOutput += fixedOutput.filing_template;
+            }
+          } catch (contractError) {
+            console.error("Contract validation error (continuing with original output):", contractError);
+            // Continue with original output if contract validation fails critically
+          }
 
           // Apply validation and formatting
           const finalText = ResponseValidator.validateAndFix(formattedOutput);
