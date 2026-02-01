@@ -28,6 +28,7 @@ Format your response clearly with sections for extracted facts, important dates,
 `;
 
 export const runtime = 'edge'; // Enable edge runtime
+export const maxDuration = 60; // Enforce 60-second execution cap for Vercel Hobby Tier 2026 compliance
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,7 +41,10 @@ export async function POST(req: NextRequest) {
           type: "AuthenticationError",
           detail: "Gemini API Key is missing."
         } satisfies StandardErrorResponse,
-        { status: 401 }
+        {
+          status: 401,
+          headers: { 'X-Vercel-Streaming': 'true' }
+        }
       );
     }
 
@@ -51,7 +55,10 @@ export async function POST(req: NextRequest) {
           type: "ValidationError",
           detail: "Invalid Gemini API Key format."
         } satisfies StandardErrorResponse,
-        { status: 400 }
+        {
+          status: 400,
+          headers: { 'X-Vercel-Streaming': 'true' }
+        }
       );
     }
 
@@ -65,7 +72,10 @@ export async function POST(req: NextRequest) {
           type: "ValidationError",
           detail: "Image data is required."
         } satisfies StandardErrorResponse,
-        { status: 400 }
+        {
+          status: 400,
+          headers: { 'X-Vercel-Streaming': 'true' }
+        }
       );
     }
 
@@ -75,7 +85,10 @@ export async function POST(req: NextRequest) {
           type: "ValidationError",
           detail: "Jurisdiction is required."
         } satisfies StandardErrorResponse,
-        { status: 400 }
+        {
+          status: 400,
+          headers: { 'X-Vercel-Streaming': 'true' }
+        }
       );
     }
 
@@ -168,7 +181,10 @@ export async function POST(req: NextRequest) {
           type: "SafetyViolation",
           detail: "Content extracted from image blocked by safety audit."
         } satisfies StandardErrorResponse,
-        { status: 400 }
+        {
+          status: 400,
+          headers: { 'X-Vercel-Streaming': 'true' }
+        }
       );
     }
 
@@ -178,8 +194,13 @@ export async function POST(req: NextRequest) {
       sources: sources
     };
 
-    // Return the response
-    return NextResponse.json(ocrResult);
+    // Return the response with Vercel streaming headers
+    return NextResponse.json(ocrResult, {
+      headers: {
+        'X-Vercel-Streaming': 'true',
+        'X-Content-Type-Options': 'nosniff'
+      }
+    });
   } catch (error: any) {
     console.error("Error in OCR API route:", error);
 
@@ -190,7 +211,10 @@ export async function POST(req: NextRequest) {
           type: "RateLimitError",
           detail: "AI service rate limit exceeded. Please try again in a few minutes."
         } satisfies StandardErrorResponse,
-        { status: 429 }
+        {
+          status: 429,
+          headers: { 'X-Vercel-Streaming': 'true' }
+        }
       );
     } else if (error.message?.includes("400") || error.message?.includes("invalid")) {
       return NextResponse.json(
@@ -198,7 +222,10 @@ export async function POST(req: NextRequest) {
           type: "AIClientError",
           detail: error.message || "Invalid request to AI service"
         } satisfies StandardErrorResponse,
-        { status: 400 }
+        {
+          status: 400,
+          headers: { 'X-Vercel-Streaming': 'true' }
+        }
       );
     } else {
       // Don't expose internal error details to prevent API key leakage
@@ -207,7 +234,10 @@ export async function POST(req: NextRequest) {
           type: "InternalServerError",
           detail: "An internal server error occurred during OCR processing"
         } satisfies StandardErrorResponse,
-        { status: 500 }
+        {
+          status: 500,
+          headers: { 'X-Vercel-Streaming': 'true' }
+        }
       );
     }
   }

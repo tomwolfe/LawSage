@@ -6,6 +6,8 @@ import { twMerge } from 'tailwind-merge';
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import AIContentChecklist from './AIContentChecklist';
+import VerificationChecklist from './VerificationChecklist';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -672,6 +674,10 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                     </ul>
                   </div>
                 )}
+
+                <AIContentChecklist jurisdiction={jurisdiction} />
+
+                <VerificationChecklist jurisdiction={jurisdiction} />
               </div>
             );
           }

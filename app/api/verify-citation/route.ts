@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 
 // Enable Edge Runtime
 export const runtime = 'edge';
+export const maxDuration = 60; // Enforce 60-second execution cap for Vercel Hobby Tier 2026 compliance
 
 interface CitationVerificationRequest {
   citation: string;
@@ -22,7 +23,13 @@ export async function POST(req: NextRequest) {
     if (req.method !== 'POST') {
       return new Response(
         JSON.stringify({ error: 'Method not allowed' }),
-        { status: 405, headers: { 'Content-Type': 'application/json' } }
+        {
+          status: 405,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Vercel-Streaming': 'true'
+          }
+        }
       );
     }
 
@@ -34,7 +41,13 @@ export async function POST(req: NextRequest) {
     if (!citation || !jurisdiction) {
       return new Response(
         JSON.stringify({ error: 'Missing citation or jurisdiction' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        {
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Vercel-Streaming': 'true'
+          }
+        }
       );
     }
 
@@ -43,7 +56,13 @@ export async function POST(req: NextRequest) {
     if (!apiKey) {
       return new Response(
         JSON.stringify({ error: 'Server configuration error: API key missing' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
+        {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Vercel-Streaming': 'true'
+          }
+        }
       );
     }
 
@@ -132,20 +151,29 @@ export async function POST(req: NextRequest) {
       };
     }
 
-    // Return the verification result
+    // Return the verification result with Vercel streaming headers
     return new Response(JSON.stringify(verificationResult), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Vercel-Streaming': 'true'
+      },
     });
   } catch (error: any) {
     console.error('Error verifying citation:', error);
     
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: 'Failed to verify citation',
         details: error.message || 'Unknown error occurred'
       }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Vercel-Streaming': 'true'
+        }
+      }
     );
   }
 }

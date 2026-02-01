@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 import { SafetyValidator, ResponseValidator, Source } from '../../../lib/validation';
+import { SelfCorrectionLayer } from '../../../lib/self-correction';
+import { TimelineExtractor } from '../../../lib/timeline-extractor';
 
 // Mandatory safety disclosure hardcoded for the response stream
 const LEGAL_DISCLAIMER = (
@@ -91,6 +93,7 @@ This is legal information, not legal advice. Always consult with a qualified att
 `;
 
 export const runtime = 'edge'; // Enable edge runtime
+export const maxDuration = 60; // Enforce 60-second execution cap for Vercel Hobby Tier 2026 compliance
 
 export async function POST(req: NextRequest) {
   try {
@@ -103,7 +106,10 @@ export async function POST(req: NextRequest) {
           type: "AuthenticationError",
           detail: "Gemini API Key is missing."
         } satisfies StandardErrorResponse,
-        { status: 401 }
+        {
+          status: 401,
+          headers: { 'X-Vercel-Streaming': 'true' }
+        }
       );
     }
 
@@ -114,7 +120,10 @@ export async function POST(req: NextRequest) {
           type: "ValidationError",
           detail: "Invalid Gemini API Key format."
         } satisfies StandardErrorResponse,
-        { status: 400 }
+        {
+          status: 400,
+          headers: { 'X-Vercel-Streaming': 'true' }
+        }
       );
     }
 
@@ -128,7 +137,10 @@ export async function POST(req: NextRequest) {
           type: "ValidationError",
           detail: "User input is required."
         } satisfies StandardErrorResponse,
-        { status: 400 }
+        {
+          status: 400,
+          headers: { 'X-Vercel-Streaming': 'true' }
+        }
       );
     }
 
@@ -138,7 +150,10 @@ export async function POST(req: NextRequest) {
           type: "ValidationError",
           detail: "Jurisdiction is required."
         } satisfies StandardErrorResponse,
-        { status: 400 }
+        {
+          status: 400,
+          headers: { 'X-Vercel-Streaming': 'true' }
+        }
       );
     }
 
@@ -149,7 +164,10 @@ export async function POST(req: NextRequest) {
           type: "SafetyViolation",
           detail: "Request blocked: Missing jurisdiction or potential safety violation."
         } satisfies StandardErrorResponse,
-        { status: 400 }
+        {
+          status: 400,
+          headers: { 'X-Vercel-Streaming': 'true' }
+        }
       );
     }
 
@@ -204,6 +222,9 @@ STRATEGY:
 ADVERSARIAL STRATEGY:
 [Opposition arguments and 'red-team' analysis of the user's case]
 
+TIMELINE EXTRACTION:
+[Chronological timeline of key events from the provided documents with dates and descriptions]
+
 ROADMAP:
 1. [First step with title and description]
 2. [Second step with title and description]
@@ -232,7 +253,7 @@ LOCAL LOGISTICS:
 FILING TEMPLATE:
 [Actual legal filing template with specific forms and procedures for ${jurisdiction}]
 
-CRITICAL: Your response must contain the EXACT format above with at least 3 legal citations in the specified formats, a numbered procedural roadmap, adversarial strategy, procedural checks, and local logistics JSON.
+CRITICAL: Your response must contain the EXACT format above with at least 3 legal citations in the specified formats, a numbered procedural roadmap, adversarial strategy, procedural checks, timeline extraction from provided documents, and local logistics JSON.
 `;
 
     // Generate content using the model
@@ -261,10 +282,29 @@ CRITICAL: Your response must contain the EXACT format above with at least 3 lega
     }
 
     // Apply validation and formatting
-    const finalText = ResponseValidator.validateAndFix(textOutput);
+    let finalText = ResponseValidator.validateAndFix(textOutput);
+
+    // If documents were provided, extract timeline information and add to the response
+    if (documents && documents.length > 0) {
+      try {
+        const timelineResult = TimelineExtractor.extractTimeline(documents);
+
+        // Add timeline information to the response
+        const timelineSection = `\n\n---\nTIMELINE EXTRACTION:\n${timelineResult.summary}\n\nKey Events:\n${timelineResult.events.map(event =>
+          `- ${event.date}: ${event.event} - ${event.description}`).join('\n')}\n\nKey Dates: ${timelineResult.key_dates.join(', ')}`;
+
+        finalText += timelineSection;
+      } catch (timelineError) {
+        console.error("Error extracting timeline:", timelineError);
+        // If timeline extraction fails, continue with the original response
+      }
+    }
+
+    // Apply self-correction layer to verify citations and improve accuracy
+    const correctedResult = await SelfCorrectionLayer.correctResponse(finalText, sources, jurisdiction);
 
     // Ensure the hardcoded disclaimer is present if not already added by workflow
-    let resultText = finalText;
+    let resultText = correctedResult.text;
     if (!resultText.includes(LEGAL_DISCLAIMER)) {
       resultText = LEGAL_DISCLAIMER + resultText;
     }
@@ -272,11 +312,16 @@ CRITICAL: Your response must contain the EXACT format above with at least 3 lega
     // Prepare the response
     const legalResult: LegalResult = {
       text: resultText,
-      sources: sources
+      sources: correctedResult.sources
     };
 
-    // Return the response
-    return NextResponse.json(legalResult);
+    // Return the response with Vercel streaming headers
+    return NextResponse.json(legalResult, {
+      headers: {
+        'X-Vercel-Streaming': 'true',
+        'X-Content-Type-Options': 'nosniff'
+      }
+    });
   } catch (error: any) {
     console.error("Error in analyze API route:", error);
 
@@ -287,7 +332,10 @@ CRITICAL: Your response must contain the EXACT format above with at least 3 lega
           type: "RateLimitError",
           detail: "AI service rate limit exceeded. Please try again in a few minutes."
         } satisfies StandardErrorResponse,
-        { status: 429 }
+        {
+          status: 429,
+          headers: { 'X-Vercel-Streaming': 'true' }
+        }
       );
     } else if (error.message?.includes("400") || error.message?.includes("invalid")) {
       return NextResponse.json(
@@ -295,7 +343,10 @@ CRITICAL: Your response must contain the EXACT format above with at least 3 lega
           type: "AIClientError",
           detail: error.message || "Invalid request to AI service"
         } satisfies StandardErrorResponse,
-        { status: 400 }
+        {
+          status: 400,
+          headers: { 'X-Vercel-Streaming': 'true' }
+        }
       );
     } else {
       // Don't expose internal error details to prevent API key leakage
@@ -304,26 +355,32 @@ CRITICAL: Your response must contain the EXACT format above with at least 3 lega
           type: "InternalServerError",
           detail: "An internal server error occurred"
         } satisfies StandardErrorResponse,
-        { status: 500 }
+        {
+          status: 500,
+          headers: { 'X-Vercel-Streaming': 'true' }
+        }
       );
     }
   }
 }
 
 export async function GET(req: NextRequest) {
-  // Health check endpoint
+  // Health check endpoint with Vercel streaming headers
   return NextResponse.json({
     status: "ok",
     message: "LawSage API is running"
+  }, {
+    headers: { 'X-Vercel-Streaming': 'true' }
   });
 }
 
 export async function HEAD(req: NextRequest) {
-  // Health check endpoint for HEAD requests
+  // Health check endpoint for HEAD requests with Vercel streaming headers
   return new NextResponse(null, {
     status: 200,
     headers: {
       'Content-Type': 'application/json',
+      'X-Vercel-Streaming': 'true'
     }
   });
 }
