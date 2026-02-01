@@ -168,28 +168,100 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
     URL.revokeObjectURL(url);
   };
 
-  // Function to download filings as PDF
+  // Function to download filings as PDF with court-standard formatting
   const downloadFilingsAsPDF = async () => {
     if (!result) return;
     const { filings } = parseLegalOutput(result.text);
 
-    // Create a temporary HTML document for PDF conversion
+    // Create a temporary HTML document for PDF conversion with court-standard formatting
     const htmlContent = `
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="UTF-8">
-          <title>Legal Filing Template - ${jurisdiction}</title>
+          <title>Court Filing - ${jurisdiction}</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
-            h1, h2, h3 { color: #333; }
-            .disclaimer { background-color: #f0f0f0; padding: 15px; border-left: 4px solid #ccc; margin: 20px 0; }
+            @page {
+              margin: 1in;
+            }
+            body {
+              font-family: "Times New Roman", Times, serif;
+              font-size: 14pt;
+              line-height: 1.6;
+              margin: 1in;
+              counter-reset: page;
+            }
+            .court-caption {
+              text-align: center;
+              margin-bottom: 1.5em;
+              border-bottom: 2px solid black;
+              padding-bottom: 10px;
+            }
+            .case-number {
+              font-weight: bold;
+              margin-top: 1em;
+            }
+            .parties {
+              margin: 1em 0;
+            }
+            .document-title {
+              text-align: center;
+              font-size: 16pt;
+              font-weight: bold;
+              margin: 1.5em 0;
+            }
+            h1, h2, h3 {
+              font-family: "Times New Roman", Times, serif;
+              margin: 1em 0 0.5em 0;
+            }
+            p {
+              margin: 0.8em 0;
+              text-align: justify;
+            }
+            .signature-block {
+              margin-top: 3em;
+              text-align: right;
+            }
+            .page-number::after {
+              content: counter(page);
+            }
+            .footer {
+              position: fixed;
+              bottom: 0;
+              width: 100%;
+              text-align: center;
+              font-size: 12pt;
+            }
           </style>
         </head>
         <body>
-          <h1>Legal Filing Template</h1>
-          <p><strong>Jurisdiction:</strong> ${jurisdiction}</p>
+          <div class="court-caption">
+            <div class="court-name"><strong>${jurisdiction.toUpperCase()} SUPERIOR COURT</strong></div>
+            <div class="county-address">COUNTY, STATE</div>
+            <div class="case-number">CASE NO: ________________________</div>
+            <div class="parties">
+              <div class="plaintiff">PLAINTIFF,</div>
+              <div class="v-line">v.</div>
+              <div class="defendant">DEFENDANT.</div>
+            </div>
+          </div>
+
+          <div class="document-title">MOTION FOR ________________________</div>
+
           <div class="content">${filings.replace(/\n/g, '<br>')}</div>
+
+          <div class="signature-block">
+            <div>___________________________</div>
+            <div>Attorney for Plaintiff/Defendant</div>
+            <div>Attorney Bar No. _______________</div>
+            <div>Firm Name</div>
+            <div>Address Line 1</div>
+            <div>Address Line 2</div>
+          </div>
+
+          <div class="footer">
+            <div>Page <span class="page-number"></span></div>
+          </div>
         </body>
       </html>
     `;

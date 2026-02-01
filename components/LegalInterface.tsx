@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Mic, Send, Loader2, AlertCircle, Clock, Trash2 } from 'lucide-react';
+import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Upload, FileText } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ResultDisplay from './ResultDisplay';
@@ -67,6 +67,8 @@ export default function LegalInterface() {
   const [history, setHistory] = useState<CaseHistoryItem[]>([]);
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<string | null>(null);
   const [backendUnreachable, setBackendUnreachable] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
     const checkHealth = async (retries = 3, delay = 1000) => {
@@ -125,13 +127,115 @@ export default function LegalInterface() {
     recognition.onstart = () => setIsListening(true);
     recognition.onend = () => setIsListening(false);
     recognition.onerror = () => setIsListening(false);
-    
+
     recognition.onresult = (event: { results: { [key: number]: { [key: number]: { transcript: string } } } }) => {
       const transcript = event.results[0][0].transcript;
       setUserInput(prev => prev + (prev ? ' ' : '') + transcript);
     };
 
     recognition.start();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setError('Please select an image file (JPEG, PNG, etc.)');
+        return;
+      }
+
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        setError('File size exceeds 10MB limit');
+        return;
+      }
+
+      setSelectedFile(file);
+
+      // Create preview URL
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+
+      // Clear any previous errors
+      setError('');
+    }
+  };
+
+  const handleUploadClick = () => {
+    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+    fileInput?.click();
+  };
+
+  const handleOCRSubmit = async () => {
+    if (!selectedFile) {
+      setError('Please select an image file first');
+      return;
+    }
+
+    const apiKey = localStorage.getItem('GEMINI_API_KEY');
+    if (!apiKey) {
+      setError('Please set your Gemini API Key in Settings first.');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const base64Image = e.target?.result as string;
+
+        const response = await fetch('/api/ocr', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Gemini-API-Key': apiKey,
+          },
+          body: JSON.stringify({
+            image: base64Image,
+            jurisdiction
+          }),
+        });
+
+        if (!response.ok) {
+          if (response.status === 429) {
+            setError('Rate limit exceeded. Please check your API quota or try again later.');
+            return;
+          } else if (response.status === 401) {
+            setError('Invalid API key. Please update your key in Settings.');
+            return;
+          } else {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Failed to process image');
+          }
+        }
+
+        const data: LegalResult = await response.json();
+        setResult(data);
+        setActiveTab('strategy');
+
+        // Add to history
+        const newHistoryItem: CaseHistoryItem = {
+          id: Date.now().toString(),
+          timestamp: new Date(),
+          jurisdiction,
+          userInput: `OCR Analysis of: ${selectedFile.name}`,
+          result: data
+        };
+
+        const updatedHistory = [newHistoryItem, ...history];
+        setHistory(updatedHistory);
+        localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'An unknown error occurred during OCR processing');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    reader.readAsDataURL(selectedFile);
   };
 
   const handleSubmit = async () => {
@@ -141,8 +245,8 @@ export default function LegalInterface() {
       setError('Please set your Gemini API Key in Settings first.');
       return;
     }
-    if (!userInput.trim()) {
-      setError('Please describe your legal situation.');
+    if (!userInput.trim() && !selectedFile) {
+      setError('Please describe your legal situation or upload an image.');
       return;
     }
 
@@ -151,60 +255,132 @@ export default function LegalInterface() {
     const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
 
     try {
-      const response = await fetch('/api/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Gemini-API-Key': apiKey,
-        },
-        body: JSON.stringify({ user_input: userInput, jurisdiction }),
-        signal: controller.signal,
-      });
+      if (selectedFile) {
+        // Process uploaded image with OCR
+        const reader = new FileReader();
 
-      clearTimeout(timeoutId);
+        // Create a promise to handle the FileReader asynchronously
+        const fileReaderPromise = new Promise<LegalResult>((resolve, reject) => {
+          reader.onload = async (e) => {
+            try {
+              const base64Image = e.target?.result as string;
 
-      const contentType = response.headers.get('content-type');
-      if (!response.ok) {
-        if (response.status === 429) {
-          setError('Rate limit exceeded. Please check your API quota or try again later.');
-          return;
-        } else if (response.status === 401) {
-          setError('Invalid API key. Please update your key in Settings.');
-          return;
-        } else {
-          let errorMessage = 'Failed to generate response';
-          if (contentType && contentType.includes('application/json')) {
-            const errData = await response.json();
-            errorMessage = errData.detail || errorMessage;
+              const response = await fetch('/api/ocr', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-Gemini-API-Key': apiKey,
+                },
+                body: JSON.stringify({
+                  image: base64Image,
+                  jurisdiction
+                }),
+              });
+
+              if (!response.ok) {
+                if (response.status === 429) {
+                  setError('Rate limit exceeded. Please check your API quota or try again later.');
+                  reject(new Error('Rate limit exceeded'));
+                  return;
+                } else if (response.status === 401) {
+                  setError('Invalid API key. Please update your key in Settings.');
+                  reject(new Error('Invalid API key'));
+                  return;
+                } else {
+                  const errorData = await response.json();
+                  throw new Error(errorData.detail || 'Failed to process image');
+                }
+              }
+
+              const data: LegalResult = await response.json();
+              resolve(data);
+            } catch (err) {
+              reject(err);
+            }
+          };
+
+          reader.onerror = () => {
+            reject(new Error('Failed to read file'));
+          };
+        });
+
+        reader.readAsDataURL(selectedFile);
+
+        // Wait for the FileReader to complete and get the result
+        const ocrResult = await fileReaderPromise;
+
+        setResult(ocrResult);
+        setActiveTab('strategy');
+
+        // Add to history
+        const newHistoryItem: CaseHistoryItem = {
+          id: Date.now().toString(),
+          timestamp: new Date(),
+          jurisdiction,
+          userInput: `OCR Analysis of: ${selectedFile.name}`,
+          result: ocrResult
+        };
+
+        const updatedHistory = [newHistoryItem, ...history];
+        setHistory(updatedHistory);
+        localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
+      } else {
+        // Process text input normally
+        const response = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Gemini-API-Key': apiKey,
+          },
+          body: JSON.stringify({ user_input: userInput, jurisdiction }),
+          signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        const contentType = response.headers.get('content-type');
+        if (!response.ok) {
+          if (response.status === 429) {
+            setError('Rate limit exceeded. Please check your API quota or try again later.');
+            return;
+          } else if (response.status === 401) {
+            setError('Invalid API key. Please update your key in Settings.');
+            return;
           } else {
-            const textError = await response.text();
-            errorMessage = `Server Error (${response.status}): ${textError.slice(0, 100)}...`;
+            let errorMessage = 'Failed to generate response';
+            if (contentType && contentType.includes('application/json')) {
+              const errData = await response.json();
+              errorMessage = errData.detail || errorMessage;
+            } else {
+              const textError = await response.text();
+              errorMessage = `Server Error (${response.status}): ${textError.slice(0, 100)}...`;
+            }
+            throw new Error(errorMessage);
           }
-          throw new Error(errorMessage);
         }
+
+        if (!contentType || !contentType.includes('application/json')) {
+          const textBody = await response.text();
+          throw new Error(`Expected JSON response but received ${contentType}. Body: ${textBody.slice(0, 100)}...`);
+        }
+
+        const data: LegalResult = await response.json();
+        setResult(data);
+        setActiveTab('strategy');
+
+        // Add to history
+        const newHistoryItem: CaseHistoryItem = {
+          id: Date.now().toString(),
+          timestamp: new Date(),
+          jurisdiction,
+          userInput,
+          result: data
+        };
+
+        const updatedHistory = [newHistoryItem, ...history];
+        setHistory(updatedHistory);
+        localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
       }
-
-      if (!contentType || !contentType.includes('application/json')) {
-        const textBody = await response.text();
-        throw new Error(`Expected JSON response but received ${contentType}. Body: ${textBody.slice(0, 100)}...`);
-      }
-
-      const data: LegalResult = await response.json();
-      setResult(data);
-      setActiveTab('strategy');
-
-      // Add to history
-      const newHistoryItem: CaseHistoryItem = {
-        id: Date.now().toString(),
-        timestamp: new Date(),
-        jurisdiction,
-        userInput,
-        result: data
-      };
-
-      const updatedHistory = [newHistoryItem, ...history];
-      setHistory(updatedHistory);
-      localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
         setError('Request timed out. Please try again.');
@@ -307,7 +483,55 @@ export default function LegalInterface() {
               placeholder="Tell your story. Describe what happened and what you need help with..."
               className="w-full h-40 p-4 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
             />
+
+            {/* File Upload Section */}
+            <div className="mt-4">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">Upload Evidence (Image)</label>
+              <div className="flex items-center gap-2">
+                <input
+                  id="file-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={handleUploadClick}
+                  className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  <Upload size={16} />
+                  <span>Choose File</span>
+                </button>
+                {selectedFile && (
+                  <div className="flex items-center gap-2 ml-2">
+                    <span className="text-sm text-slate-600 truncate max-w-[150px]">{selectedFile.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedFile(null);
+                        setPreviewUrl(null);
+                      }}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {previewUrl && (
+                <div className="mt-2">
+                  <img
+                    src={previewUrl}
+                    alt="Preview"
+                    className="max-h-32 object-contain border rounded-lg"
+                  />
+                </div>
+              )}
+            </div>
           </div>
+
           <div className="md:w-64">
             <label className="block text-sm font-semibold text-slate-700 mb-2">Jurisdiction</label>
             <select
