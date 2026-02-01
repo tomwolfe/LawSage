@@ -20,7 +20,10 @@ Your response MUST include:
 - A strategy section with legal analysis
 - A roadmap with step-by-step procedural instructions (clearly labeled as "ROADMAP:" or "NEXT STEPS:")
 - A filing template section with actual legal documents
-- At least 3 proper legal citations supporting your recommendations (these should be clearly identifiable, e.g., "12 U.S.C. § 345", "Cal. Civ. Code § 1708", "Rule 12(b)(6)")
+- At least 3 proper legal citations supporting your recommendations in these EXACT formats:
+  * Federal statutes: "12 U.S.C. § 345" (number, space, U.S.C., space, §, number)
+  * State codes: "Cal. Civ. Code § 1708" (state abbreviation, space, code name, space, §, number)
+  * Court rules: "Rule 12(b)(6)" (Rule, space, number with parentheses)
 
 Format your response as follows:
 LEGAL DISCLAIMER: [Your disclaimer here]
@@ -34,7 +37,9 @@ ROADMAP:
 3. [Third step with title and description]
 
 CITATIONS:
-- [At least 3 legal citations with sources]
+- 12 U.S.C. § 345 (or similar federal statute)
+- Cal. Civ. Code § 1708 (or similar state code)
+- Rule 12(b)(6) (or similar court rule)
 
 ---
 FILING TEMPLATE:
@@ -103,15 +108,28 @@ User Situation: {request.user_input}
 Jurisdiction: {request.jurisdiction}
 
 Act as a Universal Public Defender.
-Generate a comprehensive legal response that MUST include:
-1. A clear legal disclaimer at the beginning
-2. Legal strategy and analysis for the user's situation
-3. A numbered procedural roadmap with specific steps (labeled as "ROADMAP:")
-4. A filing template section with actual legal document text
-5. At least 3 specific legal citations (e.g., "12 U.S.C. § 345", "Cal. Civ. Code § 1708", "Rule 12(b)(6)") in a "CITATIONS:" section
-6. Use the '---' delimiter to separate the strategy/advice section from the filing template
+Generate a comprehensive legal response that MUST follow this EXACT format:
 
-CRITICAL: Your response must contain at least 3 legal citations and a procedural roadmap with numbered steps.
+LEGAL DISCLAIMER: [Your disclaimer here]
+
+STRATEGY:
+[Your legal strategy and analysis for {request.jurisdiction} jurisdiction]
+
+ROADMAP:
+1. [First step with title and description]
+2. [Second step with title and description]
+3. [Third step with title and description]
+
+CITATIONS:
+- [Federal statute in format: 12 U.S.C. § 345]
+- [State code in format: Cal. Civ. Code § 1708]
+- [Court rule in format: Rule 12(b)(6)]
+
+---
+FILING TEMPLATE:
+[Actual legal filing template with specific forms and procedures for {request.jurisdiction}]
+
+CRITICAL: Your response must contain the EXACT format above with at least 3 legal citations in the specified formats and a numbered procedural roadmap.
 """
 
         try:
