@@ -57,7 +57,6 @@ LawSage has undergone a transformative evolution! The latest version is now a **
 ## Technology Stack
 
 LawSage is built on a modern, performant full-stack architecture:
-
 *   **Frontend & Backend:** Next.js 16 (React 19) with Tailwind CSS and Lucide Icons. The entire backend logic now runs on Vercel Edge Functions.
 *   **AI Engine:** Google Gemini 2.5 Flash Preview (09-2025) (via the Google AI Python SDK) with web search grounding for real-time legal research.
 *   **AI Safety & Structure:** A multi-layered Reliability Layer ensures consistent, safe output with mandatory disclaimers, citation validation, and structural hardening.
@@ -79,7 +78,6 @@ LawSage is built on a modern, performant full-stack architecture:
 git clone https://github.com/tomwolfe/lawsage.git
 cd lawsage
 ```
-
 2.  **Install Frontend Dependencies**
 ```bash
 npm install
@@ -90,7 +88,6 @@ Start the Next.js development server:
 ```bash
 npm run dev
 ```
-
 Open your browser and navigate to [http://localhost:3000](http://localhost:3000) to begin.
 
 ### Setting Your API Key
@@ -155,21 +152,19 @@ LawSage employs a multi-layered Reliability Layer to ensure that AI-generated co
     *   **Adversarial Strategy Validation:** Ensures the presence of opposition arguments and 'red-team' analysis of the user's case.
     *   **Procedural Checks Validation:** Verifies inclusion of local court rule compliance checks.
     *   **Logistics Data Validation:** Ensures hyper-local courthouse information is included in responses.
-    *   **Mandatory Disclaimers:** Every response is prepended with a legal disclaimer to clearly distinguish legal information from legal advice.
-    *   **Structural Hardening:** A custom validator enforces a strict delimiter system ('---') to separate legal strategy from filing templates.
-    *   **Retry Mechanism:** Built-in exponential backoff for AI service rate limits ensures high availability.
-    *   **Structured Output:** The AI is prompted to return a JSON schema, which is validated server-side for completeness and safety before being presented to the user.
+*   **Mandatory Disclaimers:** Every response is prepended with a legal disclaimer to clearly distinguish legal information from legal advice.
+*   **Structural Hardening:** A custom validator enforces a strict delimiter system ('---') to separate legal strategy from filing templates.
+*   **Retry Mechanism:** Built-in exponential backoff for AI service rate limits ensures high availability.
+*   **Structured Output:** The AI is prompted to return a JSON schema, which is validated server-side for completeness and safety before being presented to the user.
 
 ## Contributing
 
 LawSage is an open-source project dedicated to legal democratization. Contributions are welcome!
-
 1.  Fork the repository.
 2.  Create a feature branch (`git checkout -b feature/your-feature-name`).
 3.  Commit your changes (`git commit -m 'Add some feature'`).
 4.  Push to the branch (`git push origin feature/your-feature-name`).
 5.  Open a pull request.
-
 Please ensure your code adheres to the existing style and includes tests for new features.
 
 ## License
