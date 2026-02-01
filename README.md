@@ -37,6 +37,7 @@ LawSage has undergone a major transformation! The latest version is now a **comp
 *   **Court-Standard Formatting:** Automatically generate filings with professional court captions and formatting for PDF printing.
 *   **Structured Output:** AI responses are validated for reliability, ensuring mandatory disclaimers, legal citations, and a clear procedural roadmap.
 *   **Robust Reliability Layer:** A multi-layered system ensures safety, accuracy, and structural completeness of every output.
+*   **Structural Hardening Validation:** Implements a strict 'Mission Contract' that enforces deterministic AI output compliance, mandating the presence of at least three verifiable legal citations, a procedural roadmap, adversarial strategy, and local court logistics in every response.
 *   **Citation Verification:** Verify legal citations in real-time to ensure they are still 'good law' using the Verify Citation button.
 *   **Interactive Next Steps Checklist:** Track your legal progress with a proactive checklist featuring due dates and status indicators.
 *   **Human-in-the-Loop Verification:** Proactive legal agent with verification layers to prevent hallucinations and ensure accuracy.
