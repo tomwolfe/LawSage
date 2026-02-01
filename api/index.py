@@ -7,7 +7,7 @@ from pydantic import BaseModel
 # Add project root to sys.path for Vercel
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fastapi import FastAPI, Header, HTTPException, File, UploadFile, Form, APIRouter
+from fastapi import FastAPI, Header, HTTPException, File, UploadFile, Form, APIRouter, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from google import genai
@@ -55,11 +55,45 @@ app.add_exception_handler(Exception, global_exception_handler)
 app.add_exception_handler(HTTPException, global_exception_handler)
 
 @app.middleware("http")
-async def log_requests(request: Any, call_next: Callable[[Any], Any]) -> Any:
+async def log_requests(request: Request, call_next: Callable) -> Any:
     print(f"Incoming request: {request.method} {request.url.path}")
     response = await call_next(request)
     print(f"Response status: {response.status_code}")
     return response
+
+@app.post("/process-case")
+@app.post("/process-case/")
+@app.post("/api/process-case")
+@app.post("/api/process-case/")
+async def process_case(
+    user_input: str = Form(None),
+    jurisdiction: str = Form(None),
+    case_id: Optional[str] = Form(None),
+    chat_history: Optional[str] = Form(None),
+    files: List[UploadFile] = File([]),
+    x_gemini_api_key: str | None = Header(None)
+) -> Any:
+    if not x_gemini_api_key:
+        raise HTTPException(status_code=401, detail="Gemini API Key is missing.")
+
+    history = []
+    if chat_history:
+        try:
+            history = json.loads(chat_history)
+        except:
+            pass
+
+    manager = LegalWorkflowManager(api_key=x_gemini_api_key)
+    return StreamingResponse(
+        manager.process_case_stream(user_input, jurisdiction, files, case_id, history),
+        media_type="text/event-stream",
+        headers={"X-Accel-Buffering": "no"}
+    )
+
+@app.get("/process-case")
+@app.get("/api/process-case")
+async def process_case_get():
+    raise HTTPException(status_code=405, detail="Method Not Allowed. Please use POST with multipart/form-data.")
 
 # Standard routes
 @app.get("/")
@@ -67,6 +101,12 @@ async def log_requests(request: Any, call_next: Callable[[Any], Any]) -> Any:
 @app.get("/api/health")
 async def health_check() -> HealthResponse:
     return HealthResponse(status="ok", message="LawSage API is running")
+
+@app.post("/")
+@app.post("/api")
+@app.post("/api/")
+async def root_post(request: Request):
+    return {"status": "ok", "message": "LawSage API Root POST", "path": request.url.path}
 
 @app.post("/upload-evidence")
 @app.post("/api/upload-evidence")
@@ -123,38 +163,6 @@ async def get_procedural_guide(jurisdiction: str):
     guide = ProceduralEngine.get_procedural_guide(jurisdiction)
     checklist = ProceduralEngine.get_checklist(jurisdiction)
     return {"guide": guide, "checklist": checklist}
-
-from fastapi import Request
-
-@app.api_route("/process-case", methods=["GET", "POST"])
-@app.api_route("/api/process-case", methods=["GET", "POST"])
-async def process_case(
-    request: Request,
-    user_input: str = Form(None),
-    jurisdiction: str = Form(None),
-    case_id: Optional[str] = Form(None),
-    chat_history: Optional[str] = Form(None),
-    files: List[UploadFile] = File([]),
-    x_gemini_api_key: str | None = Header(None)
-) -> Any:
-    if request.method == "GET":
-        return {"error": "Method Not Allowed. Please use POST with multipart/form-data.", "status": 405}
-
-    if not x_gemini_api_key:
-        raise HTTPException(status_code=401, detail="Gemini API Key is missing.")
-
-    history = []
-    if chat_history:
-        try:
-            history = json.loads(chat_history)
-        except:
-            pass
-
-    manager = LegalWorkflowManager(api_key=x_gemini_api_key)
-    return StreamingResponse(
-        manager.process_case_stream(user_input, jurisdiction, files, case_id, history),
-        media_type="text/event-stream"
-    )
 
 @app.post("/generate")
 @app.post("/api/generate", response_model=LegalHelpResponse)
