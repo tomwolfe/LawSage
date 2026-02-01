@@ -79,6 +79,40 @@ class ResponseValidator:
         return f"{final_strategy}\n\n{cls.DELIMITER}\n\n{filings_part}"
 
     @classmethod
+    def validate_legal_output(cls, content: str) -> bool:
+        """
+        Validates AI-generated legal content for structural and procedural completeness.
+        Returns True if content meets reliability standards, False otherwise.
+        Checks for:
+        a) At least two legal citations (e.g., U.S.C., Cal. Civ. Code, etc.)
+        b) A 'Next Steps' or 'Roadmap' section.
+        """
+        import re
+        
+        # Check for citations: Look for common legal citation patterns
+        # e.g., "12 U.S.C. § 345", "Cal. Civ. Code § 1708", "Rule 12(b)(6)"
+        citation_patterns = [
+            r"\d+\s+[A-Z]\.[A-Z]\.[A-Z]\.?\s+§?\s*\d+", # Federal/State statutes
+            r"[A-Z][a-z]+\.?\s+[Cc]ode\s+§?\s*\d+",     # Named codes
+            r"[Rr]ule\s+\d+\(?[a-z]?\)?",                # Rules of procedure
+            r"§\s*\d+",                                  # Section symbols
+            r"Section\s+\d+",                            # Section keyword
+        ]
+        
+        citation_count = 0
+        for pattern in citation_patterns:
+            matches = re.findall(pattern, content)
+            citation_count += len(matches)
+        
+        has_citations = citation_count >= 2
+        
+        # Check for Roadmap/Next Steps
+        roadmap_keywords = ["Next Steps", "Roadmap", "Procedural Roadmap", "What to do next", "Step-by-step"]
+        has_roadmap = any(kw.lower() in content.lower() for kw in roadmap_keywords)
+        
+        return has_citations and has_roadmap
+
+    @classmethod
     def parse_to_dict(cls, text: str) -> Dict[str, str]:
         """
         Parses the validated text into strategy and filings.

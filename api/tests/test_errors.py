@@ -11,8 +11,7 @@ from google.api_core import exceptions as google_exceptions
 client = TestClient(app, raise_server_exceptions=False)
 
 def test_global_handler_internal_error():
-    """Verify that a generic Exception is caught and returns 500 JSON schema."""
-    with patch("api.index.genai.Client") as mock_client:
+    with patch("api.workflow.genai.Client") as mock_client:
         mock_client.side_effect = Exception("System failure")
         
         response = client.post(
@@ -30,7 +29,7 @@ def test_global_handler_internal_error():
 def test_global_handler_app_exception():
     """Verify that AppException returns custom status and type."""
     # We can trigger an AppException by mocking something inside the route
-    with patch("api.index.get_settings") as mock_settings:
+    with patch("api.workflow.get_settings") as mock_settings:
         mock_settings.side_effect = AppException("Custom error", type="CustomType", status_code=418)
         
         response = client.post(
@@ -47,7 +46,7 @@ def test_global_handler_app_exception():
 
 def test_global_handler_rate_limit_error():
     """Verify that 429 errors from Google are handled."""
-    with patch("api.index.genai.Client") as mock_client:
+    with patch("api.workflow.genai.Client") as mock_client:
         # Create a mock for Google's ResourceExhausted or similar
         mock_client.side_effect = google_exceptions.ResourceExhausted("Quota exceeded")
         
@@ -65,7 +64,7 @@ def test_global_handler_rate_limit_error():
 
 def test_global_handler_client_error():
     """Verify that client errors return 400."""
-    with patch("api.index.genai.Client") as mock_client:
+    with patch("api.workflow.genai.Client") as mock_client:
         # errors.ClientError needs a message at least.
         # Actually APIError (parent) might need more, but let's try just a custom mock if it fails.
         # Looking at traceback: TypeError: APIError.__init__() missing 1 required positional argument: 'response_json'

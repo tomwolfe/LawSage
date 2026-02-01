@@ -72,6 +72,19 @@ This command runs `next dev` and `uvicorn api.index:app --host 127.0.0.1 --port 
 
 Open your browser and navigate to [http://localhost:3000](http://localhost:3000) to begin.
 
+## AI Safety & Structure
+
+LawSage employs a multi-layered Reliability Layer to ensure that AI-generated content is safe, accurate, and structurally complete:
+
+*   **Red-Team Auditing:** Every user request is audited for safety violations and jurisdictional clarity before being processed.
+*   **Grounded Generation:** Gemini 2.5 Flash is utilized with real-time Google Search grounding to ensure information is based on current statutes.
+*   **Reliability Validation:**
+    *   **Citations Validation:** Ensures every response contains at least two verifiable legal citations (e.g., U.S.C., State Codes).
+    *   **Procedural Completeness:** Verifies the presence of a 'Next Steps' or 'Roadmap' section to guide the pro se litigant.
+*   **Mandatory Disclaimers:** Every response is prepended with a legal disclaimer to clearly distinguish legal information from legal advice.
+*   **Structural Hardening:** A custom validator enforces a strict delimiter system ('---') to separate legal strategy from filing templates.
+*   **Retry Mechanism:** Built-in exponential backoff for AI service rate limits ensures high availability.
+
 ## How It Works
 
 1.  **Input:** Describe your legal issue in plain language (e.g., "I was evicted from my apartment without notice").

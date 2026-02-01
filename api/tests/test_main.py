@@ -33,7 +33,7 @@ def test_generate_legal_help_success(mock_genai_client: MagicMock) -> None:
     
     # Mock parts
     mock_part = MagicMock()
-    mock_part.text = "Strategy text --- Filings text"
+    mock_part.text = "According to 12 U.S.C. § 345 and Rule 12(b)(6). Procedural Roadmap: Step 1. --- Filings text"
     mock_part.thought = False
     mock_candidate.content.parts = [mock_part]
     
@@ -60,7 +60,7 @@ def test_generate_legal_help_success(mock_genai_client: MagicMock) -> None:
     assert "text" in data
     assert "sources" in data
     assert "LEGAL DISCLAIMER" in data["text"]
-    assert "Strategy text" in data["text"]
+    assert "According to 12 U.S.C. § 345" in data["text"]
     assert "---" in data["text"]
     assert "Filings text" in data["text"]
     assert len(data["sources"]) == 1
@@ -76,7 +76,7 @@ def test_generate_legal_help_source_no_uri(mock_genai_client: MagicMock) -> None
     mock_candidate = MagicMock()
     mock_candidate.finish_reason = "STOP"
     mock_part = MagicMock()
-    mock_part.text = "Strategy --- Filings"
+    mock_part.text = "According to 12 U.S.C. § 345 and Rule 12(b)(6). Procedural Roadmap: Step 1. --- Filings"
     mock_part.thought = False
     mock_candidate.content.parts = [mock_part]
     
@@ -116,7 +116,7 @@ def test_generate_legal_help_missing_delimiter(mock_genai_client: MagicMock) -> 
     
     # Mock parts
     mock_part = MagicMock()
-    mock_part.text = "Just strategy, no delimiter here."
+    mock_part.text = "According to 12 U.S.C. § 345 and Rule 12(b)(6). Procedural Roadmap: Step 1. No delimiter here."
     mock_part.thought = False
     mock_candidate.content.parts = [mock_part]
     

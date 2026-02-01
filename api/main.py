@@ -1,9 +1,12 @@
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import os
 from typing import Any, Callable
+from google.genai import errors
+from google.api_core import exceptions as google_exceptions
 
-from api.models import LegalRequest, LegalResult, HealthResponse
+from api.models import LegalRequest, LegalResult, HealthResponse, StandardErrorResponse
 from api.workflow import LawSageWorkflow
 from api.exceptions import global_exception_handler, AppException
 
@@ -35,28 +38,67 @@ async def health_check() -> HealthResponse:
 
 @app.post("/generate")
 @app.post("/api/generate", response_model=LegalResult)
-async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | None = Header(None)) -> LegalResult:
+async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | None = Header(None)) -> Any:
     if not x_gemini_api_key:
-        raise HTTPException(
-            status_code=401, 
-            detail="Gemini API Key is missing."
+        return JSONResponse(
+            status_code=401,
+            content=StandardErrorResponse(
+                type="AuthenticationError",
+                detail="Gemini API Key is missing."
+            ).model_dump()
         )
     
     # Basic validation
     if not x_gemini_api_key.startswith("AIza") or len(x_gemini_api_key) < 20:
-        raise HTTPException(
+        return JSONResponse(
             status_code=400,
-            detail="Invalid Gemini API Key format."
+            content=StandardErrorResponse(
+                type="ValidationError",
+                detail="Invalid Gemini API Key format."
+            ).model_dump()
         )
 
-    workflow = LawSageWorkflow(api_key=x_gemini_api_key)
-    result = workflow.invoke(request)
-    
-    # Ensure the hardcoded disclaimer is present if not already added by workflow
-    if LegalDisclaimer.strip() not in result.text:
-        result.text = LegalDisclaimer + result.text
+    try:
+        workflow = LawSageWorkflow(api_key=x_gemini_api_key)
+        result = workflow.invoke(request)
+        
+        # Ensure the hardcoded disclaimer is present if not already added by workflow
+        if LegalDisclaimer.strip() not in result.text:
+            result.text = LegalDisclaimer + result.text
 
-    return result
+        return result
+    except AppException as e:
+        return JSONResponse(
+            status_code=e.status_code,
+            content=StandardErrorResponse(
+                type=e.type,
+                detail=e.detail
+            ).model_dump()
+        )
+    except (errors.ClientError, google_exceptions.GoogleAPICallError) as e:
+        status_code = 400
+        error_type = "AIClientError"
+        detail = str(e)
+        if "429" in str(e).lower() or "quota" in str(e).lower():
+            status_code = 429
+            error_type = "RateLimitError"
+            detail = "AI service rate limit exceeded. Please try again in a few minutes."
+        
+        return JSONResponse(
+            status_code=status_code,
+            content=StandardErrorResponse(
+                type=error_type,
+                detail=detail
+            ).model_dump()
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content=StandardErrorResponse(
+                type="InternalServerError",
+                detail=str(e)
+            ).model_dump()
+        )
 
 if __name__ == "__main__":
     import uvicorn

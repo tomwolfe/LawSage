@@ -63,9 +63,9 @@ def test_response_validator_already_present():
 
 def test_system_instruction_constant_exists():
     """Test that the SYSTEM_INSTRUCTION constant exists in the module."""
-    import api.index
-    assert hasattr(api.index, 'SYSTEM_INSTRUCTION')
-    assert 'delimiter' in api.index.SYSTEM_INSTRUCTION.lower()
+    import api.workflow
+    assert hasattr(api.workflow, 'SYSTEM_INSTRUCTION')
+    assert 'delimiter' in api.workflow.SYSTEM_INSTRUCTION.lower()
 
 
 if __name__ == "__main__":

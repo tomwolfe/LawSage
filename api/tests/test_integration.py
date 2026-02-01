@@ -13,7 +13,7 @@ def test_health_check():
 @patch("api.workflow.LawSageWorkflow.step_2_generate")
 def test_generate_endpoint_success(mock_generate):
     # Mock successful generation
-    mock_generate.return_value = ("Strategy\n\n---\n\nFiling text", [])
+    mock_generate.return_value = ("According to 12 U.S.C. § 345 and Rule 12(b)(6). Procedural Roadmap: Step 1.\n\n---\n\nFiling text", [])
     
     payload = {
         "user_input": "I need help with a traffic ticket",

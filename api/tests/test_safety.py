@@ -33,11 +33,11 @@ def test_generate_legal_help_safety_trigger(mock_genai_client: MagicMock) -> Non
         headers={"X-Gemini-API-Key": "AIza-test-key-with-enough-length"}
     )
     
-    assert response.status_code == 200
+    assert response.status_code == 400
     data = response.json()
-    assert "safety filters" in data["text"]
-    assert "SAFETY" in data["text"]
-    assert data["sources"] == []
+    assert data["error"] is True
+    assert data["type"] == "ModelConstraint"
+    assert "SAFETY" in data["detail"]
 
 @patch("google.genai.Client")
 def test_generate_legal_help_empty_candidates(mock_genai_client: MagicMock) -> None:
@@ -54,7 +54,7 @@ def test_generate_legal_help_empty_candidates(mock_genai_client: MagicMock) -> N
         headers={"X-Gemini-API-Key": "AIza-test-key-with-enough-length"}
     )
     
-    assert response.status_code == 200
+    assert response.status_code == 422
     data = response.json()
-    assert "no candidates" in data["text"]
-    assert data["sources"] == []
+    assert data["error"] is True
+    assert data["type"] == "ReliabilityViolation"
