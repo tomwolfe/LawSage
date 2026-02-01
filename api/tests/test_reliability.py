@@ -37,7 +37,7 @@ def test_step_2_generate_logic(mock_client_class):
     """Test the logic inside step_2_generate including source extraction."""
     mock_client = MagicMock()
     mock_client_class.return_value = mock_client
-    
+
     # Mock a response with grounding metadata
     mock_response = MagicMock()
     candidate = {
@@ -52,12 +52,12 @@ def test_step_2_generate_logic(mock_client_class):
     }
     mock_response.candidates = [candidate]
     mock_client.models.generate_content.return_value = mock_response
-    
+
     workflow = LawSageWorkflow(api_key="AIzaTestKey1234567890")
     request = LegalRequest(user_input="Test", jurisdiction="California")
-    
-    text, sources = workflow.step_2_generate(request)
-    
+
+    text, sources, original_json_str = workflow.step_2_generate(request)
+
     assert "Found some laws" in text
     assert len(sources) == 2
     assert sources[0].title == "Statute 1"
