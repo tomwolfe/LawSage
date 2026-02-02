@@ -57,7 +57,10 @@ async function loadLegalLookupDb(): Promise<LegalLookupDatabase> {
   } catch (error) {
     console.error('Error loading legal lookup database:', error);
     // Return an empty database to prevent crashes
-    return { pro_se_procedural_rules: [] };
+    return { 
+      pro_se_procedural_rules: [],
+      ex_parte_notice_rules: [] 
+    };
   }
 }
 
