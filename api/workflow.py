@@ -30,7 +30,7 @@ Your JSON response MUST include:
   * "status": "pending"
   * "due_date_placeholder": "TBD"
 - "filing_template": A comprehensive template that includes TWO distinct sections:
-  (A) The Civil Complaint (grounded in relevant statutes like CC § 789.3 and CCP § 1160.2 for lockouts).
+  (A) The Civil Complaint (grounded in relevant statutes like CC § 789.3 and CCP § 1160.2 for lockouts). When citing CC § 789.3, you MUST explicitly mention the mandatory minimum statutory penalty of $250 per violation as defined in subsection (c).
   (B) The Ex Parte Application for TRO/OSC.
   Include explicit placeholders for required Judicial Council forms like CM-010, MC-030, CIV-100, etc.
 - "citations": A list of objects with "text", "source", "url", and "is_verified". Use these EXACT formats:
@@ -213,7 +213,7 @@ Your response MUST include:
 3. 'roadmap': Step-by-step next steps for {request.jurisdiction}.
 4. 'local_logistics': Specific courthouse info for {request.jurisdiction}.
 5. 'filing_template': A comprehensive template that includes TWO distinct sections:
-   (A) The Civil Complaint (grounded in relevant statutes like CC § 789.3 and CCP § 1160.2 if applicable).
+   (A) The Civil Complaint (grounded in relevant statutes like CC § 789.3 and CCP § 1160.2 if applicable). MANDATORY: Explicitly mention the mandatory minimum statutory penalty of $250 per violation as defined in CC § 789.3(c).
    (B) The Ex Parte Application for TRO/OSC.
    Include explicit placeholders for required Judicial Council forms like CM-010 and MC-030.
    {f"Base your templates on this content: {template_content}" if template_content else ""}

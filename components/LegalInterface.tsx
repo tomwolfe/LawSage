@@ -81,6 +81,7 @@ export default function LegalInterface() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [caseLedger, setCaseLedger] = useState<CaseLedgerEntry[]>([]);
+  const [apiKey, setApiKey] = useState('');
 
   // Initialize state from URL fragment on component mount
   useEffect(() => {
@@ -125,6 +126,13 @@ export default function LegalInterface() {
       }
 
       // Note: We don't restore file selection as that would require re-reading the file
+    }
+  }, []);
+
+  useEffect(() => {
+    const savedKey = localStorage.getItem('GEMINI_API_KEY');
+    if (savedKey) {
+      setApiKey(savedKey);
     }
   }, []);
 
@@ -680,6 +688,7 @@ export default function LegalInterface() {
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           jurisdiction={jurisdiction}
+          apiKey={apiKey}
         />
       )}
     </div>

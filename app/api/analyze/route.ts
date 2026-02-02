@@ -94,7 +94,7 @@ Your response MUST be in valid JSON format with the following structure:
       "required_documents": ["List of documents needed"]
     }
   ],
-  "filing_template": "A comprehensive template that includes TWO distinct sections:\\n(A) The Civil Complaint (grounded in relevant statutes like CC § 789.3 and CCP § 1160.2 for California lockouts).\\n(B) The Ex Parte Application for TRO/OSC.\\nInclude explicit placeholders for required Judicial Council forms like CM-010, MC-030, and CIV-100.",
+  "filing_template": "A comprehensive template that includes TWO distinct sections:\\n(A) The Civil Complaint (grounded in relevant statutes like CC § 789.3 and CCP § 1160.2 for California lockouts). MANDATORY: When citing CC § 789.3, explicitly mention the mandatory minimum statutory penalty of $250 per violation as defined in subsection (c).\\n(B) The Ex Parte Application for TRO/OSC.\\nInclude explicit placeholders for required Judicial Council forms like CM-010, MC-030, and CIV-100.",
   "citations": [
     {
       "text": "12 U.S.C. § 345",

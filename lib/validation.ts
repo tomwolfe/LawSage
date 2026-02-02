@@ -235,7 +235,7 @@ export class ResponseValidator {
     ];
 
     // Find all citations using all patterns
-    let allMatches = new Set<string>(); // Use a set to avoid duplicates
+    const allMatches = new Set<string>(); // Use a set to avoid duplicates
     for (const pattern of citationPatterns) {
       const matches = content.match(pattern) || [];
       for (const match of matches) {
@@ -309,7 +309,7 @@ export class ResponseValidator {
   // Additional validation methods to match the Python implementation
   static validateAndFixLegacy(content: string): string {
     // Legacy validation and fix method for backward compatibility.
-    let text = content;
+    const text = content;
 
     // 1. Normalize Delimiter first to separate strategy and filings
     // We look for '---', '***', or '___' with optional surrounding whitespace

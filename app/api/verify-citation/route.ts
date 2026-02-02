@@ -40,19 +40,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Get API key from environment variables
-    const apiKey = process.env.GEMINI_API_KEY;
+    // Get API key from headers or environment variables
+    const xGeminiApiKey = req.headers.get('X-Gemini-API-Key');
+    const apiKey = xGeminiApiKey || process.env.GEMINI_API_KEY;
+    
     if (!apiKey) {
       return new Response(
         JSON.stringify({ error: 'Server configuration error: API key missing' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
     // Initialize the Gemini client
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash-preview-09-2025',
+      model: 'gemini-1.5-flash',
+      tools: [
+        {
+          // @ts-expect-error - googleSearchRetrieval is supported but may not be in all type definitions
+          googleSearchRetrieval: {},
+        },
+      ],
       generationConfig: {
         temperature: 0.1,
         maxOutputTokens: 1000,
@@ -68,39 +76,29 @@ export async function POST(req: NextRequest) {
       Subject Matter: ${subject_matter || "General Legal"}
       
       You MUST perform two checks:
-      1. VALIDITY: Is the citation "good law"? (Not overruled, repealed, or outdated).
+      1. VALIDITY: Is the citation "good law"? (Not overruled, repealed, or outdated). Check specifically for California Civil Code § 789.3 and CCP § 527 if applicable.
       2. RELEVANCE: Is this citation contextually relevant to ${jurisdiction} and the subject of ${subject_matter || "the case"}? 
-         - Flag citations that are from the wrong jurisdiction (e.g., citing a New York case for a California matter unless it's for a universal principle).
-         - Flag citations that are unrelated to the subject matter (e.g., citing a maritime law case for a landlord-tenant dispute).
+         - Flag citations that are from the wrong jurisdiction.
+         - Flag citations that are unrelated to the subject matter.
+      
+      For California Civil Code § 789.3, note that subsection (c) mandates a minimum statutory penalty of $250 per violation.
       
       Please respond with a JSON object containing:
       - "is_verified": boolean indicating if the citation is "good law"
       - "is_relevant": boolean indicating if the citation is relevant to the jurisdiction and subject matter
-      - "verification_source": string with the source used for verification
+      - "verification_source": string with the source used for verification (e.g., "Google Search - California Legislative Information")
       - "status_message": string with a brief explanation of the status (validity and relevance)
       - "details": additional details about why it is or isn't relevant/valid
       
-      Example response format:
-      {
-        "is_verified": true,
-        "is_relevant": false,
-        "verification_source": "Google Scholar, Case Law Database",
-        "status_message": "Citation is good law but NOT relevant to this jurisdiction.",
-        "details": "Jordan v. Tashiro (1928) is a Supreme Court case about treaty rights and corporate formation, which does not apply to a California residential lockout situation."
-      }
+      Return ONLY the JSON object.
     `;
 
     // Generate content using the model with web search capability
-    const result = await model.generateContent({
-      contents: [{
-        role: 'user',
-        parts: [{ text: verificationPrompt }]
-      }]
-    });
+    const result = await model.generateContent(verificationPrompt);
 
     // Extract the response
     const response = await result.response;
-    let textResponse = response.text();
+    const textResponse = response.text();
 
     // Try to parse the response as JSON
     let verificationResult: CitationVerificationResponse;

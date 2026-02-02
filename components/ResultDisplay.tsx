@@ -64,6 +64,7 @@ interface ResultDisplayProps {
   activeTab: 'strategy' | 'filings' | 'sources' | 'survival-guide' | 'opposition-view';
   setActiveTab: (tab: 'strategy' | 'filings' | 'sources' | 'survival-guide' | 'opposition-view') => void;
   jurisdiction: string;
+  apiKey?: string;
 }
 
 // Enhanced parsing function to handle both legacy and structured formats
@@ -173,7 +174,7 @@ function parseLegalOutput(text: string): { strategy: string; filings: string; st
   };
 }
 
-export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdiction }: ResultDisplayProps) {
+export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdiction, apiKey }: ResultDisplayProps) {
   const [copyStatus, setCopyStatus] = useState<{[key: string]: boolean | string}>({ all: false, 'opposition-view': false, 'survival-guide': false });
   const [citationVerificationStatus, setCitationVerificationStatus] = useState<{[key: string]: {
     is_verified: boolean | undefined;
@@ -321,10 +322,12 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
   // Function to verify a citation
   const verifyCitation = async (citationText: string) => {
     try {
+      const currentApiKey = apiKey || localStorage.getItem('GEMINI_API_KEY') || '';
       const response = await fetch('/api/verify-citation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-Gemini-API-Key': currentApiKey,
         },
         body: JSON.stringify({
           citation: citationText,
@@ -404,121 +407,235 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
     URL.revokeObjectURL(url);
   };
 
+  // Helper function to create a California-style pleading header
+  const createCaliforniaFilingHeader = async (
+    { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType }: any,
+    caseInfo: { attorneyName?: string; barNumber?: string; firmName?: string; partyName?: string; courtName?: string; caseNumber?: string; plaintiff?: string; defendant?: string; documentTitle?: string }
+  ) => {
+    return [
+      // Attorney Information
+      new Paragraph({
+        children: [
+          new TextRun({ text: caseInfo.attorneyName || "[NAME]", bold: true }),
+          new TextRun({ text: `, Bar No. ${caseInfo.barNumber || "[BAR NO]"}` }),
+        ],
+      }),
+      new Paragraph({ text: caseInfo.firmName || "[FIRM NAME]" }),
+      new Paragraph({ text: "[ADDRESS]" }),
+      new Paragraph({ text: "[PHONE]" }),
+      new Paragraph({ text: "" }),
+      new Paragraph({
+        children: [
+          new TextRun({ text: `Attorney for ${caseInfo.partyName || "Plaintiff, [NAME]"}`, bold: true }),
+        ],
+      }),
+      new Paragraph({ text: "" }),
+      new Paragraph({ text: "" }),
+
+      // Court Name
+      new Paragraph({
+        children: [
+          new TextRun({ text: caseInfo.courtName || "SUPERIOR COURT OF CALIFORNIA", bold: true }),
+        ],
+        alignment: AlignmentType.CENTER,
+      }),
+      new Paragraph({
+        children: [
+          new TextRun({ text: `COUNTY OF ${caseInfo.plaintiff ? "[COUNTY]" : "[COUNTY]"}`, bold: true }),
+        ],
+        alignment: AlignmentType.CENTER,
+      }),
+      new Paragraph({ text: "" }),
+
+      // Caption Box
+      new Table({
+        width: { size: 100, type: WidthType.PERCENTAGE },
+        borders: {
+          top: { style: BorderStyle.NONE },
+          bottom: { style: BorderStyle.NONE },
+          left: { style: BorderStyle.NONE },
+          right: { style: BorderStyle.NONE },
+          insideHorizontal: { style: BorderStyle.NONE },
+          insideVertical: { style: BorderStyle.NONE },
+        },
+        rows: [
+          new TableRow({
+            children: [
+              new TableCell({
+                width: { size: 50, type: WidthType.PERCENTAGE },
+                children: [
+                  new Paragraph({ text: caseInfo.plaintiff || "[PLAINTIFF NAME]," }),
+                  new Paragraph({ text: "" }),
+                  new Paragraph({ text: "          Plaintiff," }),
+                  new Paragraph({ text: "" }),
+                  new Paragraph({ text: "    vs." }),
+                  new Paragraph({ text: "" }),
+                  new Paragraph({ text: caseInfo.defendant || "[DEFENDANT NAME]," }),
+                  new Paragraph({ text: "" }),
+                  new Paragraph({ text: "          Defendant." }),
+                ],
+                borders: {
+                  right: { style: BorderStyle.SINGLE, size: 1, color: "000000" },
+                },
+              }),
+              new TableCell({
+                width: { size: 50, type: WidthType.PERCENTAGE },
+                children: [
+                  new Paragraph({
+                    children: [new TextRun({ text: `)  Case No. ${caseInfo.caseNumber || "[CASE NO]"}`, bold: true })],
+                  }),
+                  new Paragraph({ text: ")" }),
+                  new Paragraph({
+                    children: [new TextRun({ text: `)  ${caseInfo.documentTitle || "[DOCUMENT TITLE]"}`, bold: true })],
+                  }),
+                  new Paragraph({ text: ")" }),
+                  new Paragraph({ text: ")" }),
+                  new Paragraph({ text: ")" }),
+                  new Paragraph({ text: ")" }),
+                  new Paragraph({ text: ")" }),
+                  new Paragraph({ text: ")" }),
+                ],
+              }),
+            ],
+          }),
+        ],
+      }),
+      new Paragraph({ text: "________________________)" }),
+      new Paragraph({ text: "" }),
+    ];
+  };
+
   // Helper function to create a standard document
   const createStandardDocument = async () => {
-    const { Document, Paragraph, TextRun, HeadingLevel, AlignmentType } = await import('docx');
+    const docx = await import('docx');
+    const { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle } = docx;
+
+    const isCalifornia = jurisdiction.toLowerCase().includes('california');
+    let children: any[] = [];
+
+    if (isCalifornia) {
+      const header = await createCaliforniaFilingHeader(docx, {
+        courtName: `${jurisdiction.toUpperCase()} SUPERIOR COURT`,
+        documentTitle: "COMPLAINT AND EX PARTE APPLICATION",
+        plaintiff: "PLAINTIFF [NAME]",
+        defendant: "DEFENDANT [NAME]",
+      });
+      children = [...header];
+    } else {
+      children.push(
+        new Paragraph({
+          text: "LEGAL ANALYSIS AND FILINGS",
+          heading: HeadingLevel.HEADING_1,
+          alignment: AlignmentType.CENTER,
+        })
+      );
+    }
+
+    children.push(
+      new Paragraph({
+        text: "Disclaimer: This document contains legal information, not legal advice. Consult with a qualified attorney.",
+        heading: HeadingLevel.HEADING_2,
+      }),
+      new Paragraph({
+        text: strategyText,
+      }),
+      new Paragraph({
+        text: "Generated Filings",
+        heading: HeadingLevel.HEADING_2,
+        alignment: AlignmentType.CENTER,
+      }),
+      new Paragraph({
+        text: filingsText,
+      })
+    );
+
+    children.push(
+      new Paragraph({
+        text: "Sources & Citations",
+        heading: HeadingLevel.HEADING_2,
+      }),
+      ...(structured?.citations || []).map(citation => new Paragraph({
+        children: [
+          new TextRun({
+            text: citation.text,
+            bold: true,
+          }),
+          new TextRun(` - ${citation.source || ''}`),
+          ...(citation.url ? [new TextRun(` (${citation.url})`)] : []),
+          ...(citation.is_verified !== undefined ? [
+            new TextRun(` [Status: ${citation.is_verified ? 'VERIFIED' : 'UNVERIFIED'}]`)
+          ] : []),
+        ]
+      }))
+    );
 
     return new Document({
       sections: [{
-        properties: {},
-        children: [
-          new Paragraph({
-            text: "LEGAL ANALYSIS AND FILINGS",
-            heading: HeadingLevel.HEADING_1,
-            alignment: AlignmentType.CENTER,
-          }),
-          new Paragraph({
-            text: "Disclaimer: This document contains legal information, not legal advice. Consult with a qualified attorney.",
-            heading: HeadingLevel.HEADING_2,
-          }),
-          new Paragraph({
-            text: strategyText,
-          }),
-          new Paragraph({
-            text: "Generated Filings",
-            heading: HeadingLevel.HEADING_2,
-          }),
-          new Paragraph({
-            text: filingsText,
-          }),
-          new Paragraph({
-            text: "Sources & Citations",
-            heading: HeadingLevel.HEADING_2,
-          }),
-          ...(structured?.citations || []).map(citation => new Paragraph({
-            children: [
-              new TextRun({
-                text: citation.text,
-                bold: true,
-              }),
-              new TextRun(` - ${citation.source || ''}`),
-              ...(citation.url ? [new TextRun(` (${citation.url})`)] : []),
-              ...(citation.is_verified !== undefined ? [
-                new TextRun(` [Status: ${citation.is_verified ? 'VERIFIED' : 'UNVERIFIED'}]`)
-              ] : []),
-            ]
-          })),
-        ],
+        properties: {
+          page: {
+            margin: {
+              top: 1440,
+              bottom: 1440,
+              left: 1440,
+              right: 1440,
+            },
+          },
+        },
+        children,
       }],
     });
   };
 
   // Helper function to create a motion document based on the schema
   const createMotionDocument = async (motion: LegalMotion) => {
-    const { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType } = await import('docx');
+    const docx = await import('docx');
+    const { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle } = docx;
 
-    // Create the main document structure
-    const children = [
-      // Title page
-      new Paragraph({
-        text: motion.caseInfo.courtName,
-        heading: HeadingLevel.HEADING_1,
-        alignment: AlignmentType.CENTER,
-      }),
-      new Paragraph({
-        text: `${motion.caseInfo.jurisdiction.toUpperCase()}, ${motion.caseInfo.caseNumber}`,
-        alignment: AlignmentType.CENTER,
-      }),
-      new Paragraph({
-        text: "",
-      }),
-      new Paragraph({
-        text: `${motion.filingParty},`,
-        alignment: AlignmentType.LEFT,
-      }),
-      new Paragraph({
-        text: "                       Plaintiff/Petitioner",
-        alignment: AlignmentType.LEFT,
-      }),
-      new Paragraph({
-        text: "",
-      }),
-      new Paragraph({
-        text: `vs.`,
-        alignment: AlignmentType.CENTER,
-      }),
-      new Paragraph({
-        text: "",
-      }),
-      new Paragraph({
-        text: `${motion.opposingParty},`,
-        alignment: AlignmentType.LEFT,
-      }),
-      new Paragraph({
-        text: "                       Defendant/Respondent",
-        alignment: AlignmentType.LEFT,
-      }),
-      new Paragraph({
-        text: "",
-      }),
-      new Paragraph({
-        text: `_________________________________`,
-        alignment: AlignmentType.CENTER,
-      }),
-      new Paragraph({
-        text: "",
-      }),
+    const isCalifornia = motion.caseInfo.jurisdiction.toLowerCase().includes('california');
+    let children: any[] = [];
 
-      // Motion title
-      new Paragraph({
-        text: motion.title,
-        heading: HeadingLevel.HEADING_1,
-        alignment: AlignmentType.CENTER,
-      }),
-      new Paragraph({
-        text: "",
-      }),
+    if (isCalifornia) {
+      const header = await createCaliforniaFilingHeader(docx, {
+        courtName: motion.caseInfo.courtName,
+        caseNumber: motion.caseInfo.caseNumber,
+        documentTitle: motion.title,
+        plaintiff: motion.filingParty, // Assuming filing party is plaintiff for now, or use logic
+        defendant: motion.opposingParty,
+        attorneyName: motion.signatureBlock.attorneyName,
+        barNumber: motion.signatureBlock.attorneyBarNumber,
+        firmName: motion.signatureBlock.firmName,
+      });
+      children = [...header];
+    } else {
+      // Original title page logic for non-California
+      children.push(
+        new Paragraph({
+          text: motion.caseInfo.courtName,
+          heading: HeadingLevel.HEADING_1,
+          alignment: AlignmentType.CENTER,
+        }),
+        new Paragraph({
+          text: `${motion.caseInfo.jurisdiction.toUpperCase()}, ${motion.caseInfo.caseNumber}`,
+          alignment: AlignmentType.CENTER,
+        }),
+        new Paragraph({ text: "" }),
+        new Paragraph({ text: `${motion.filingParty},`, alignment: AlignmentType.LEFT }),
+        new Paragraph({ text: "                       Plaintiff/Petitioner", alignment: AlignmentType.LEFT }),
+        new Paragraph({ text: "" }),
+        new Paragraph({ text: `vs.`, alignment: AlignmentType.CENTER }),
+        new Paragraph({ text: "" }),
+        new Paragraph({ text: `${motion.opposingParty},`, alignment: AlignmentType.LEFT }),
+        new Paragraph({ text: "                       Defendant/Respondent", alignment: AlignmentType.LEFT }),
+        new Paragraph({ text: "" }),
+        new Paragraph({ text: `_________________________________`, alignment: AlignmentType.CENTER }),
+        new Paragraph({ text: "" }),
+        new Paragraph({ text: motion.title, heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
+        new Paragraph({ text: "" })
+      );
+    }
 
+    // Add common sections
+    children.push(
       // Description
       new Paragraph({
         text: motion.description,
@@ -564,8 +681,8 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
       }),
       new Paragraph({
         text: "",
-      }),
-    ];
+      })
+    );
 
     // Add motion-specific sections based on type
     switch (motion.type) {

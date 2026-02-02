@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
       throw new Error("No response from Gemini multimodal model");
     }
 
-    let extractedText = response.text();
+    const extractedText = response.text();
     const sources: Source[] = [];
 
     // Apply validation and fact extraction

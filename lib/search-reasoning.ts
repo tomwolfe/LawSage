@@ -41,7 +41,7 @@ export async function generateSearchQueries(
     const responseText = result.response.text().trim();
     
     // Try to extract JSON from response
-    let jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
+    const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[1].trim());
     } else {
