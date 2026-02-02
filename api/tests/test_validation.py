@@ -28,6 +28,7 @@ def test_legal_output_schema_creation():
     output = LegalOutput(
         disclaimer="LEGAL DISCLAIMER: This is legal information...",
         strategy="Based on your situation, here is the recommended strategy...",
+        adversarial_strategy="The opposition might argue that the lockout was for safety reasons...",
         roadmap=[strategy_item],
         filing_template="Court Form ABC-123...",
         citations=[citation],
@@ -84,7 +85,7 @@ def test_response_validator_validate_and_fix():
 
 def test_response_validator_validate_legal_output():
     """Test the ResponseValidator.validate_legal_output method."""
-    # Valid content with 3 citations and roadmap (should pass)
+    # Valid content with 3 citations, roadmap, adversarial strategy and procedural checks
     valid_content = """
     This is a legal strategy with citations.
 
@@ -96,6 +97,12 @@ def test_response_validator_validate_legal_output():
     Next Steps:
     1. File initial paperwork
     2. Serve opposing party
+
+    Opposition View:
+    The landlord may argue that the tenant abandoned the property.
+
+    Procedural Checks:
+    Local Rules of Court require filing in Department 1.
     """
 
     assert ResponseValidator.validate_legal_output(valid_content) is True
@@ -168,6 +175,7 @@ def test_legal_output_with_multiple_citations():
     output = LegalOutput(
         disclaimer="LEGAL DISCLAIMER: This is legal information...",
         strategy="Strategy content...",
+        adversarial_strategy="Adversarial content...",
         roadmap=roadmap_items,
         filing_template="Filing template content...",
         citations=citations,
@@ -184,6 +192,7 @@ def test_empty_fields_handling():
     output = LegalOutput(
         disclaimer="LEGAL DISCLAIMER: This is legal information...",
         strategy="Strategy content...",
+        adversarial_strategy="Adversarial content...",
         roadmap=[],
         filing_template="Filing template content...",
         citations=[],

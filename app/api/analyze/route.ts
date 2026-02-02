@@ -94,7 +94,7 @@ Your response MUST be in valid JSON format with the following structure:
       "required_documents": ["List of documents needed"]
     }
   ],
-  "filing_template": "Actual legal filing template here",
+  "filing_template": "A comprehensive template that includes TWO distinct sections:\\n(A) The Civil Complaint (grounded in relevant statutes like CC § 789.3 and CCP § 1160.2 for California lockouts).\\n(B) The Ex Parte Application for TRO/OSC.\\nInclude explicit placeholders for required Judicial Council forms like CM-010, MC-030, and CIV-100.",
   "citations": [
     {
       "text": "12 U.S.C. § 345",
@@ -104,11 +104,11 @@ Your response MUST be in valid JSON format with the following structure:
   ],
   "sources": ["Additional sources referenced in the response"],
   "local_logistics": {
-    "courthouse_address": "Complete address of the courthouse",
-    "filing_fees": "Specific filing fees for this case type",
+    "courthouse_address": "For Los Angeles housing TROs, prioritize: Stanley Mosk Courthouse, 111 N. Hill St, Los Angeles, CA 90012. Specify the 'Ex Parte' window or housing department.",
+    "filing_fees": "Specific filing fees for this case type (e.g., $435 for LASC Civil, or fee waiver info)",
     "dress_code": "Courthouse dress code requirements",
     "parking_info": "Parking information near courthouse",
-    "hours_of_operation": "Courthouse hours of operation",
+    "hours_of_operation": "Courthouse hours of operation (Note: 10:00 AM rule for Ex Parte notice in LASC)",
     "local_rules_url": "URL to local rules of court"
   },
   "procedural_checks": ["Results of procedural technicality checks against Local Rules of Court"]
@@ -280,11 +280,15 @@ Jurisdiction: ${jurisdiction}
 
 You must return a SINGLE JSON object containing:
 1. 'strategy': Overall legal strategy.
-2. 'adversarial_strategy': Red-team analysis of weaknesses. MANDATORY: Do not use placeholders.
+2. 'adversarial_strategy': Red-team analysis of weaknesses. MANDATORY: Do not use placeholders. Identify specific counter-arguments the opposition will use.
 3. 'roadmap': Step-by-step next steps for ${jurisdiction}. If this is an emergency (e.g., lockout), include specific Ex Parte notice times from the provided rules.
-4. 'local_logistics': Specific courthouse info for ${jurisdiction}.
-5. 'filing_template': ${templateContent ? "Use this template but customize it and include ALL sections (Complaint, TRO, Declaration): " + templateContent : "Generate a specific template for " + jurisdiction}.
-6. 'citations': At least 3 verified citations relevant to the subject matter and jurisdiction.
+4. 'local_logistics': Specific courthouse info for ${jurisdiction}. For LASC, prioritize Stanley Mosk Courthouse (111 N. Hill St) for housing TROs.
+5. 'filing_template': Generate TWO distinct templates: 
+   (A) The Civil Complaint (grounded in CC § 789.3 and CCP § 1160.2 if applicable).
+   (B) The Ex Parte Application for TRO/OSC. 
+   Include explicit placeholders for required Judicial Council forms like CM-010 and MC-030.
+   ${templateContent ? "Base these on this content: " + templateContent : ""}
+6. 'citations': At least 3 verified citations relevant to the subject matter and jurisdiction (e.g., Cal. Civ. Code § 789.3).
 
 Return only valid JSON.
 `;

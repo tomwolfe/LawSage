@@ -2,15 +2,21 @@ import { ResponseValidator, SafetyValidator } from '../lib/validation';
 
 describe('ResponseValidator', () => {
   describe('validateLegalOutput', () => {
-    test('should return true for content with at least 3 citations and roadmap', () => {
+    test('should return true for content with citations, roadmap, adversarial strategy, and procedural checks', () => {
       const content = `
         STRATEGY:
         Your legal strategy goes here.
+
+        OPPOSITION VIEW (RED-TEAM ANALYSIS):
+        The landlord may argue that the tenant abandoned the property. This is a significant weakness in our case.
 
         ROADMAP:
         1. First step
         2. Second step
         3. Third step
+
+        COURTHOUSE INFORMATION & LOCAL LOGISTICS:
+        Filing fee is $435 at Stanley Mosk Courthouse.
 
         CITATIONS:
         - 12 U.S.C. § 345
@@ -57,10 +63,16 @@ describe('ResponseValidator', () => {
         STRATEGY:
         Your legal strategy goes here.
 
+        OPPOSITION VIEW:
+        The opposition will likely argue that the user failed to provide proper notice before initiating the lockout procedure, which could be a significant legal hurdle.
+
         ROADMAP:
         1. First step
         2. Second step
         3. Third step
+
+        PROCEDURAL CHECKS:
+        Procedural info here. This is also a bit longer to ensure it is detected correctly by the validator.
 
         CITATIONS:
         - 12 U.S.C. § 345 (federal statute)

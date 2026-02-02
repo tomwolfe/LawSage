@@ -114,10 +114,17 @@
   "ex_parte_notice_rules": [
     {
       "id": 1,
-      "courthouse": "Los Angeles Superior Court (LASC)",
+      "courthouse": "LASC - Stanley Mosk Courthouse (Housing/Civil)",
       "jurisdiction": "California",
       "notice_time": "10:00 AM",
-      "rule": "CRC 3.1203 - Notice must be given by 10:00 AM the court day before the hearing."
+      "rule": "LASC Local Rule 3.202 - For housing TROs (lockouts), file at Stanley Mosk Courthouse (111 N. Hill St). Notice must be given by 10:00 AM the court day before."
+    },
+    {
+      "id": 5,
+      "courthouse": "LASC - General Civil Departments",
+      "jurisdiction": "California",
+      "notice_time": "10:00 AM",
+      "rule": "CRC 3.1203 - Notice due by 10:00 AM the court day before the hearing."
     },
     {
       "id": 2,

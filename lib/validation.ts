@@ -205,8 +205,8 @@ export class ResponseValidator {
 
       for (const s of sentences) {
         const sLower = s.toLowerCase();
-        if (!disclaimerKeywords.some(kw => sLower.includes(kw))) {
-          // It's not a disclaimer sentence, keep it
+        if (s.length > 150 || !disclaimerKeywords.some(kw => sLower.includes(kw))) {
+          // It's not a disclaimer sentence or it's long enough to be content, keep it
           filteredSentences.push(s);
         }
       }
@@ -362,8 +362,8 @@ export class ResponseValidator {
       
       for (const s of sentences) {
         const sLower = s.toLowerCase();
-        if (!disclaimerKeywords.some(kw => sLower.includes(kw))) {
-          // It's not a disclaimer sentence, keep it
+        if (s.length > 150 || !disclaimerKeywords.some(kw => sLower.includes(kw))) {
+          // It's not a disclaimer sentence or it's long enough to be content, keep it
           filteredSentences.push(s);
         }
       }

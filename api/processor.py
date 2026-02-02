@@ -32,10 +32,12 @@ class ResponseValidator:
 
                     # Clean the strategy field to remove any hallucinated disclaimers
                     cleaned_strategy = cls._remove_disclaimers_from_text(parsed_data.strategy)
+                    cleaned_adversarial = cls._remove_disclaimers_from_text(parsed_data.adversarial_strategy)
 
                     # Construct the final output with the standard disclaimer at the top
                     final_output = cls.STANDARD_DISCLAIMER
                     final_output += f"STRATEGY:\n{cleaned_strategy}\n\n"
+                    final_output += f"OPPOSITION VIEW (RED-TEAM ANALYSIS):\n{cleaned_adversarial}\n\n"
 
                     # Format roadmap items
                     final_output += "ROADMAP:\n"
@@ -79,10 +81,12 @@ class ResponseValidator:
 
             # Clean the strategy field to remove any hallucinated disclaimers
             cleaned_strategy = cls._remove_disclaimers_from_text(parsed_data.strategy)
+            cleaned_adversarial = cls._remove_disclaimers_from_text(parsed_data.adversarial_strategy)
 
             # Construct the final output with the standard disclaimer at the top
             final_output = cls.STANDARD_DISCLAIMER
             final_output += f"STRATEGY:\n{cleaned_strategy}\n\n"
+            final_output += f"OPPOSITION VIEW (RED-TEAM ANALYSIS):\n{cleaned_adversarial}\n\n"
 
             # Format roadmap items
             final_output += "ROADMAP:\n"
@@ -132,14 +136,22 @@ class ResponseValidator:
         cleaned_lines = []
 
         for line in lines:
-            if not line.strip():
+            stripped_line = line.strip()
+            if not stripped_line:
                 cleaned_lines.append("")
                 continue
 
             # Check if the line contains disclaimer keywords
-            line_lower = line.lower()
+            line_lower = stripped_line.lower()
             is_disclaimer = any(keyword in line_lower for keyword in disclaimer_keywords)
 
+            # If it's a very long line, it's likely actual content even if it has keywords
+            if is_disclaimer and len(stripped_line) > 200:
+                is_disclaimer = False
+            
+            # If it's the standard disclaimer we added, we don't need to remove it here 
+            # as we add it back at the root level, but let's be careful.
+            
             if not is_disclaimer:
                 cleaned_lines.append(line)
 
