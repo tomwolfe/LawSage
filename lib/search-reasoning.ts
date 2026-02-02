@@ -1,4 +1,4 @@
-import { genai } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 
 /**
  * Generates 3 targeted legal search queries using Gemini for deeper grounding
@@ -12,7 +12,7 @@ export async function generateSearchQueries(
   jurisdiction: string, 
   geminiApiKey: string
 ): Promise<string[]> {
-  const client = genai.Client({ apiKey: geminiApiKey });
+  const client = new GoogleGenAI({ apiKey: geminiApiKey });
   const model = 'gemini-2.5-flash-preview-09-2025';
 
   const systemInstruction = `You are a legal research specialist. Given a user's legal situation and jurisdiction,
@@ -40,7 +40,7 @@ export async function generateSearchQueries(
       contents: prompt,
       config: { systemInstruction }
     });
-    const responseText = result.text().trim();
+    const responseText = result.text?.trim() ?? '';
     
     // Try to extract JSON from response
     const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
@@ -98,7 +98,7 @@ export async function executeSearchQueries(
   queries: string[], 
   geminiApiKey: string
 ): Promise<any[]> {
-  const client = genai.Client({ apiKey: geminiApiKey });
+  const client = new GoogleGenAI({ apiKey: geminiApiKey });
   const model = 'gemini-2.5-flash-preview-09-2025';
 
   const results: any[] = [];
@@ -116,7 +116,7 @@ export async function executeSearchQueries(
       // Extract the search results
       // In the new SDK, grounding metadata is accessed differently
       // Let's check the structure
-      const responseText = result.text();
+      const responseText = result.text ?? '';
       
       // If we have grounding metadata, it should be in the response
       // For now, we'll return the text or a placeholder

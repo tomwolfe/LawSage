@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { genai } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import { SafetyValidator, ResponseValidator, Source } from '../../../lib/validation';
 
 // Mandatory safety disclosure hardcoded for the response stream
@@ -257,7 +257,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const client = genai.Client({ apiKey: xGeminiApiKey });
+    const client = new GoogleGenAI({ apiKey: xGeminiApiKey });
 
     let documentsText = "";
     if (documents && documents.length > 0) {
@@ -302,8 +302,8 @@ Return only valid JSON.
           });
           let rawOutput = '';
 
-          for await (const chunk of result.stream) {
-            rawOutput += chunk.text();
+          for await (const chunk of result) {
+            rawOutput += chunk.text;
           }
 
           let processedOutput = rawOutput;

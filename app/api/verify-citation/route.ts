@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { genai } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 
 // Enable Edge Runtime
 export const runtime = 'edge';
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Initialize the Gemini client using the new SDK
-    const client = genai.Client({ apiKey });
+    const client = new GoogleGenAI({ apiKey });
 
     // Create a prompt to verify the citation using web search
     const verificationPrompt = `
@@ -92,7 +92,10 @@ export async function POST(req: NextRequest) {
     });
 
     // Extract the response text
-    const textResponse = result.text();
+    const textResponse = result.text;
+    if (!textResponse) {
+      throw new Error("No response text from Gemini");
+    }
 
     // Try to parse the response as JSON
     let verificationResult: CitationVerificationResponse;

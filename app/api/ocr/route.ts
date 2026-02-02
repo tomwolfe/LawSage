@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { genai } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import { SafetyValidator, ResponseValidator, Source } from '../../../lib/validation';
 
 // Define types
@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Initialize the Google GenAI client using the new SDK
-    const client = genai.Client({ apiKey: xGeminiApiKey });
+    const client = new GoogleGenAI({ apiKey: xGeminiApiKey });
 
     // Create the prompt for OCR
     const prompt = `Analyze this legal document and extract all relevant facts, dates, parties, and legal references. 
@@ -131,24 +131,6 @@ export async function POST(req: NextRequest) {
       ],
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
-        safetySettings: [
-          {
-            category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-            threshold: 'BLOCK_MEDIUM_AND_ABOVE',
-          },
-          {
-            category: 'HARM_CATEGORY_HATE_SPEECH',
-            threshold: 'BLOCK_MEDIUM_AND_ABOVE',
-          },
-          {
-            category: 'HARM_CATEGORY_HARASSMENT',
-            threshold: 'BLOCK_MEDIUM_AND_ABOVE',
-          },
-          {
-            category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-            threshold: 'BLOCK_MEDIUM_AND_ABOVE',
-          },
-        ],
       }
     });
 
@@ -156,7 +138,10 @@ export async function POST(req: NextRequest) {
       throw new Error("No response from Gemini multimodal model");
     }
 
-    const extractedText = result.text();
+    const extractedText = result.text;
+    if (!extractedText) {
+      throw new Error("No text extracted from image");
+    }
     const sources: Source[] = [];
 
     // Apply validation and fact extraction
