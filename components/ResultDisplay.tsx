@@ -77,7 +77,13 @@ function parseLegalOutput(text: string): { strategy: string; filings: string; st
 
   // Try to parse as structured JSON first
   try {
-    const parsed = JSON.parse(text) as StructuredLegalOutput;
+    const parsedRaw = JSON.parse(text);
+    // Handle procedural_roadmap vs roadmap
+    const parsed: StructuredLegalOutput = {
+      ...parsedRaw,
+      roadmap: parsedRaw.roadmap || parsedRaw.procedural_roadmap || []
+    };
+
     if (parsed.disclaimer && parsed.strategy && parsed.filing_template) {
       // Format the structured output for display
       let strategyText = `${parsed.disclaimer}\n\n${parsed.strategy}\n\n`;
@@ -743,6 +749,36 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
           <LinkIcon size={18} />
           Legal Sources
         </button>
+        <div className="flex-1"></div>
+        <div className="px-6 py-4 flex items-center gap-2">
+          <button
+            onClick={async () => {
+              const currentUrl = window.location.href;
+              try {
+                setCopyStatus(prev => ({ ...prev, share: 'loading' as any }));
+                const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(currentUrl)}`);
+                if (response.ok) {
+                  const shortUrl = await response.text();
+                  await navigator.clipboard.writeText(shortUrl);
+                  setCopyStatus(prev => ({ ...prev, share: true as any }));
+                  setTimeout(() => setCopyStatus(prev => ({ ...prev, share: false as any })), 2000);
+                } else {
+                  throw new Error("Failed to shorten URL");
+                }
+              } catch (err) {
+                console.error(err);
+                // Fallback to copying long URL
+                await navigator.clipboard.writeText(currentUrl);
+                setCopyStatus(prev => ({ ...prev, share: true as any }));
+                setTimeout(() => setCopyStatus(prev => ({ ...prev, share: false as any })), 2000);
+              }
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-colors"
+          >
+            <LinkIcon size={16} />
+            {copyStatus.share === 'loading' ? 'Shortening...' : copyStatus.share ? 'Link Copied!' : 'Share Case'}
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 p-6 overflow-y-auto">

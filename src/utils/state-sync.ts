@@ -92,12 +92,30 @@ export function getStateFromUrl(): any {
  * @returns A combined state object with both case folder, analysis result, and ledger
  */
 export function createVirtualCaseFolderState(caseFolder: any, analysisResult: any, ledger?: any[]): any {
+  // Deeper compression for document summaries and results
+  const compressResult = (res: any) => {
+    if (!res || !res.text) return res;
+    return {
+      ...res,
+      text: LZString.compressToBase64(res.text),
+      _c: true // flag indicating it's compressed
+    };
+  };
+
+  const compressedHistory = caseFolder.history?.map((item: any) => ({
+    ...item,
+    result: compressResult(item.result)
+  }));
+
   return {
-    caseFolder,
-    analysisResult,
+    caseFolder: {
+      ...caseFolder,
+      history: compressedHistory
+    },
+    analysisResult: compressResult(analysisResult),
     ledger: ledger || [],
     timestamp: Date.now(),
-    version: '1.0'
+    version: '1.1'
   };
 }
 
@@ -118,10 +136,25 @@ export function restoreVirtualCaseFolderState(urlHash: string): any {
       return null;
     }
 
-    // Validate the state structure
-    if (typeof decompressedState !== 'object') {
-      console.warn('Invalid state structure in URL hash');
-      return null;
+    // Decompress the fields that were compressed in createVirtualCaseFolderState
+    const decompressResult = (res: any) => {
+      if (!res || !res._c || !res.text) return res;
+      return {
+        ...res,
+        text: LZString.decompressFromBase64(res.text),
+        _c: undefined
+      };
+    };
+
+    if (decompressedState.caseFolder && decompressedState.caseFolder.history) {
+      decompressedState.caseFolder.history = decompressedState.caseFolder.history.map((item: any) => ({
+        ...item,
+        result: decompressResult(item.result)
+      }));
+    }
+
+    if (decompressedState.analysisResult) {
+      decompressedState.analysisResult = decompressResult(decompressedState.analysisResult);
     }
 
     return decompressedState;
@@ -131,45 +164,128 @@ export function restoreVirtualCaseFolderState(urlHash: string): any {
   }
 }
 
+let globalWatcherTimeoutId: any = null;
+
+let globalLastStateHash: string | null = null;
+
+
+
 /**
- * Watches for state changes and updates the URL accordingly
- * @param getState A function that returns the current state to be synced
- * @param debounceMs Debounce time in milliseconds to avoid excessive updates (default: 1000ms)
- * @returns A function to stop watching
+
+
+
+ * Resets the global watcher state (mainly for testing)
+
+
+
  */
+
+
+
+export function resetWatcherState(): void {
+
+
+
+  if (globalWatcherTimeoutId) {
+
+
+
+    clearTimeout(globalWatcherTimeoutId);
+
+
+
+    globalWatcherTimeoutId = null;
+
+
+
+  }
+
+
+
+  globalLastStateHash = null;
+
+
+
+}
+
+
+
+
+
+
+
+/**
+
+
+
+ * Watches for state changes and updates the URL accordingly
+
+
+
+
+
+ * @param getState A function that returns the current state to be synced
+
+ * @param debounceMs Debounce time in milliseconds to avoid excessive updates (default: 1000ms)
+
+ * @returns A function to trigger the debounced update
+
+ */
+
 export function watchStateAndSyncToUrl(getState: () => any, debounceMs: number = 1000): () => void {
-  let timeoutId: NodeJS.Timeout | null = null;
-  let lastStateHash: string | null = null;
-  
+
   const updateUrl = () => {
+
     try {
+
       const currentState = getState();
+
       if (!currentState) return;
+
       
+
       // Create a hash of the current state to avoid unnecessary updates
+
       const currentStateJson = JSON.stringify(currentState);
+
       const currentStateHash = btoa(encodeURIComponent(currentStateJson)).substring(0, 32);
+
       
+
       // Only update if the state has actually changed
-      if (currentStateHash !== lastStateHash) {
+
+      if (currentStateHash !== globalLastStateHash) {
+
         updateUrlWithState(currentState);
-        lastStateHash = currentStateHash;
+
+        globalLastStateHash = currentStateHash;
+
       }
+
     } catch (error) {
+
       console.error('Error in state watcher:', error);
+
     }
+
   };
+
   
+
   // Debounced version of the update function
-  const debouncedUpdate = () => {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
+
+  return () => {
+
+    if (globalWatcherTimeoutId) {
+
+      clearTimeout(globalWatcherTimeoutId);
+
     }
+
     
-    timeoutId = setTimeout(updateUrl, debounceMs);
+
+    globalWatcherTimeoutId = setTimeout(updateUrl, debounceMs);
+
   };
-  
-  // Listen for state changes (this would be called by the component when state changes)
-  // For now, we'll return a function that can be called manually when state changes
-  return debouncedUpdate;
+
 }

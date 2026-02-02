@@ -13,6 +13,7 @@ def test_json_validation_with_minimum_citations():
     valid_json = {
         "disclaimer": "Legal disclaimer",
         "strategy": "Legal strategy",
+        "adversarial_strategy": "Opposition arguments here",
         "roadmap": [
             {
                 "step": 1,
@@ -26,7 +27,9 @@ def test_json_validation_with_minimum_citations():
             {"text": "Cal. Civ. Code § 1708", "source": "Civil Code", "url": "https://example.com"},
             {"text": "Rule 12(b)(6)", "source": "FRCP", "url": "https://example.com"}
         ],
-        "sources": ["https://example.com"]
+        "sources": ["https://example.com"],
+        "local_logistics": {"courthouse_address": "123 Main St"},
+        "procedural_checks": ["Check 1"]
     }
     
     assert ResponseValidator.validate_legal_output(json.dumps(valid_json)) is True
@@ -38,6 +41,7 @@ def test_json_validation_fails_with_insufficient_citations():
     invalid_json = {
         "disclaimer": "Legal disclaimer",
         "strategy": "Legal strategy",
+        "adversarial_strategy": "Opposition arguments here",
         "roadmap": [
             {
                 "step": 1,
@@ -50,7 +54,9 @@ def test_json_validation_fails_with_insufficient_citations():
             {"text": "12 U.S.C. § 345", "source": "USC", "url": "https://example.com"},
             {"text": "Cal. Civ. Code § 1708", "source": "Civil Code", "url": "https://example.com"}
         ],
-        "sources": ["https://example.com"]
+        "sources": ["https://example.com"],
+        "local_logistics": {"courthouse_address": "123 Main St"},
+        "procedural_checks": ["Check 1"]
     }
     
     assert ResponseValidator.validate_legal_output(json.dumps(invalid_json)) is False
@@ -62,6 +68,7 @@ def test_json_validation_fails_without_roadmap():
     invalid_json = {
         "disclaimer": "Legal disclaimer",
         "strategy": "Legal strategy",
+        "adversarial_strategy": "Opposition arguments here",
         "roadmap": [],
         "filing_template": "Template content",
         "citations": [
@@ -69,7 +76,9 @@ def test_json_validation_fails_without_roadmap():
             {"text": "Cal. Civ. Code § 1708", "source": "Civil Code", "url": "https://example.com"},
             {"text": "Rule 12(b)(6)", "source": "FRCP", "url": "https://example.com"}
         ],
-        "sources": ["https://example.com"]
+        "sources": ["https://example.com"],
+        "local_logistics": {"courthouse_address": "123 Main St"},
+        "procedural_checks": ["Check 1"]
     }
     
     assert ResponseValidator.validate_legal_output(json.dumps(invalid_json)) is False
@@ -81,6 +90,7 @@ def test_json_validation_processes_and_formats_output():
     valid_json = {
         "disclaimer": "Legal disclaimer",
         "strategy": "Legal strategy with some disclaimer text that should be removed. I am an AI helping you.",
+        "adversarial_strategy": "Opposition arguments here",
         "roadmap": [
             {
                 "step": 1,
@@ -96,7 +106,9 @@ def test_json_validation_processes_and_formats_output():
             {"text": "Cal. Civ. Code § 1708", "source": "Civil Code", "url": "https://example.com"},
             {"text": "Rule 12(b)(6)", "source": "FRCP", "url": "https://example.com"}
         ],
-        "sources": ["https://example.com"]
+        "sources": ["https://example.com"],
+        "local_logistics": {"courthouse_address": "123 Main St"},
+        "procedural_checks": ["Check 1"]
     }
     
     result = ResponseValidator.validate_and_fix(json.dumps(valid_json))
@@ -131,6 +143,7 @@ def test_json_validation_handles_dict_input():
     valid_dict = {
         "disclaimer": "Legal disclaimer",
         "strategy": "Legal strategy",
+        "adversarial_strategy": "Opposition arguments here",
         "roadmap": [
             {
                 "step": 1,
@@ -144,7 +157,9 @@ def test_json_validation_handles_dict_input():
             {"text": "Cal. Civ. Code § 1708", "source": "Civil Code", "url": "https://example.com"},
             {"text": "Rule 12(b)(6)", "source": "FRCP", "url": "https://example.com"}
         ],
-        "sources": ["https://example.com"]
+        "sources": ["https://example.com"],
+        "local_logistics": {"courthouse_address": "123 Main St"},
+        "procedural_checks": ["Check 1"]
     }
     
     assert ResponseValidator.validate_legal_output(valid_dict) is True
@@ -156,7 +171,7 @@ def test_json_validation_handles_dict_input():
 def test_json_validation_preserves_legacy_format():
     """Test that legacy format is still processed correctly."""
     # This should still work with the legacy format
-    legacy_text = "This is a legal strategy with citations.\n\nCitations:\n- 12 U.S.C. § 345\n- Cal. Civ. Code § 1708\n- Rule 12(b)(6)\n\nNext Steps:\n1. File paperwork\n2. Submit documents\n---\nFiling template here"
+    legacy_text = "This is a legal strategy with citations.\n\nCitations:\n- 12 U.S.C. § 345\n- Cal. Civ. Code § 1708\n- Rule 12(b)(6)\n\nNext Steps:\n1. File paperwork\n2. Submit documents\n\nAdversarial Strategy:\n- Argument A\n\nProcedural Checks:\n- Check 1\n\n---\nFiling template here"
     
     # This should use the legacy validation path
     result = ResponseValidator.validate_legal_output(legacy_text)
@@ -169,6 +184,7 @@ def test_json_validation_removes_hallucinated_disclaimers():
     json_with_disclaimers = {
         "disclaimer": "Legal disclaimer",
         "strategy": "Here is your legal strategy. Note: I am an AI helping you represent yourself Pro Se. This is legal information, not legal advice. You should talk to a qualified attorney. More strategy content here.",
+        "adversarial_strategy": "Opposition arguments here",
         "roadmap": [
             {
                 "step": 1,
@@ -182,7 +198,9 @@ def test_json_validation_removes_hallucinated_disclaimers():
             {"text": "Cal. Civ. Code § 1708", "source": "Civil Code", "url": "https://example.com"},
             {"text": "Rule 12(b)(6)", "source": "FRCP", "url": "https://example.com"}
         ],
-        "sources": ["https://example.com"]
+        "sources": ["https://example.com"],
+        "local_logistics": {"courthouse_address": "123 Main St"},
+        "procedural_checks": ["Check 1"]
     }
 
     result = ResponseValidator.validate_and_fix(json.dumps(json_with_disclaimers))

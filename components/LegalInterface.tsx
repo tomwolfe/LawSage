@@ -84,7 +84,9 @@ export default function LegalInterface() {
 
   // Initialize state from URL fragment on component mount
   useEffect(() => {
-    const savedState = getStateFromUrl();
+    const hash = window.location.hash.substring(1);
+    const savedState = restoreVirtualCaseFolderState(hash);
+    
     if (savedState) {
       // Check if this is the enhanced Virtual Case Folder state format
       if (savedState.caseFolder && savedState.analysisResult) {
@@ -137,16 +139,13 @@ export default function LegalInterface() {
       backendUnreachable
     }, result, caseLedger);
 
-    // Update URL immediately with current state
-    updateUrlWithState(getStateToSync());
-
-    // Set up watcher for ongoing state changes
-    const stopWatching = watchStateAndSyncToUrl(getStateToSync, 1000);
+    // Use debounced watcher for ongoing state changes
+    const debouncedUpdate = watchStateAndSyncToUrl(getStateToSync, 1000);
+    debouncedUpdate();
 
     // Return cleanup function
     return () => {
-      // Call stopWatching if it exists
-      // In this implementation, we just ensure the latest state is saved when component unmounts
+      // On unmount, ensure latest state is saved immediately
       updateUrlWithState(getStateToSync());
     };
   }, [userInput, jurisdiction, result, activeTab, history, selectedHistoryItem, backendUnreachable, caseLedger]);

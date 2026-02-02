@@ -74,13 +74,16 @@ function cosineSimilarity(text1: string, text2: string): number {
 
 // System instruction for the model
 const SYSTEM_INSTRUCTION = `
-You are a legal assistant helping pro se litigants (people representing themselves).
-You must perform a comprehensive analysis that includes adversarial strategy and procedural checks.
+You are a Universal Public Defender helping pro se litigants (people representing themselves).
+You MUST perform a comprehensive analysis that batches three critical areas into a SINGLE response:
+1. ADVERSARIAL STRATEGY: A 'red-team' analysis of the user's claims, identifying weaknesses and potential opposition arguments.
+2. PROCEDURAL ROADMAP: A step-by-step guide on what to do next, with estimated times and required documents.
+3. LOCAL LOGISTICS: Courthouse locations, filing fees, dress codes, and hours of operation.
 
 Your response MUST be in valid JSON format with the following structure:
 {
   "disclaimer": "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. This is legal information, not legal advice. Always consult with a qualified attorney.",
-  "strategy": "Your legal strategy and analysis here",
+  "strategy": "Your primary legal strategy and analysis here",
   "adversarial_strategy": "Opposition arguments and 'red-team' analysis of the user's case",
   "procedural_roadmap": [
     {
@@ -115,15 +118,11 @@ Your response MUST be in valid JSON format with the following structure:
 }
 
 CRITICAL INSTRUCTIONS:
-1. Perform a 'red-team' analysis of the user's claims - identify weaknesses and potential opposition arguments
-2. Use the Google Search tool to find 'Local Rules of Court' for the user's specific county/district
-3. Extract courthouse location, filing fees, and procedural requirements from these local rules
-4. If Local Rules search fails, fall back to general state rules with a warning flag
-5. Ensure the response is valid JSON with all required fields
-6. Include at least 3 proper legal citations in the citations array
-7. Include a detailed procedural_roadmap with at least 3 steps
-8. Include comprehensive local logistics information
-9. Return ALL requested information in a single JSON response to minimize API calls
+1. Use the Google Search tool (if available) to find 'Local Rules of Court' for the user's specific county/district.
+2. Extract courthouse location, filing fees, and procedural requirements from these local rules.
+3. Return ALL requested information in a single JSON response to stay within Vercel Hobby limits (<20 calls/day).
+4. Include at least 3 proper legal citations.
+5. Provide a detailed procedural_roadmap with at least 3 steps.
 `;
 
 export const runtime = 'edge'; // Enable edge runtime
@@ -157,56 +156,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if the query matches any rules in the legal lookup database first (static grounding layer)
-    // This provides instant, zero-latency research for common queries
-    if (xGeminiApiKey) {
-      // Only validate API key if provided (for advanced features)
-      if (!xGeminiApiKey.startsWith("AIza") || xGeminiApiKey.length < 20) {
-        return NextResponse.json(
-          {
-            type: "ValidationError",
-            detail: "Invalid Gemini API Key format."
-          } satisfies StandardErrorResponse,
-          { status: 400 }
-        );
-      }
-    }
-
     // Try the static grounding layer first - check if this is a common procedural question
     const { getLegalLookupResponse } = await import('../../../src/utils/legal-lookup');
     const staticResponse = await getLegalLookupResponse(`${user_input} ${jurisdiction}`);
 
     if (staticResponse) {
       // If we found a match in the static grounding layer, return it immediately
-      // This provides zero-latency research for common procedural rules
       return NextResponse.json(staticResponse);
     }
 
     // Template injection: Find the best matching template for the user's input
     let templateContent = '';
     try {
-      // Fetch the templates manifest
       const manifestResponse = await fetch(`${req.nextUrl.origin}/templates/manifest.json`);
       if (manifestResponse.ok) {
         const manifest = await manifestResponse.json();
         const templates = manifest.templates || [];
 
-        // Find the best matching template using cosine similarity
         let bestMatch = null;
         let highestSimilarity = -1;
 
         for (const template of templates) {
-          // Calculate similarity with title
           const titleSimilarity = cosineSimilarity(user_input.toLowerCase(), template.title.toLowerCase());
-
-          // Calculate similarity with description
           const descSimilarity = cosineSimilarity(user_input.toLowerCase(), template.description.toLowerCase());
-
-          // Calculate similarity with keywords
           const keywordsText = template.keywords.join(' ');
           const keywordsSimilarity = cosineSimilarity(user_input.toLowerCase(), keywordsText.toLowerCase());
-
-          // Weighted combination of similarities
           const combinedSimilarity = (titleSimilarity * 0.4) + (descSimilarity * 0.3) + (keywordsSimilarity * 0.3);
 
           if (combinedSimilarity > highestSimilarity) {
@@ -215,8 +189,7 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // If we found a good match, fetch the template content
-        if (bestMatch && highestSimilarity > 0.1) { // Threshold for considering a match
+        if (bestMatch && highestSimilarity > 0.1) {
           const templatePath = bestMatch.templatePath;
           const templateResponse = await fetch(`${req.nextUrl.origin}${templatePath}`);
           if (templateResponse.ok) {
@@ -226,10 +199,8 @@ export async function POST(req: NextRequest) {
       }
     } catch (error) {
       console.warn('Template matching failed:', error);
-      // Continue without template injection if it fails
     }
 
-    // If no match in static grounding layer, proceed with Gemini API call
     if (!xGeminiApiKey) {
       return NextResponse.json(
         {
@@ -240,7 +211,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Perform red team audit
     if (!SafetyValidator.redTeamAudit(user_input, jurisdiction)) {
       return NextResponse.json(
         {
@@ -251,32 +221,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Initialize the Google Generative AI client
     const genAI = new GoogleGenerativeAI(xGeminiApiKey);
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash-preview-09-2025",
       systemInstruction: SYSTEM_INSTRUCTION,
-      safetySettings: [
-        {
-          category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        },
-      ],
     });
 
-    // Create the prompt
     let documentsText = "";
     if (documents && documents.length > 0) {
       documentsText = "RELEVANT DOCUMENTS FROM VIRTUAL CASE FOLDER:\n\n";
@@ -291,106 +241,33 @@ ${documentsText}
 User Situation: ${user_input}
 Jurisdiction: ${jurisdiction}
 
-Act as a Universal Public Defender.
-Generate a comprehensive legal response in the following JSON format:
+You must return a SINGLE JSON object containing:
+1. 'strategy': Overall legal strategy.
+2. 'adversarial_strategy': Red-team analysis of weaknesses.
+3. 'procedural_roadmap': Step-by-step next steps for ${jurisdiction}.
+4. 'local_logistics': Specific courthouse info for ${jurisdiction}.
+5. 'filing_template': ${templateContent ? "Use this template but customize it: " + templateContent : "Generate a specific template for " + jurisdiction}.
+6. 'citations': At least 3 verified citations.
 
-{
-  "disclaimer": "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. This is legal information, not legal advice. Always consult with a qualified attorney.",
-  "strategy": "Your legal strategy and analysis for ${jurisdiction} jurisdiction",
-  "adversarial_strategy": "Opposition arguments and 'red-team' analysis of the user's case",
-  "procedural_roadmap": [
-    {
-      "step": 1,
-      "title": "First step title",
-      "description": "Detailed description of what to do",
-      "estimated_time": "Timeframe for completion",
-      "required_documents": ["List of documents needed"],
-      "status": "pending"
-    },
-    {
-      "step": 2,
-      "title": "Second step title",
-      "description": "Detailed description of what to do",
-      "estimated_time": "Timeframe for completion",
-      "required_documents": ["List of documents needed"],
-      "status": "pending"
-    },
-    {
-      "step": 3,
-      "title": "Third step title",
-      "description": "Detailed description of what to do",
-      "estimated_time": "Timeframe for completion",
-      "required_documents": ["List of documents needed"],
-      "status": "pending"
-    }
-  ],
-  "filing_template": "${templateContent || `Actual legal filing template with specific forms and procedures for ${jurisdiction}`}",
-  "citations": [
-    {
-      "text": "12 U.S.C. § 345",
-      "source": "federal statute",
-      "url": "optional URL to citation source",
-      "is_verified": false,
-      "verification_source": "optional source used to verify"
-    },
-    {
-      "text": "Cal. Civ. Code § 1708",
-      "source": "state code",
-      "url": "optional URL to citation source",
-      "is_verified": false,
-      "verification_source": "optional source used to verify"
-    },
-    {
-      "text": "Rule 12(b)(6)",
-      "source": "court rule",
-      "url": "optional URL to citation source",
-      "is_verified": false,
-      "verification_source": "optional source used to verify"
-    }
-  ],
-  "sources": ["Additional sources referenced in the response"],
-  "local_logistics": {
-    "courthouse_address": "Complete address of the courthouse in ${jurisdiction}",
-    "filing_fees": "Specific filing fees for this case type in ${jurisdiction}",
-    "dress_code": "Courthouse dress code requirements in ${jurisdiction}",
-    "parking_info": "Parking information near courthouse in ${jurisdiction}",
-    "hours_of_operation": "Courthouse hours of operation in ${jurisdiction}",
-    "local_rules_url": "URL to local rules of court in ${jurisdiction}"
-  },
-  "procedural_checks": ["Results of procedural technicality checks against Local Rules of Court in ${jurisdiction}"]
-}
-
-CRITICAL: Your response must be valid JSON with all required fields. Include at least 3 legal citations, a detailed procedural_roadmap with at least 3 steps, and comprehensive local logistics information specific to ${jurisdiction}. Return ALL information in a single response to minimize API calls.
+Return only valid JSON.
 `;
 
-    // Create a readable stream to keep the connection alive during processing
     const encoder = new TextEncoder();
-
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          // Stream content using the model
           const result = await model.generateContentStream(prompt);
-
-          // Process the streamed response
           let rawOutput = '';
-          let parsedOutput: any = null;
-          let sources: Source[] = [];
-          let formattedOutput = '';
 
-          // Process each chunk as it arrives
           for await (const chunk of result.stream) {
-            const chunkText = chunk.text();
-            rawOutput += chunkText;
+            rawOutput += chunk.text();
           }
 
-          // Try to extract JSON from the complete response if it's wrapped in markdown or other text
           let processedOutput = rawOutput;
           let jsonMatch = rawOutput.match(/```json\s*([\s\S]*?)\s*```/);
           if (jsonMatch) {
             processedOutput = jsonMatch[1].trim();
           } else {
-            // Try to find JSON within the text
             const braceStart = rawOutput.indexOf('{');
             const braceEnd = rawOutput.lastIndexOf('}');
             if (braceStart !== -1 && braceEnd !== -1 && braceEnd > braceStart) {
@@ -398,124 +275,43 @@ CRITICAL: Your response must be valid JSON with all required fields. Include at 
             }
           }
 
-          try {
-            parsedOutput = JSON.parse(processedOutput);
-          } catch (e) {
-            console.error("Failed to parse JSON response from Gemini:", e);
-            console.error("Raw output:", rawOutput);
+          const parsedOutput = JSON.parse(processedOutput);
+          
+          // Re-format into text for compatibility with existing frontend tabs
+          let formattedText = `${parsedOutput.disclaimer}\n\n`;
+          formattedText += `STRATEGY:\n${parsedOutput.strategy}\n\n`;
+          formattedText += `ADVERSARIAL STRATEGY:\n${parsedOutput.adversarial_strategy}\n\n`;
+          
+          formattedText += "PROCEDURAL ROADMAP:\n";
+          parsedOutput.procedural_roadmap.forEach((item: any) => {
+            formattedText += `${item.step}. ${item.title}: ${item.description}\n`;
+            if (item.estimated_time) formattedText += `   Time: ${item.estimated_time}\n`;
+          });
+          formattedText += "\n";
 
-            // Send error response
-            const errorMessage = `ERROR: Failed to parse structured response from AI. Raw response: ${rawOutput}`;
+          formattedText += "LOCAL LOGISTICS:\n";
+          formattedText += JSON.stringify(parsedOutput.local_logistics, null, 2);
+          formattedText += "\n\n";
 
-            const errorResult: LegalResult = {
-              text: errorMessage,
-              sources: []
-            };
+          formattedText += "---\n\nFILING TEMPLATE:\n";
+          formattedText += parsedOutput.filing_template;
 
-            // Send the complete response as a single JSON object
-            controller.enqueue(encoder.encode(JSON.stringify(errorResult)));
-            controller.close();
-            return;
-          }
-
-          // Extract sources from the parsed JSON
-          if (parsedOutput.sources && Array.isArray(parsedOutput.sources)) {
-            for (const source of parsedOutput.sources) {
-              if (typeof source === 'string' && source.startsWith('http')) {
-                sources.push({ title: "Legal Resource", uri: source });
-              }
-            }
-          }
-
-          // If no sources were found in the JSON, extract from citations
-          if (sources.length === 0 && parsedOutput.citations && Array.isArray(parsedOutput.citations)) {
-            for (const citation of parsedOutput.citations) {
-              if (citation.url && typeof citation.url === 'string' && citation.url.startsWith('http')) {
-                sources.push({ title: citation.text || "Legal Citation", uri: citation.url });
-              }
-            }
-          }
-
-          // Format the structured output as text for compatibility with existing frontend
-          formattedOutput = `${parsedOutput.disclaimer}\n\n`;
-
-          formattedOutput += `STRATEGY:\n${parsedOutput.strategy}\n\n`;
-
-          if (parsedOutput.adversarial_strategy) {
-            formattedOutput += `ADVERSARIAL STRATEGY:\n${parsedOutput.adversarial_strategy}\n\n`;
-          }
-
-          if (parsedOutput.procedural_roadmap && Array.isArray(parsedOutput.procedural_roadmap)) {
-            formattedOutput += "PROCEDURAL ROADMAP:\n";
-            for (const item of parsedOutput.procedural_roadmap) {
-              formattedOutput += `\n${item.step}. ${item.title}\n`;
-              formattedOutput += `   Description: ${item.description}\n`;
-              if (item.estimated_time) {
-                formattedOutput += `   Estimated Time: ${item.estimated_time}\n`;
-              }
-              if (item.required_documents && Array.isArray(item.required_documents) && item.required_documents.length > 0) {
-                formattedOutput += `   Required Documents: ${item.required_documents.join(', ')}\n`;
-              }
-              formattedOutput += `   Status: ${item.status}\n`;
-            }
-            formattedOutput += "\n";
-          }
-
-          if (parsedOutput.procedural_checks && Array.isArray(parsedOutput.procedural_checks) && parsedOutput.procedural_checks.length > 0) {
-            formattedOutput += "PROCEDURAL CHECKS:\n";
-            for (const check of parsedOutput.procedural_checks) {
-              formattedOutput += `- ${check}\n`;
-            }
-            formattedOutput += "\n";
-          }
-
-          if (parsedOutput.citations && Array.isArray(parsedOutput.citations)) {
-            formattedOutput += "CITATIONS:\n";
-            for (const citation of parsedOutput.citations) {
-              formattedOutput += `- ${citation.text}`;
-              if (citation.source) {
-                formattedOutput += ` (${citation.source})`;
-              }
-              if (citation.url) {
-                formattedOutput += ` ${citation.url}`;
-              }
-              formattedOutput += "\n";
-            }
-            formattedOutput += "\n";
-          }
-
-          if (parsedOutput.local_logistics) {
-            formattedOutput += "---\n\nLOCAL LOGISTICS:\n";
-            formattedOutput += JSON.stringify(parsedOutput.local_logistics, null, 2) + "\n\n";
-          }
-
-          formattedOutput += "---\n\nFILING TEMPLATE:\n";
-          formattedOutput += parsedOutput.filing_template;
-
-          // Apply validation and formatting
-          const finalText = ResponseValidator.validateAndFix(formattedOutput);
-
-          // Prepare the final response
           const legalResult: LegalResult = {
-            text: finalText,
-            sources: sources
+            text: formattedText,
+            sources: parsedOutput.citations?.map((c: any) => ({ title: c.text, uri: c.url })) || []
           };
 
-          // Send the complete response as a single JSON object
           controller.enqueue(encoder.encode(JSON.stringify(legalResult)));
+        } catch (e) {
+          console.error("AI processing error:", e);
+          controller.enqueue(encoder.encode(JSON.stringify({ text: "Error processing request", sources: [] })));
         } finally {
           controller.close();
         }
       }
     });
 
-    // Return the response as a stream
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Transfer-Encoding': 'chunked',
-      },
-    });
+    return new Response(stream, { headers: { 'Content-Type': 'application/json' } });
   } catch (error: any) {
     console.error("Error in analyze API route:", error);
 
