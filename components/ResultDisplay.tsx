@@ -336,17 +336,26 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let errorMsg = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMsg = errorData.details || errorData.error || errorMsg;
+        } catch (e) {
+          // Fallback to text if JSON parse fails
+          const text = await response.text();
+          if (text) errorMsg = text.slice(0, 100);
+        }
+        throw new Error(errorMsg);
       }
 
       const data = await response.json();
       return data;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error verifying citation:', error);
       return {
         is_verified: false,
         verification_source: 'Error',
-        status_message: 'Verification failed'
+        status_message: error.message || 'Verification failed'
       };
     }
   };

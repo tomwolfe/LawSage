@@ -103,25 +103,22 @@ export async function POST(req: NextRequest) {
     let verificationResult: CitationVerificationResponse;
     
     try {
-      // Extract JSON from the response if it's wrapped in markdown code block
-      const jsonMatch = textResponse.match(/```json\n?([\s\S]*?)\n?```|```([\s\S]*?)```/);
-      let jsonString = '';
+      let jsonString = textResponse;
+      
+      // Extract JSON from the response if it's wrapped in markdown code block or contains other text
+      const jsonMatch = textResponse.match(/```json\s*([\s\S]*?)\s*```/) || 
+                        textResponse.match(/```\s*([\s\S]*?)\s*```/);
       
       if (jsonMatch) {
-        jsonString = jsonMatch[1] || jsonMatch[2] || textResponse;
+        jsonString = jsonMatch[1].trim();
       } else {
-        jsonString = textResponse;
+        // Find the first { and last }
+        const start = textResponse.indexOf('{');
+        const end = textResponse.lastIndexOf('}');
+        if (start !== -1 && end !== -1 && end > start) {
+          jsonString = textResponse.substring(start, end + 1);
+        }
       }
-      
-      // Clean up the JSON string
-      jsonString = jsonString.trim();
-      if (jsonString.startsWith('```json')) {
-        jsonString = jsonString.substring(7); // Remove ```json
-      }
-      if (jsonString.endsWith('```')) {
-        jsonString = jsonString.substring(0, jsonString.length - 3); // Remove ```
-      }
-      jsonString = jsonString.trim();
       
       verificationResult = JSON.parse(jsonString);
     } catch (parseError) {
