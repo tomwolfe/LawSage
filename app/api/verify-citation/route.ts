@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
         {
           googleSearch: {},
         },
-      ],
+      ] as any,
       generationConfig: {
         temperature: 0.1,
         maxOutputTokens: 1000,
