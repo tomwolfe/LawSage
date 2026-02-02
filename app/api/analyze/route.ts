@@ -76,7 +76,7 @@ function cosineSimilarity(text1: string, text2: string): number {
 const SYSTEM_INSTRUCTION = `
 You are a Universal Public Defender helping pro se litigants (people representing themselves).
 You MUST perform a comprehensive analysis that batches three critical areas into a SINGLE response:
-1. ADVERSARIAL STRATEGY: A 'red-team' analysis of the user's claims, identifying weaknesses and potential opposition arguments.
+1. ADVERSARIAL STRATEGY: A 'red-team' analysis of the user's claims. You MUST identify at least three specific weaknesses or potential opposition arguments. DO NOT provide placeholders like "No strategy provided" or "To be determined." If you cannot find a weakness, analyze the most likely procedural hurdles the opposition will raise.
 2. PROCEDURAL ROADMAP: A step-by-step guide on what to do next, with estimated times and required documents.
 3. LOCAL LOGISTICS: Courthouse locations, filing fees, dress codes, and hours of operation.
 
@@ -84,7 +84,7 @@ Your response MUST be in valid JSON format with the following structure:
 {
   "disclaimer": "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. This is legal information, not legal advice. Always consult with a qualified attorney.",
   "strategy": "Your primary legal strategy and analysis here",
-  "adversarial_strategy": "Opposition arguments and 'red-team' analysis of the user's case",
+  "adversarial_strategy": "A DETAILED red-team analysis of the user's case. Identify specific weaknesses and how the opposition will likely counter each of the user's main points. This section is MANDATORY and must be substantial.",
   "procedural_roadmap": [
     {
       "step": 1,
@@ -120,9 +120,10 @@ Your response MUST be in valid JSON format with the following structure:
 CRITICAL INSTRUCTIONS:
 1. Use the Google Search tool (if available) to find 'Local Rules of Court' for the user's specific county/district.
 2. Extract courthouse location, filing fees, and procedural requirements from these local rules.
-3. Return ALL requested information in a single JSON response to stay within Vercel Hobby limits (<20 calls/day).
+3. Return ALL requested information in a single JSON response.
 4. Include at least 3 proper legal citations.
 5. Provide a detailed procedural_roadmap with at least 3 steps.
+6. MANDATORY: The 'adversarial_strategy' must NOT be empty or use generic placeholders. It must be a critical analysis of the specific facts provided by the user.
 `;
 
 export const runtime = 'edge'; // Enable edge runtime
@@ -167,6 +168,22 @@ export async function POST(req: NextRequest) {
 
     // Template injection: Find the best matching template for the user's input
     let templateContent = '';
+    let isEmergency = user_input.toLowerCase().includes('lockout') || user_input.toLowerCase().includes('changed locks');
+    
+    // Fetch Ex Parte rules if it's an emergency
+    let exParteRulesText = "";
+    if (isEmergency) {
+      const { searchExParteRules } = await import('../../../src/utils/legal-lookup');
+      const exParteRules = await searchExParteRules(jurisdiction);
+      if (exParteRules.length > 0) {
+        exParteRulesText = "EX PARTE NOTICE RULES FOR THIS JURISDICTION:\n";
+        exParteRules.forEach(rule => {
+          exParteRulesText += `- ${rule.courthouse}: Notice due by ${rule.notice_time}. Rule: ${rule.rule}\n`;
+        });
+        exParteRulesText += "\n";
+      }
+    }
+
     try {
       const manifestResponse = await fetch(`${req.nextUrl.origin}/templates/manifest.json`);
       if (manifestResponse.ok) {
@@ -237,17 +254,18 @@ export async function POST(req: NextRequest) {
 
     const prompt = `
 ${documentsText}
+${exParteRulesText}
 
 User Situation: ${user_input}
 Jurisdiction: ${jurisdiction}
 
 You must return a SINGLE JSON object containing:
 1. 'strategy': Overall legal strategy.
-2. 'adversarial_strategy': Red-team analysis of weaknesses.
-3. 'procedural_roadmap': Step-by-step next steps for ${jurisdiction}.
+2. 'adversarial_strategy': Red-team analysis of weaknesses. MANDATORY: Do not use placeholders.
+3. 'procedural_roadmap': Step-by-step next steps for ${jurisdiction}. If this is an emergency (e.g., lockout), include specific Ex Parte notice times from the provided rules.
 4. 'local_logistics': Specific courthouse info for ${jurisdiction}.
 5. 'filing_template': ${templateContent ? "Use this template but customize it: " + templateContent : "Generate a specific template for " + jurisdiction}.
-6. 'citations': At least 3 verified citations.
+6. 'citations': At least 3 verified citations relevant to the subject matter and jurisdiction.
 
 Return only valid JSON.
 `;

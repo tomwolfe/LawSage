@@ -153,6 +153,14 @@
       "templatePath": "/templates/trust-deed.md"
     },
     {
+      "id": "lockout-emergency-pack",
+      "title": "Lockout Emergency Pack",
+      "category": "Real Estate Law",
+      "description": "Comprehensive pack for emergency lockout situations including Complaint, Ex Parte Application for TRO, and Declaration.",
+      "keywords": ["lockout", "changed locks", "ex parte", "tro", "emergency", "eviction", "landlord", "possession", "declaration"],
+      "templatePath": "/templates/lockout-emergency-pack.md"
+    },
+    {
       "id": "partnership-agreement",
       "title": "Partnership Agreement",
       "category": "Business Law",

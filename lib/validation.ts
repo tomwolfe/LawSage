@@ -271,7 +271,33 @@ export class ResponseValidator {
 
     // Check for Adversarial Strategy
     const adversarialKeywords = ["Adversarial Strategy", "Opposition View", "Red-Team Analysis", "Opposition arguments"];
-    const hasAdversarial = adversarialKeywords.some(kw => content.toLowerCase().includes(kw.toLowerCase()));
+    const hasAdversarialHeader = adversarialKeywords.some(kw => content.toLowerCase().includes(kw.toLowerCase()));
+    
+    // Check if the adversarial strategy is actually content and not a placeholder
+    const placeholderPatterns = [
+      /no strategy provided/i,
+      /to be determined/i,
+      /not available/i,
+      /none provided/i,
+      /placeholder/i,
+      /analysis pending/i
+    ];
+    
+    // Find the adversarial strategy section content
+    let adversarialContent = "";
+    const lowerContent = content.toLowerCase();
+    for (const kw of adversarialKeywords) {
+      const index = lowerContent.indexOf(kw.toLowerCase());
+      if (index !== -1) {
+        // Assume the section ends at the next double newline or next major header
+        const sectionEnd = lowerContent.indexOf("\n\n", index + kw.length);
+        adversarialContent = content.substring(index, sectionEnd !== -1 ? sectionEnd : content.length);
+        break;
+      }
+    }
+    
+    const isPlaceholder = placeholderPatterns.some(pattern => pattern.test(adversarialContent));
+    const hasAdversarial = hasAdversarialHeader && adversarialContent.length > 50 && !isPlaceholder;
 
     // Check for Procedural Checks
     const proceduralKeywords = ["Procedural Checks", "Local Rules of Court", "Procedural technicality"];

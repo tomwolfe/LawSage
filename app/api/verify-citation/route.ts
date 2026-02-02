@@ -7,10 +7,12 @@ export const runtime = 'edge';
 interface CitationVerificationRequest {
   citation: string;
   jurisdiction: string;
+  subject_matter?: string;
 }
 
 interface CitationVerificationResponse {
   is_verified: boolean;
+  is_relevant: boolean;
   verification_source: string;
   status_message: string;
   details?: string;
@@ -28,7 +30,7 @@ export async function POST(req: NextRequest) {
 
     // Parse the request body
     const body: CitationVerificationRequest = await req.json();
-    const { citation, jurisdiction } = body;
+    const { citation, jurisdiction, subject_matter } = body;
 
     // Validate inputs
     if (!citation || !jurisdiction) {
@@ -59,25 +61,33 @@ export async function POST(req: NextRequest) {
 
     // Create a prompt to verify the citation using web search
     const verificationPrompt = `
-      Verify if the following legal citation is still valid ("good law") in ${jurisdiction} jurisdiction:
+      Verify the following legal citation:
       
       Citation: "${citation}"
+      Target Jurisdiction: ${jurisdiction}
+      Subject Matter: ${subject_matter || "General Legal"}
+      
+      You MUST perform two checks:
+      1. VALIDITY: Is the citation "good law"? (Not overruled, repealed, or outdated).
+      2. RELEVANCE: Is this citation contextually relevant to ${jurisdiction} and the subject of ${subject_matter || "the case"}? 
+         - Flag citations that are from the wrong jurisdiction (e.g., citing a New York case for a California matter unless it's for a universal principle).
+         - Flag citations that are unrelated to the subject matter (e.g., citing a maritime law case for a landlord-tenant dispute).
       
       Please respond with a JSON object containing:
-      - "is_verified": boolean indicating if the citation is still valid
+      - "is_verified": boolean indicating if the citation is "good law"
+      - "is_relevant": boolean indicating if the citation is relevant to the jurisdiction and subject matter
       - "verification_source": string with the source used for verification
-      - "status_message": string with a brief explanation of the verification status
-      - "details": optional string with additional details about the citation's status
+      - "status_message": string with a brief explanation of the status (validity and relevance)
+      - "details": additional details about why it is or isn't relevant/valid
       
       Example response format:
       {
         "is_verified": true,
-        "verification_source": "Google Scholar, Legal Databases",
-        "status_message": "Citation is valid and still good law",
-        "details": "This statute has not been repealed or amended recently"
+        "is_relevant": false,
+        "verification_source": "Google Scholar, Case Law Database",
+        "status_message": "Citation is good law but NOT relevant to this jurisdiction.",
+        "details": "Jordan v. Tashiro (1928) is a Supreme Court case about treaty rights and corporate formation, which does not apply to a California residential lockout situation."
       }
-      
-      If the citation is invalid, overruled, or no longer good law, set is_verified to false and explain why.
     `;
 
     // Generate content using the model with web search capability
@@ -122,10 +132,14 @@ export async function POST(req: NextRequest) {
       console.warn('Failed to parse verification response as JSON:', parseError);
       console.log('Raw response:', textResponse);
       
+      const textLower = textResponse.toLowerCase();
       verificationResult = {
-        is_verified: textResponse.toLowerCase().includes('valid') || 
-                     textResponse.toLowerCase().includes('good law') ||
-                     textResponse.toLowerCase().includes('still in effect'),
+        is_verified: textLower.includes('valid') || 
+                     textLower.includes('good law') ||
+                     textLower.includes('still in effect'),
+        is_relevant: !textLower.includes('not relevant') && 
+                     !textLower.includes('irrelevant') &&
+                     !textLower.includes('wrong jurisdiction'),
         verification_source: 'Gemini Web Search',
         status_message: textResponse.substring(0, 200) + '...',
         details: textResponse

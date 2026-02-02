@@ -110,5 +110,35 @@
     { "id": 109, "rule_number": "VT 12 VSA 5531", "title": "Small Claims Limit", "description": "Small claims limit is $10,000.", "jurisdiction": "Vermont", "category": "Small Claims" },
     { "id": 110, "rule_number": "WY WRCP 12", "title": "Summons Response Time", "description": "Answer due within 20 days after service (30 days if out of state).", "jurisdiction": "Wyoming", "category": "Service" },
     { "id": 111, "rule_number": "WY Stat 1-21-201", "title": "Small Claims Limit", "description": "Small claims limit is $6,000.", "jurisdiction": "Wyoming", "category": "Small Claims" }
+  ],
+  "ex_parte_notice_rules": [
+    {
+      "id": 1,
+      "courthouse": "Los Angeles Superior Court (LASC)",
+      "jurisdiction": "California",
+      "notice_time": "10:00 AM",
+      "rule": "CRC 3.1203 - Notice must be given by 10:00 AM the court day before the hearing."
+    },
+    {
+      "id": 2,
+      "courthouse": "San Francisco Superior Court",
+      "jurisdiction": "California",
+      "notice_time": "10:00 AM",
+      "rule": "Local Rule 9.1 - Notice must be given by 10:00 AM the court day before the hearing."
+    },
+    {
+      "id": 3,
+      "courthouse": "New York County Supreme Court",
+      "jurisdiction": "New York",
+      "notice_time": "Varies",
+      "rule": "CPLR 2214 - Order to Show Cause (OSC) is usually required for ex parte relief."
+    },
+    {
+      "id": 4,
+      "courthouse": "Harris County District Court",
+      "jurisdiction": "Texas",
+      "notice_time": "Reasonable Notice",
+      "rule": "Rule 680 - No TRO shall be granted without notice unless it clearly appears from specific facts that immediate and irreparable injury will result."
+    }
   ]
 }

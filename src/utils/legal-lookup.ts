@@ -20,8 +20,17 @@ interface LegalRule {
   category: string;
 }
 
+interface ExParteNoticeRule {
+  id: number;
+  courthouse: string;
+  jurisdiction: string;
+  notice_time: string;
+  rule: string;
+}
+
 interface LegalLookupDatabase {
   pro_se_procedural_rules: LegalRule[];
+  ex_parte_notice_rules: ExParteNoticeRule[];
 }
 
 let legalLookupDb: LegalLookupDatabase | null = null;
@@ -86,6 +95,25 @@ export async function searchLegalLookup(query: string): Promise<LegalRule[]> {
 export async function hasLegalLookupMatch(query: string): Promise<boolean> {
   const matches = await searchLegalLookup(query);
   return matches.length > 0;
+}
+
+/**
+ * Searches the legal lookup database for ex parte notice rules
+ * @param jurisdiction The jurisdiction to search for
+ * @returns Array of matching ex parte notice rules
+ */
+export async function searchExParteRules(jurisdiction: string): Promise<ExParteNoticeRule[]> {
+  const db = await loadLegalLookupDb();
+  
+  if (!jurisdiction || !db?.ex_parte_notice_rules) {
+    return [];
+  }
+
+  const searchTerm = jurisdiction.toLowerCase().trim();
+  
+  return db.ex_parte_notice_rules.filter(rule => {
+    return rule.jurisdiction.toLowerCase().includes(searchTerm);
+  });
 }
 
 /**
