@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       model: 'gemini-2.5-flash-preview-09-2025',
       tools: [
         {
-          googleSearchRetrieval: {},
+          googleSearch: {},
         },
       ],
       generationConfig: {
