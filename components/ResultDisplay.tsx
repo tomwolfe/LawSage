@@ -130,9 +130,14 @@ function parseLegalOutput(text: string): { strategy: string; filings: string; st
         }
       }
 
+      // Handle filing_template - it may be an object (structured motion) or string
+      const filingsContent = typeof parsed.filing_template === 'object' 
+        ? JSON.stringify(parsed.filing_template, null, 2)
+        : parsed.filing_template;
+
       return {
         strategy: strategyText,
-        filings: parsed.filing_template,
+        filings: filingsContent,
         structured: parsed
       };
     }
