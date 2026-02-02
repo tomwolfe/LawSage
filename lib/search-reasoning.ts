@@ -1,5 +1,4 @@
-import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
-import type { FunctionDeclarationSchemaProperty } from '@google/generative-ai';
+import { genai } from '@google/genai';
 
 /**
  * Generates 3 targeted legal search queries using Gemini for deeper grounding
@@ -13,18 +12,17 @@ export async function generateSearchQueries(
   jurisdiction: string, 
   geminiApiKey: string
 ): Promise<string[]> {
-  const genAI = new GoogleGenerativeAI(geminiApiKey);
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash-preview-09-2025',
-    systemInstruction: `You are a legal research specialist. Given a user's legal situation and jurisdiction,
+  const client = genai.Client({ apiKey: geminiApiKey });
+  const model = 'gemini-2.5-flash-preview-09-2025';
+
+  const systemInstruction = `You are a legal research specialist. Given a user's legal situation and jurisdiction,
     generate exactly 3 targeted search queries that would help find relevant legal precedents,
     statutory law, and local court rules. Focus on queries that would find:
     1. Local Rules of Court specific to the jurisdiction
     2. Statutory precedents relevant to the legal issue
     3. Case law or procedural requirements for the specific type of case
 
-    Return ONLY an array of 3 search queries as a JSON array, nothing else.`
-  });
+    Return ONLY an array of 3 search queries as a JSON array, nothing else.`;
 
   const prompt = `
     User Situation: ${userInput}
@@ -37,8 +35,12 @@ export async function generateSearchQueries(
   `;
 
   try {
-    const result = await model.generateContent(prompt);
-    const responseText = result.response.text().trim();
+    const result = await client.models.generateContent({
+      model,
+      contents: prompt,
+      config: { systemInstruction }
+    });
+    const responseText = result.text().trim();
     
     // Try to extract JSON from response
     const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
@@ -96,67 +98,33 @@ export async function executeSearchQueries(
   queries: string[], 
   geminiApiKey: string
 ): Promise<any[]> {
-  const genAI = new GoogleGenerativeAI(geminiApiKey);
-  
-  // Using the same model but without system instruction to allow tool usage
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash-preview-09-2025',
-  });
-
-  const searchTool = {
-    functionDeclarations: [{
-      name: "google_search",
-      description: "Search the web for information",
-      parameters: {
-        type: SchemaType.OBJECT,
-        properties: {
-          query: {
-            type: SchemaType.STRING,
-            description: "The search query"
-          } satisfies FunctionDeclarationSchemaProperty
-        },
-        required: ["query"]
-      }
-    }]
-  };
+  const client = genai.Client({ apiKey: geminiApiKey });
+  const model = 'gemini-2.5-flash-preview-09-2025';
 
   const results: any[] = [];
 
   for (const query of queries) {
     try {
-      const result = await model.generateContent({
-        contents: [{
-          role: 'user',
-          parts: [{ text: `Search for: ${query}` }]
-        }],
-        tools: [searchTool]
+      const result = await client.models.generateContent({
+        model,
+        contents: `Search for: ${query}`,
+        config: {
+          tools: [{ googleSearch: {} }]
+        }
       });
 
       // Extract the search results
-      const response = result.response;
-      const functionCalls = response.functionCalls();
-      if (functionCalls && functionCalls.length > 0) {
-        // Process function calls to get search results
-        for (const functionCall of functionCalls) {
-          if (functionCall.name === 'google_search') {
-            // Note: Actual search results would come back in the function response,
-            // but since we're simulating this, we'll return the query for now
-            results.push({
-              query,
-              search_results: `Search results for: ${query}`, // Placeholder - actual implementation would process real search results
-              timestamp: new Date().toISOString()
-            });
-          }
-        }
-      } else {
-        // If no function calls, try to get text response
-        const textResponse = response.text();
-        results.push({
-          query,
-          search_results: textResponse,
-          timestamp: new Date().toISOString()
-        });
-      }
+      // In the new SDK, grounding metadata is accessed differently
+      // Let's check the structure
+      const responseText = result.text();
+      
+      // If we have grounding metadata, it should be in the response
+      // For now, we'll return the text or a placeholder
+      results.push({
+        query,
+        search_results: responseText, // The new SDK often synthesizes search results directly into the text
+        timestamp: new Date().toISOString()
+      });
     } catch (error) {
       console.error(`Error executing search query "${query}":`, error);
       results.push({

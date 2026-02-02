@@ -5,27 +5,29 @@ import { POST as AnalyzePOST } from '../app/api/analyze/route';
 global.fetch = jest.fn();
 
 // Mock the Google Generative AI module
-jest.mock('@google/generative-ai', () => ({
-  GoogleGenerativeAI: jest.fn(() => ({
-    getGenerativeModel: jest.fn(() => ({
-      generateContentStream: jest.fn(() => ({
-        stream: {
-          [Symbol.asyncIterator]: () => {
-            const chunks = [{ text: () => '{"disclaimer":"test","strategy":"test","filing_template":"test template","citations":[],"sources":[],"procedural_roadmap":[],"local_logistics":{},"procedural_checks":[]}' }];
-            let index = 0;
-            return {
-              next: () => {
-                if (index < chunks.length) {
-                  return Promise.resolve({ done: false, value: chunks[index++] });
+jest.mock('@google/genai', () => ({
+  genai: {
+    Client: jest.fn(() => ({
+      models: {
+        generateContentStream: jest.fn(() => ({
+          stream: {
+            [Symbol.asyncIterator]: () => {
+              const chunks = [{ text: () => '{"disclaimer":"test","strategy":"test","filing_template":"test template","citations":[],"sources":[],"procedural_roadmap":[],"local_logistics":{},"procedural_checks":[]}' }];
+              let index = 0;
+              return {
+                next: () => {
+                  if (index < chunks.length) {
+                    return Promise.resolve({ done: false, value: chunks[index++] });
+                  }
+                  return Promise.resolve({ done: true, value: undefined });
                 }
-                return Promise.resolve({ done: true, value: undefined });
-              }
-            };
+              };
+            }
           }
-        }
-      }))
+        }))
+      }
     }))
-  }))
+  }
 }));
 
 describe('Template Injection Validation Tests', () => {

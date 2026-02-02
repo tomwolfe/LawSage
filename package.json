@@ -11,7 +11,7 @@
     "test:all": "npm run test:api && npm run lint"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
+    "@google/genai": "^1.39.0",
     "@tailwindcss/typography": "^0.5.19",
     "clsx": "^2.1.1",
     "docx": "^9.0.3",

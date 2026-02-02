@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { genai } from '@google/genai';
 
 // Enable Edge Runtime
 export const runtime = 'edge';
@@ -51,20 +51,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Initialize the Gemini client
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash-preview-09-2025',
-      tools: [
-        {
-          googleSearch: {},
-        },
-      ] as any,
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 1000,
-      }
-    });
+    // Initialize the Gemini client using the new SDK
+    const client = genai.Client({ apiKey });
 
     // Create a prompt to verify the citation using web search
     const verificationPrompt = `
@@ -93,11 +81,18 @@ export async function POST(req: NextRequest) {
     `;
 
     // Generate content using the model with web search capability
-    const result = await model.generateContent(verificationPrompt);
+    const result = await client.models.generateContent({
+      model: 'gemini-2.5-flash-preview-09-2025',
+      contents: verificationPrompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+        temperature: 0.1,
+        maxOutputTokens: 1000,
+      }
+    });
 
-    // Extract the response
-    const response = await result.response;
-    const textResponse = response.text();
+    // Extract the response text
+    const textResponse = result.text();
 
     // Try to parse the response as JSON
     let verificationResult: CitationVerificationResponse;

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
+import { genai } from '@google/genai';
 import { SafetyValidator, ResponseValidator, Source } from '../../../lib/validation';
 
 // Define types
@@ -109,53 +109,54 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Initialize the Google Generative AI client
-    const genAI = new GoogleGenerativeAI(xGeminiApiKey);
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash-preview-09-2025", // Using the multimodal capable model
-      systemInstruction: SYSTEM_INSTRUCTION,
-      safetySettings: [
-        {
-          category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        },
-        {
-          category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-          threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        },
-      ],
-    });
+    // Initialize the Google GenAI client using the new SDK
+    const client = genai.Client({ apiKey: xGeminiApiKey });
 
     // Create the prompt for OCR
     const prompt = `Analyze this legal document and extract all relevant facts, dates, parties, and legal references. 
     Focus on information that would be useful for legal analysis and case preparation. 
     Include any case numbers, court names, deadlines, and important legal terms.`;
 
-    // Create the image part
-    const imagePart = {
-      inlineData: {
-        data: Buffer.from(imageData).toString('base64'),
-        mimeType: 'image/jpeg' // We'll default to jpeg, but could detect from data URL
-      }
-    };
-
     // Generate content using the multimodal model
-    const result = await model.generateContent([prompt, imagePart]);
-    const response = result.response;
+    const result = await client.models.generateContent({
+      model: "gemini-2.5-flash-preview-09-2025", // Using the multimodal capable model
+      contents: [
+        prompt,
+        {
+          inlineData: {
+            data: Buffer.from(imageData).toString('base64'),
+            mimeType: 'image/jpeg' // We'll default to jpeg, but could detect from data URL
+          }
+        }
+      ],
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION,
+        safetySettings: [
+          {
+            category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
+            threshold: 'BLOCK_MEDIUM_AND_ABOVE',
+          },
+          {
+            category: 'HARM_CATEGORY_HATE_SPEECH',
+            threshold: 'BLOCK_MEDIUM_AND_ABOVE',
+          },
+          {
+            category: 'HARM_CATEGORY_HARASSMENT',
+            threshold: 'BLOCK_MEDIUM_AND_ABOVE',
+          },
+          {
+            category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+            threshold: 'BLOCK_MEDIUM_AND_ABOVE',
+          },
+        ],
+      }
+    });
 
-    if (!response) {
+    if (!result) {
       throw new Error("No response from Gemini multimodal model");
     }
 
-    const extractedText = response.text();
+    const extractedText = result.text();
     const sources: Source[] = [];
 
     // Apply validation and fact extraction

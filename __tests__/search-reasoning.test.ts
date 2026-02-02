@@ -1,13 +1,13 @@
 import { generateSearchQueries, executeSearchQueries, performMultiStepSearchReasoning } from '../lib/search-reasoning';
 
-// Mock the GoogleGenerativeAI module
-jest.mock('@google/generative-ai', () => {
+// Mock the @google/genai module
+jest.mock('@google/genai', () => {
   return {
-    GoogleGenerativeAI: jest.fn().mockImplementation(() => {
-      return {
-        getGenerativeModel: jest.fn().mockReturnValue({
-          generateContent: jest.fn().mockResolvedValue({
-            response: {
+    genai: {
+      Client: jest.fn().mockImplementation(() => {
+        return {
+          models: {
+            generateContent: jest.fn().mockResolvedValue({
               text: jest.fn().mockReturnValue(
                 JSON.stringify([
                   "local rules of court California civil procedure",
@@ -15,11 +15,11 @@ jest.mock('@google/generative-ai', () => {
                   "case law motion to dismiss standards"
                 ])
               )
-            }
-          })
-        })
-      };
-    })
+            })
+          }
+        };
+      })
+    }
   };
 });
 
@@ -41,7 +41,14 @@ describe('Search Reasoning Module', () => {
     });
 
     it('should return default queries if API call fails', async () => {
-      // Force an error scenario
+      // Force an error scenario by bypassing the mock for this specific call
+      const { genai } = require('@google/genai');
+      genai.Client.mockImplementationOnce(() => ({
+        models: {
+          generateContent: jest.fn().mockRejectedValue(new Error('API Error'))
+        }
+      }));
+
       const originalConsoleError = console.error;
       console.error = jest.fn();
 

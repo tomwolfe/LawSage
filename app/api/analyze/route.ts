@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
+import { genai } from '@google/genai';
 import { SafetyValidator, ResponseValidator, Source } from '../../../lib/validation';
 
 // Mandatory safety disclosure hardcoded for the response stream
@@ -257,11 +257,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const genAI = new GoogleGenerativeAI(xGeminiApiKey);
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash-preview-09-2025",
-      systemInstruction: SYSTEM_INSTRUCTION,
-    });
+    const client = genai.Client({ apiKey: xGeminiApiKey });
 
     let documentsText = "";
     if (documents && documents.length > 0) {
@@ -297,7 +293,13 @@ Return only valid JSON.
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          const result = await model.generateContentStream(prompt);
+          const result = await client.models.generateContentStream({
+            model: "gemini-2.5-flash-preview-09-2025",
+            contents: prompt,
+            config: {
+              systemInstruction: SYSTEM_INSTRUCTION,
+            }
+          });
           let rawOutput = '';
 
           for await (const chunk of result.stream) {
