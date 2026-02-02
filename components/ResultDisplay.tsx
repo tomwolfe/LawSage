@@ -174,7 +174,7 @@ function parseLegalOutput(text: string): { strategy: string; filings: string; st
 }
 
 export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdiction }: ResultDisplayProps) {
-  const [copyStatus, setCopyStatus] = useState<{[key: string]: boolean}>({ all: false, 'opposition-view': false, 'survival-guide': false });
+  const [copyStatus, setCopyStatus] = useState<{[key: string]: boolean | string}>({ all: false, 'opposition-view': false, 'survival-guide': false });
   const [citationVerificationStatus, setCitationVerificationStatus] = useState<{[key: string]: {
     is_verified: boolean | undefined;
     verification_source?: string;
@@ -755,13 +755,13 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
             onClick={async () => {
               const currentUrl = window.location.href;
               try {
-                setCopyStatus(prev => ({ ...prev, share: 'loading' as any }));
+                setCopyStatus(prev => ({ ...prev, share: 'loading' as 'loading' | boolean }));
                 const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(currentUrl)}`);
                 if (response.ok) {
                   const shortUrl = await response.text();
                   await navigator.clipboard.writeText(shortUrl);
-                  setCopyStatus(prev => ({ ...prev, share: true as any }));
-                  setTimeout(() => setCopyStatus(prev => ({ ...prev, share: false as any })), 2000);
+                  setCopyStatus(prev => ({ ...prev, share: true }));
+                  setTimeout(() => setCopyStatus(prev => ({ ...prev, share: false })), 2000);
                 } else {
                   throw new Error("Failed to shorten URL");
                 }
@@ -769,8 +769,8 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                 console.error(err);
                 // Fallback to copying long URL
                 await navigator.clipboard.writeText(currentUrl);
-                setCopyStatus(prev => ({ ...prev, share: true as any }));
-                setTimeout(() => setCopyStatus(prev => ({ ...prev, share: false as any })), 2000);
+                setCopyStatus(prev => ({ ...prev, share: true }));
+                setTimeout(() => setCopyStatus(prev => ({ ...prev, share: false })), 2000);
               }
             }}
             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-colors"
