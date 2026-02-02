@@ -85,14 +85,13 @@ Your response MUST be in valid JSON format with the following structure:
   "disclaimer": "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. This is legal information, not legal advice. Always consult with a qualified attorney.",
   "strategy": "Your primary legal strategy and analysis here",
   "adversarial_strategy": "A DETAILED red-team analysis of the user's case. Identify specific weaknesses and how the opposition will likely counter each of the user's main points. This section is MANDATORY and must be substantial.",
-  "procedural_roadmap": [
+  "roadmap": [
     {
       "step": 1,
       "title": "First step title",
       "description": "Detailed description of what to do",
       "estimated_time": "Timeframe for completion",
-      "required_documents": ["List of documents needed"],
-      "status": "pending"
+      "required_documents": ["List of documents needed"]
     }
   ],
   "filing_template": "Actual legal filing template here",
@@ -100,9 +99,7 @@ Your response MUST be in valid JSON format with the following structure:
     {
       "text": "12 U.S.C. § 345",
       "source": "federal statute",
-      "url": "optional URL to citation source",
-      "is_verified": false,
-      "verification_source": "optional source used to verify"
+      "url": "optional URL to citation source"
     }
   ],
   "sources": ["Additional sources referenced in the response"],
@@ -122,7 +119,7 @@ CRITICAL INSTRUCTIONS:
 2. Extract courthouse location, filing fees, and procedural requirements from these local rules.
 3. Return ALL requested information in a single JSON response.
 4. Include at least 3 proper legal citations.
-5. Provide a detailed procedural_roadmap with at least 3 steps.
+5. Provide a detailed roadmap with at least 3 steps.
 6. MANDATORY: The 'adversarial_strategy' must NOT be empty or use generic placeholders. It must be a critical analysis of the specific facts provided by the user.
 `;
 
@@ -168,7 +165,7 @@ export async function POST(req: NextRequest) {
 
     // Template injection: Find the best matching template for the user's input
     let templateContent = '';
-    let isEmergency = user_input.toLowerCase().includes('lockout') || user_input.toLowerCase().includes('changed locks');
+    const isEmergency = user_input.toLowerCase().includes('lockout') || user_input.toLowerCase().includes('changed locks');
     
     // Fetch Ex Parte rules if it's an emergency
     let exParteRulesText = "";
@@ -184,38 +181,60 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    try {
-      const manifestResponse = await fetch(`${req.nextUrl.origin}/templates/manifest.json`);
-      if (manifestResponse.ok) {
-        const manifest = await manifestResponse.json();
-        const templates = manifest.templates || [];
-
-        let bestMatch = null;
-        let highestSimilarity = -1;
-
-        for (const template of templates) {
-          const titleSimilarity = cosineSimilarity(user_input.toLowerCase(), template.title.toLowerCase());
-          const descSimilarity = cosineSimilarity(user_input.toLowerCase(), template.description.toLowerCase());
-          const keywordsText = template.keywords.join(' ');
-          const keywordsSimilarity = cosineSimilarity(user_input.toLowerCase(), keywordsText.toLowerCase());
-          const combinedSimilarity = (titleSimilarity * 0.4) + (descSimilarity * 0.3) + (keywordsSimilarity * 0.3);
-
-          if (combinedSimilarity > highestSimilarity) {
-            highestSimilarity = combinedSimilarity;
-            bestMatch = template;
-          }
-        }
-
-        if (bestMatch && highestSimilarity > 0.1) {
-          const templatePath = bestMatch.templatePath;
-          const templateResponse = await fetch(`${req.nextUrl.origin}${templatePath}`);
-          if (templateResponse.ok) {
-            templateContent = await templateResponse.text();
-          }
-        }
+    if (isEmergency) {
+      const { searchExParteRules } = await import('../../../src/utils/legal-lookup');
+      const exParteRules = await searchExParteRules(jurisdiction);
+      if (exParteRules.length > 0) {
+        exParteRulesText = "EX PARTE NOTICE RULES FOR THIS JURISDICTION:\n";
+        exParteRules.forEach(rule => {
+          exParteRulesText += `- ${rule.courthouse}: Notice due by ${rule.notice_time}. Rule: ${rule.rule}\n`;
+        });
+        exParteRulesText += "\n";
       }
-    } catch (error) {
-      console.warn('Template matching failed:', error);
+      
+      // Force high-priority template for lockouts
+      try {
+        const templateResponse = await fetch(`${req.nextUrl.origin}/templates/lockout-emergency-pack.md`);
+        if (templateResponse.ok) {
+          templateContent = await templateResponse.text();
+        }
+      } catch (e) { console.error("Emergency template fetch failed", e); }
+    }
+
+    if (!templateContent) {
+      try {
+        const manifestResponse = await fetch(`${req.nextUrl.origin}/templates/manifest.json`);
+        if (manifestResponse.ok) {
+          const manifest = await manifestResponse.json();
+          const templates = manifest.templates || [];
+
+          let bestMatch = null;
+          let highestSimilarity = -1;
+
+          for (const template of templates) {
+            const titleSimilarity = cosineSimilarity(user_input.toLowerCase(), template.title.toLowerCase());
+            const descSimilarity = cosineSimilarity(user_input.toLowerCase(), template.description.toLowerCase());
+            const keywordsText = template.keywords.join(' ');
+            const keywordsSimilarity = cosineSimilarity(user_input.toLowerCase(), keywordsText.toLowerCase());
+            const combinedSimilarity = (titleSimilarity * 0.4) + (descSimilarity * 0.3) + (keywordsSimilarity * 0.3);
+
+            if (combinedSimilarity > highestSimilarity) {
+              highestSimilarity = combinedSimilarity;
+              bestMatch = template;
+            }
+          }
+
+          if (bestMatch && highestSimilarity > 0.1) {
+            const templatePath = bestMatch.templatePath;
+            const templateResponse = await fetch(`${req.nextUrl.origin}${templatePath}`);
+            if (templateResponse.ok) {
+              templateContent = await templateResponse.text();
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Template matching failed:', error);
+      }
     }
 
     if (!xGeminiApiKey) {
@@ -252,7 +271,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const prompt = `
+const prompt = `
 ${documentsText}
 ${exParteRulesText}
 
@@ -262,9 +281,9 @@ Jurisdiction: ${jurisdiction}
 You must return a SINGLE JSON object containing:
 1. 'strategy': Overall legal strategy.
 2. 'adversarial_strategy': Red-team analysis of weaknesses. MANDATORY: Do not use placeholders.
-3. 'procedural_roadmap': Step-by-step next steps for ${jurisdiction}. If this is an emergency (e.g., lockout), include specific Ex Parte notice times from the provided rules.
+3. 'roadmap': Step-by-step next steps for ${jurisdiction}. If this is an emergency (e.g., lockout), include specific Ex Parte notice times from the provided rules.
 4. 'local_logistics': Specific courthouse info for ${jurisdiction}.
-5. 'filing_template': ${templateContent ? "Use this template but customize it: " + templateContent : "Generate a specific template for " + jurisdiction}.
+5. 'filing_template': ${templateContent ? "Use this template but customize it and include ALL sections (Complaint, TRO, Declaration): " + templateContent : "Generate a specific template for " + jurisdiction}.
 6. 'citations': At least 3 verified citations relevant to the subject matter and jurisdiction.
 
 Return only valid JSON.
@@ -282,7 +301,7 @@ Return only valid JSON.
           }
 
           let processedOutput = rawOutput;
-          let jsonMatch = rawOutput.match(/```json\s*([\s\S]*?)\s*```/);
+          const jsonMatch = rawOutput.match(/```json\s*([\s\S]*?)\s*```/);
           if (jsonMatch) {
             processedOutput = jsonMatch[1].trim();
           } else {
@@ -295,28 +314,9 @@ Return only valid JSON.
 
           const parsedOutput = JSON.parse(processedOutput);
           
-          // Re-format into text for compatibility with existing frontend tabs
-          let formattedText = `${parsedOutput.disclaimer}\n\n`;
-          formattedText += `STRATEGY:\n${parsedOutput.strategy}\n\n`;
-          formattedText += `ADVERSARIAL STRATEGY:\n${parsedOutput.adversarial_strategy}\n\n`;
-          
-          formattedText += "PROCEDURAL ROADMAP:\n";
-          parsedOutput.procedural_roadmap.forEach((item: any) => {
-            formattedText += `${item.step}. ${item.title}: ${item.description}\n`;
-            if (item.estimated_time) formattedText += `   Time: ${item.estimated_time}\n`;
-          });
-          formattedText += "\n";
-
-          formattedText += "LOCAL LOGISTICS:\n";
-          formattedText += JSON.stringify(parsedOutput.local_logistics, null, 2);
-          formattedText += "\n\n";
-
-          formattedText += "---\n\nFILING TEMPLATE:\n";
-          formattedText += parsedOutput.filing_template;
-
           const legalResult: LegalResult = {
-            text: formattedText,
-            sources: parsedOutput.citations?.map((c: any) => ({ title: c.text, uri: c.url })) || []
+            text: JSON.stringify(parsedOutput),
+            sources: parsedOutput.citations?.map((c: { text: string; url?: string }) => ({ title: c.text, uri: c.url })) || []
           };
 
           controller.enqueue(encoder.encode(JSON.stringify(legalResult)));

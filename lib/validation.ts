@@ -270,7 +270,7 @@ export class ResponseValidator {
     const hasRoadmap = roadmapKeywords.some(kw => content.toLowerCase().includes(kw.toLowerCase()));
 
     // Check for Adversarial Strategy
-    const adversarialKeywords = ["Adversarial Strategy", "Opposition View", "Red-Team Analysis", "Opposition arguments"];
+    const adversarialKeywords = ["Adversarial Strategy", "Opposition View", "Red-Team Analysis", "Opposition arguments", "OPPOSITION VIEW (RED-TEAM ANALYSIS)"];
     const hasAdversarialHeader = adversarialKeywords.some(kw => content.toLowerCase().includes(kw.toLowerCase()));
     
     // Check if the adversarial strategy is actually content and not a placeholder
@@ -300,7 +300,7 @@ export class ResponseValidator {
     const hasAdversarial = hasAdversarialHeader && adversarialContent.length > 50 && !isPlaceholder;
 
     // Check for Procedural Checks
-    const proceduralKeywords = ["Procedural Checks", "Local Rules of Court", "Procedural technicality"];
+    const proceduralKeywords = ["Procedural Checks", "Local Rules of Court", "Procedural technicality", "COURTHOUSE INFORMATION & LOCAL LOGISTICS"];
     const hasProcedural = proceduralKeywords.some(kw => content.toLowerCase().includes(kw.toLowerCase()));
 
     return hasCitations && hasRoadmap && hasAdversarial && hasProcedural;

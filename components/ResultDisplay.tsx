@@ -986,36 +986,10 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                 <div className="space-y-4">
                   <h4 className="font-semibold text-slate-700">Legal Citations</h4>
                   {structured.citations.map((citation, index) => {
-                    const [verificationStatus, setVerificationStatus] = useState<{
-                      is_verified: boolean | undefined;
-                      verification_source?: string;
-                      status_message?: string;
-                      loading: boolean;
-                    }>({
+                    const status = citationVerificationStatus[citation.text] || {
                       is_verified: citation.is_verified,
                       verification_source: citation.verification_source,
                       loading: false
-                    });
-
-                    const verifyCitationHandler = async () => {
-                      setVerificationStatus(prev => ({ ...prev, loading: true }));
-
-                      try {
-                        const result = await handleVerifyCitation(citation);
-                        setVerificationStatus({
-                          is_verified: result.is_verified,
-                          verification_source: result.verification_source,
-                          status_message: result.status_message,
-                          loading: false
-                        });
-                      } catch (error) {
-                        setVerificationStatus({
-                          is_verified: false,
-                          verification_source: 'Error',
-                          status_message: 'Verification failed',
-                          loading: false
-                        });
-                      }
                     };
 
                     return (
@@ -1032,25 +1006,25 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                           {citation.source && (
                             <p className="text-sm text-slate-500 mt-1">{citation.source}</p>
                           )}
-                          {citationVerificationStatus[citation.text]?.verification_source && (
+                          {status.verification_source && (
                             <p className="text-xs text-slate-400 mt-1">
-                              Verified by: {citationVerificationStatus[citation.text].verification_source}
+                              Verified by: {status.verification_source}
                             </p>
                           )}
                         </div>
 
                         <div className="flex items-center gap-2">
-                          {citationVerificationStatus[citation.text]?.loading ? (
+                          {status.loading ? (
                             <RotateCcw className="animate-spin text-indigo-600" size={18} />
                           ) : (
                             <>
-                              {citationVerificationStatus[citation.text]?.is_verified !== undefined ? (
+                              {status.is_verified !== undefined ? (
                                 <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
-                                  citationVerificationStatus[citation.text].is_verified
+                                  status.is_verified
                                     ? 'bg-green-100 text-green-800'
                                     : 'bg-red-100 text-red-800'
                                 }`}>
-                                  {citationVerificationStatus[citation.text].is_verified ? (
+                                  {status.is_verified ? (
                                     <>
                                       <CheckCircle size={12} />
                                       Verified
@@ -1072,13 +1046,13 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                                   }));
 
                                   try {
-                                    const result = await handleVerifyCitation(citation);
+                                    const res = await handleVerifyCitation(citation);
                                     setCitationVerificationStatus(prev => ({
                                       ...prev,
                                       [citation.text]: {
-                                        is_verified: result.is_verified,
-                                        verification_source: result.verification_source,
-                                        status_message: result.status_message,
+                                        is_verified: res.is_verified,
+                                        verification_source: res.verification_source,
+                                        status_message: res.status_message,
                                         loading: false
                                       }
                                     }));
@@ -1094,7 +1068,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                                     }));
                                   }
                                 }}
-                                disabled={citationVerificationStatus[citation.text]?.loading}
+                                disabled={status.loading}
                                 className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-50"
                                 title="Verify citation status"
                               >
