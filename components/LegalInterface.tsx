@@ -41,7 +41,7 @@ interface LegalResult {
   sources: Source[];
 }
 
-interface CaseLedgerEntry {
+export interface CaseLedgerEntry {
   id: string;
   timestamp: Date;
   eventType: 'complaint_filed' | 'answer_due' | 'motion_submitted' | 'discovery_served' | 'trial_date_set' | 'other';

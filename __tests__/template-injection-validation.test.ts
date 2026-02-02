@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { POST as AnalyzePOST } from '../../app/api/analyze/route';
+import { POST as AnalyzePOST } from '../app/api/analyze/route';
 
 // Mock the fetch function to simulate API calls
 global.fetch = jest.fn();
@@ -48,11 +48,11 @@ describe('Template Injection Validation Tests', () => {
             }
           ]
         })
-      })
+      } as any)
       .mockResolvedValueOnce({
         ok: true,
         text: () => Promise.resolve("# MOTION TO DISMISS\n\nContent of the motion to dismiss template.")
-      });
+      } as any);
   });
 
   test('should validate that generated output contains injected template structure', async () => {
@@ -117,11 +117,11 @@ describe('Template Injection Validation Tests', () => {
       .mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({ templates: mockTemplates })
-      })
+      } as any)
       .mockResolvedValueOnce({
         ok: true,
         text: () => Promise.resolve("# MOTION TO DISMISS\n\nContent of the motion to dismiss template.")
-      });
+      } as any);
 
     const response = await AnalyzePOST(mockRequest);
     const result = await response.json();
@@ -160,7 +160,7 @@ describe('Template Injection Validation Tests', () => {
             }
           ]
         })
-      });
+      } as any);
 
     const response = await AnalyzePOST(mockRequest);
     const result = await response.json();
@@ -199,11 +199,11 @@ describe('Template Injection Validation Tests', () => {
             }
           ]
         })
-      })
+      } as any)
       .mockResolvedValueOnce({
         ok: true,
         text: () => Promise.resolve("# CONTRACT REVIEW CHECKLIST\n\nChecklist content here.")
-      });
+      } as any);
 
     const response = await AnalyzePOST(mockRequest);
     const result = await response.json();
@@ -253,11 +253,11 @@ describe('Template Injection Validation Tests', () => {
               }
             ]
           })
-        })
+        } as any)
         .mockResolvedValueOnce({
           ok: true,
           text: () => Promise.resolve(`${testCase.templateTitle}\n\nContent for ${testCase.expectedTemplate}`)
-        });
+        } as any);
 
       const mockRequest = {
         json: () => Promise.resolve({

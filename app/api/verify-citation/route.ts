@@ -57,7 +57,6 @@ export async function POST(req: NextRequest) {
       model: 'gemini-1.5-flash',
       tools: [
         {
-          // @ts-expect-error - googleSearchRetrieval is supported but may not be in all type definitions
           googleSearchRetrieval: {},
         },
       ],

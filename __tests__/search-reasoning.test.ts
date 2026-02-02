@@ -16,15 +16,6 @@ jest.mock('@google/generative-ai', () => {
                 ])
               )
             }
-          }),
-          generateContent: jest.fn().mockResolvedValue({
-            response: {
-              text: () => JSON.stringify([
-                "local rules of court California civil procedure",
-                "statutory precedents breach of contract California", 
-                "case law motion to dismiss standards"
-              ])
-            }
           })
         })
       };
