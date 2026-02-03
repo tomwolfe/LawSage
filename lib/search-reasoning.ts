@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 
 /**
  * Generates 3 targeted legal search queries using Gemini for deeper grounding
@@ -12,8 +12,7 @@ export async function generateSearchQueries(
   jurisdiction: string, 
   geminiApiKey: string
 ): Promise<string[]> {
-  const client = new GoogleGenerativeAI(geminiApiKey);
-  const model = client.getGenerativeModel({ model: 'gemini-2.5-flash-preview-09-2025' });
+  const client = new GoogleGenAI({ apiKey: geminiApiKey });
 
   const systemInstruction = `You are a legal research specialist. Given a user's legal situation and jurisdiction,
     generate exactly 3 targeted search queries that would help find relevant legal precedents,
@@ -35,7 +34,13 @@ export async function generateSearchQueries(
   `;
 
   try {
-    const result = await model.generateContent(prompt);
+    const result = await client.models.generateContent({
+      model: 'gemini-2.5-flash-preview-09-2025',
+      contents: prompt,
+      config: {
+        systemInstruction: systemInstruction,
+      }
+    });
     const responseText = result.text?.trim() ?? '';
     
     // Try to extract JSON from response
@@ -94,14 +99,16 @@ export async function executeSearchQueries(
   queries: string[], 
   geminiApiKey: string
 ): Promise<any[]> {
-  const client = new GoogleGenerativeAI(geminiApiKey);
-  const model = client.getGenerativeModel({ model: 'gemini-2.5-flash-preview-09-2025' });
+  const client = new GoogleGenAI({ apiKey: geminiApiKey });
 
   const results: any[] = [];
 
   for (const query of queries) {
     try {
-      const result = await model.generateContent(`Search for: ${query}`);
+      const result = await client.models.generateContent({
+        model: 'gemini-2.5-flash-preview-09-2025',
+        contents: `Search for: ${query}`
+      });
 
       // Extract the search results
       // In the new SDK, grounding metadata is accessed differently

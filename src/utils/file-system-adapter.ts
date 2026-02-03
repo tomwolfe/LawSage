@@ -1,6 +1,44 @@
 // utils/file-system-adapter.ts
 // Local folder persistence using File System Access API
 
+// Define types for File System Access API
+type FileSystemHandleKind = 'file' | 'directory';
+
+interface FileSystemHandle {
+  readonly kind: FileSystemHandleKind;
+  readonly name: string;
+}
+
+interface FileSystemDirectoryHandle extends FileSystemHandle {
+  getFileHandle(name: string, options?: { create?: boolean }): Promise<FileSystemFileHandle>;
+  getDirectoryHandle(name: string, options?: { create?: boolean }): Promise<FileSystemDirectoryHandle>;
+  removeEntry(name: string, options?: { recursive?: boolean }): Promise<void>;
+  resolve(possibleDescendant: FileSystemHandle): Promise<string[] | null>;
+  [Symbol.asyncIterator](): AsyncIterableIterator<[string, FileSystemHandle]>;
+  values(): AsyncIterableIterator<FileSystemHandle>;
+  keys(): AsyncIterableIterator<string>;
+  entries(): AsyncIterableIterator<[string, FileSystemHandle]>;
+}
+
+interface FileSystemFileHandle extends FileSystemHandle {
+  createWritable(options?: { keepExistingData?: boolean }): Promise<FileSystemWritableFileStream>;
+  getFile(): Promise<File>;
+}
+
+interface FileSystemWritableFileStream extends WritableStream {
+  write(data: BufferSource | Blob | string): Promise<void>;
+  seek(position: number): Promise<void>;
+  truncate(size: number): Promise<void>;
+  close(): Promise<void>;
+}
+
+// Extend Window interface to include File System Access API methods
+declare global {
+  interface Window {
+    showDirectoryPicker?: (options?: any) => Promise<FileSystemDirectoryHandle>;
+  }
+}
+
 interface DocumentData {
   text: string;
   timestamp: Date;
@@ -74,7 +112,8 @@ export class LocalFolderManager {
 
       for await (const entry of this.directoryHandle.values()) {
         if (entry.kind === 'file' && entry.name.startsWith(this.fileName)) {
-          const file = await entry.getFile();
+          const fileHandle = entry as FileSystemFileHandle;
+          const file = await fileHandle.getFile();
           const content = await file.text();
           return JSON.parse(content);
         }
@@ -131,7 +170,8 @@ export class LocalFolderManager {
       for await (const entry of this.directoryHandle.values()) {
         if (entry.kind === 'file' && entry.name.startsWith(this.fileName)) {
           try {
-            const file = await entry.getFile();
+            const fileHandle = entry as FileSystemFileHandle;
+            const file = await fileHandle.getFile();
             const content = await file.text();
             const caseData = JSON.parse(content);
             cases.push(caseData);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import { SafetyValidator, ResponseValidator, Source } from '../../../lib/validation';
 import { getHybridConfig, shouldRouteToGLM, shouldRouteToGemini, getGLMAPIKey } from '../../../src/utils/hybrid-router';
 import { GLMClient } from '../../../api/glm-client';
@@ -331,7 +331,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const client = new GoogleGenerativeAI(xGeminiApiKey);
+    const client = new GoogleGenAI({ apiKey: xGeminiApiKey });
 
     let documentsText = "";
     if (documents && documents.length > 0) {
