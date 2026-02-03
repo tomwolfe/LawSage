@@ -1,17 +1,19 @@
-import { 
-  validateMotionToDismiss, 
-  validateMotionForDiscovery, 
-  validateMotionForSummaryJudgment, 
+import {
+  validateMotionToDismiss,
+  validateMotionForDiscovery,
+  validateMotionForSummaryJudgment,
   validateMotionToCompel,
   validateLegalMotion,
   MotionToDismiss,
   MotionForDiscovery
 } from '../lib/schemas/motions';
 
+const { describe, it, expect } = require('@jest/globals');
+
 describe('Motion Schemas Validation', () => {
   describe('MotionToDismiss validation', () => {
     it('should validate a complete MotionToDismiss', () => {
-      const validMotion: MotionToDismiss = {
+      const validMotion = {
         id: 'test-id',
         title: 'Motion to Dismiss',
         description: 'A motion to dismiss for failure to state a claim',
@@ -77,7 +79,7 @@ describe('Motion Schemas Validation', () => {
 
   describe('MotionForDiscovery validation', () => {
     it('should validate a complete MotionForDiscovery', () => {
-      const validMotion: MotionForDiscovery = {
+      const validMotion = {
         id: 'test-id',
         title: 'Motion for Discovery',
         description: 'A motion for discovery of relevant documents',
@@ -146,7 +148,7 @@ describe('Motion Schemas Validation', () => {
 
   describe('validateLegalMotion', () => {
     it('should validate different types of motions correctly', () => {
-      const dismissMotion: MotionToDismiss = {
+      const dismissMotion = {
         id: 'test-id',
         title: 'Motion to Dismiss',
         description: 'A motion to dismiss for failure to state a claim',

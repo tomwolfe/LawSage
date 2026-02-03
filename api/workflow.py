@@ -84,7 +84,13 @@ def cosine_similarity(text1: str, text2: str) -> float:
     if mag1 == 0 or mag2 == 0:
         return 0.0
 
-    return dot_product / (mag1 * mag2)
+    similarity = dot_product / (mag1 * mag2)
+
+    # Handle floating point precision issues - if very close to 1.0, return 1.0
+    if abs(similarity - 1.0) < 1e-10:
+        return 1.0
+
+    return similarity
 
 class LawSageWorkflow:
     """

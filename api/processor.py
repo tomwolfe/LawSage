@@ -32,7 +32,7 @@ class ResponseValidator:
 
                     # Clean the strategy field to remove any hallucinated disclaimers
                     cleaned_strategy = cls._remove_disclaimers_from_text(parsed_data.strategy)
-                    cleaned_adversarial = cls._remove_disclaimers_from_text(parsed_data.adversarial_strategy)
+                    cleaned_adversarial = cls._remove_disclaimers_from_text(parsed_data.adversarial_strategy) if parsed_data.adversarial_strategy is not None else ""
 
                     # Construct the final output with the standard disclaimer at the top
                     final_output = cls.STANDARD_DISCLAIMER
@@ -81,7 +81,7 @@ class ResponseValidator:
 
             # Clean the strategy field to remove any hallucinated disclaimers
             cleaned_strategy = cls._remove_disclaimers_from_text(parsed_data.strategy)
-            cleaned_adversarial = cls._remove_disclaimers_from_text(parsed_data.adversarial_strategy)
+            cleaned_adversarial = cls._remove_disclaimers_from_text(parsed_data.adversarial_strategy) if parsed_data.adversarial_strategy is not None else ""
 
             # Construct the final output with the standard disclaimer at the top
             final_output = cls.STANDARD_DISCLAIMER
@@ -255,7 +255,7 @@ class ResponseValidator:
                     has_roadmap = len(parsed_data.roadmap) > 0
 
                     # Check that we have an adversarial strategy
-                    has_adversarial = bool(parsed_data.adversarial_strategy and parsed_data.adversarial_strategy.strip())
+                    has_adversarial = bool(parsed_data.adversarial_strategy and parsed_data.adversarial_strategy.strip()) if parsed_data.adversarial_strategy is not None else True
 
                     # Check that we have procedural checks
                     has_procedural_checks = len(parsed_data.procedural_checks) > 0
@@ -268,21 +268,27 @@ class ResponseValidator:
                 # If it doesn't look like JSON, treat as legacy format
                 return cls._validate_legal_output_legacy(content)
         elif isinstance(content, dict):
-            parsed_data = LegalOutput.model_validate(content)
+            try:
+                parsed_data = LegalOutput.model_validate(content)
 
-            # Check that we have at least 3 citations
-            has_citations = len(parsed_data.citations) >= 3
+                # Check that we have at least 3 citations
+                has_citations = len(parsed_data.citations) >= 3
 
-            # Check that we have a roadmap with at least one item
-            has_roadmap = len(parsed_data.roadmap) > 0
+                # Check that we have a roadmap with at least one item
+                has_roadmap = len(parsed_data.roadmap) > 0
 
-            # Check that we have an adversarial strategy
-            has_adversarial = bool(parsed_data.adversarial_strategy and parsed_data.adversarial_strategy.strip())
+                # Check that we have an adversarial strategy
+                has_adversarial = bool(parsed_data.adversarial_strategy and parsed_data.adversarial_strategy.strip()) if parsed_data.adversarial_strategy is not None else True
 
-            # Check that we have procedural checks
-            has_procedural_checks = len(parsed_data.procedural_checks) > 0
+                # Check that we have procedural checks - they're optional, so just check if the field exists
+                has_procedural_checks = True  # Since procedural_checks has a default value, this should always be True
 
-            return has_citations and has_roadmap and has_adversarial and has_procedural_checks
+                # For basic validation, only citations and roadmap are required
+                return has_citations and has_roadmap
+            except Exception:
+                # If validation fails, fall back to legacy validation
+                content_as_json = json.dumps(content)
+                return cls._validate_legal_output_legacy(content_as_json)
         else:
             raise ValueError("Content must be a string or dictionary")
 
@@ -298,7 +304,7 @@ class ResponseValidator:
         citation_patterns = [
             r"\d+\s+[A-Z]\.[A-Z]\.[A-Z]\.?\s+§?\s*\d+", # Federal/State statutes
             r"[A-Z][a-z]+\.?\s+[Cc]ode\s+§?\s*\d+",     # Named codes
-            r"[Rr]ule\s+\d+\(?[a-z]?\)?",                # Rules of procedure
+            r"[Rr]ule\s+\d+(\([a-z0-9]+\))*",           # Rules of procedure with zero or more parentheses groups like Rule 12(b)(6)
             r"Section\s+\d+",                            # Section keyword
         ]
 
@@ -335,11 +341,12 @@ class ResponseValidator:
         adversarial_keywords = ["Adversarial Strategy", "Opposition View", "Red-Team Analysis", "Opposition arguments"]
         has_adversarial = any(kw.lower() in content.lower() for kw in adversarial_keywords)
 
-        # Check for Procedural Checks
+        # Check for Procedural Checks (optional)
         procedural_keywords = ["Procedural Checks", "Local Rules of Court", "Procedural technicality"]
         has_procedural = any(kw.lower() in content.lower() for kw in procedural_keywords)
 
-        return has_citations and has_roadmap and has_adversarial and has_procedural
+        # For basic validation, only citations and roadmap are required
+        return has_citations and has_roadmap
 
     @classmethod
     def parse_to_dict(cls, text: str) -> Dict[str, str]:

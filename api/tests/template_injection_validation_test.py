@@ -17,14 +17,15 @@ def sample_request():
 
 @pytest.fixture
 def mock_api_key():
-    return "AIza-valid-test-key"
+    return "AIza-valid-test-key-longer"
 
 def test_server_side_validation_includes_injected_template_structure(sample_request, mock_api_key):
     """Test that the generated LegalOutput contains the injected template structure."""
     with patch('api.workflow.LawSageWorkflow.invoke') as mock_invoke:
         # Mock the workflow response to include template content
-        mock_result = MagicMock()
-        mock_result.text = """
+        from api.models import LegalResult, Source
+        mock_result = LegalResult(
+            text="""
 LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se.
 This is legal information, not legal advice. Always consult with a qualified attorney.
 
@@ -48,8 +49,9 @@ FILING TEMPLATE:
 **TO THE HONORABLE COURT:**
 
 Plaintiff respectfully moves this Court to dismiss the complaint...
-"""
-        mock_result.sources = [{"title": "Sample Legal Resource", "uri": "https://example.com"}]
+""",
+            sources=[Source(title="Sample Legal Resource", uri="https://example.com")]
+        )
         mock_invoke.return_value = mock_result
         
         response = client.post(

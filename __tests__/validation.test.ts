@@ -1,4 +1,5 @@
 import { ResponseValidator, SafetyValidator } from '../lib/validation';
+const { describe, test, expect } = require('@jest/globals');
 
 describe('ResponseValidator', () => {
   describe('validateLegalOutput', () => {
@@ -143,7 +144,7 @@ describe('SafetyValidator', () => {
 
     test('should return true when no grounding data is provided', () => {
       const finalOutput = 'Any content here.';
-      const groundingData: {title: string | null, uri: string | null}[] = [];
+      const groundingData: Array<{title: string | null, uri: string | null}> = [];
 
       const result = SafetyValidator.validateGrounding(finalOutput, groundingData);
       expect(result).toBe(true);

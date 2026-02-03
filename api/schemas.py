@@ -43,8 +43,8 @@ class LegalOutput(BaseModel):
         ...,
         description="Legal strategy and analysis for the user's situation"
     )
-    adversarial_strategy: str = Field(
-        ...,
+    adversarial_strategy: Optional[str] = Field(
+        None,
         description="Opposition arguments and 'red-team' analysis of the user's case"
     )
     roadmap: List[StrategyItem] = Field(

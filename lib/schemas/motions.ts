@@ -137,28 +137,35 @@ export function validateMotionToDismiss(motion: MotionToDismiss): { isValid: boo
   if (!motion.filedDate) errors.push('Filed date is required');
   if (!motion.filingParty) errors.push('Filing party is required');
   if (!motion.opposingParty) errors.push('Opposing party is required');
-  if (!motion.caseInfo.caseNumber) errors.push('Case number is required');
-  if (!motion.caseInfo.courtName) errors.push('Court name is required');
-  if (!motion.caseInfo.jurisdiction) errors.push('Jurisdiction is required');
+  if (!motion.caseInfo) errors.push('Case information is required');
+  else {
+    if (!motion.caseInfo.caseNumber) errors.push('Case number is required');
+    if (!motion.caseInfo.courtName) errors.push('Court name is required');
+    if (!motion.caseInfo.jurisdiction) errors.push('Jurisdiction is required');
+  }
   if (!motion.legalAuthority || motion.legalAuthority.length === 0) errors.push('At least one legal authority is required');
   if (!motion.factualBasis) errors.push('Factual basis is required');
   if (!motion.reliefRequested) errors.push('Relief requested is required');
-  if (!motion.signatureBlock.attorneyName) errors.push('Attorney name is required in signature block');
-  if (!motion.signatureBlock.date) errors.push('Date is required in signature block');
+  if (!motion.signatureBlock) errors.push('Signature block is required');
+  else {
+    if (!motion.signatureBlock.attorneyName) errors.push('Attorney name is required in signature block');
+    if (!motion.signatureBlock.date) errors.push('Date is required in signature block');
+  }
 
   // Validate grounds - at least one must be true
   const grounds = motion.grounds;
-  if (!grounds.lackOfSubjectMatterJurisdiction && 
-      !grounds.lackOfPersonalJurisdiction && 
-      !grounds.improperVenue && 
-      !grounds.insufficientService && 
-      !grounds.failureToStateClaim && 
-      !grounds.statuteOfLimitations && 
+  if (!grounds) errors.push('Grounds for dismissal are required');
+  else if (!grounds.lackOfSubjectMatterJurisdiction &&
+      !grounds.lackOfPersonalJurisdiction &&
+      !grounds.improperVenue &&
+      !grounds.insufficientService &&
+      !grounds.failureToStateClaim &&
+      !grounds.statuteOfLimitations &&
       !grounds.other) {
     errors.push('At least one ground for dismissal must be selected');
   }
 
-  if (grounds.other && !grounds.otherDescription) {
+  if (grounds?.other && !grounds.otherDescription) {
     errors.push('Other ground description is required when "other" is selected');
   }
 
@@ -177,17 +184,23 @@ export function validateMotionForDiscovery(motion: MotionForDiscovery): { isVali
   if (!motion.filedDate) errors.push('Filed date is required');
   if (!motion.filingParty) errors.push('Filing party is required');
   if (!motion.opposingParty) errors.push('Opposing party is required');
-  if (!motion.caseInfo.caseNumber) errors.push('Case number is required');
-  if (!motion.caseInfo.courtName) errors.push('Court name is required');
-  if (!motion.caseInfo.jurisdiction) errors.push('Jurisdiction is required');
+  if (!motion.caseInfo) errors.push('Case information is required');
+  else {
+    if (!motion.caseInfo.caseNumber) errors.push('Case number is required');
+    if (!motion.caseInfo.courtName) errors.push('Court name is required');
+    if (!motion.caseInfo.jurisdiction) errors.push('Jurisdiction is required');
+  }
   if (!motion.legalAuthority || motion.legalAuthority.length === 0) errors.push('At least one legal authority is required');
   if (!motion.factualBasis) errors.push('Factual basis is required');
   if (!motion.reliefRequested) errors.push('Relief requested is required');
-  if (!motion.signatureBlock.attorneyName) errors.push('Attorney name is required in signature block');
-  if (!motion.signatureBlock.date) errors.push('Date is required in signature block');
+  if (!motion.signatureBlock) errors.push('Signature block is required');
+  else {
+    if (!motion.signatureBlock.attorneyName) errors.push('Attorney name is required in signature block');
+    if (!motion.signatureBlock.date) errors.push('Date is required in signature block');
+  }
 
   if (!motion.discoveryType) errors.push('Discovery type is required');
-  
+
   if (!motion.discoveryRequests || motion.discoveryRequests.length === 0) {
     errors.push('At least one discovery request is required');
   } else {
@@ -222,18 +235,27 @@ export function validateMotionForSummaryJudgment(motion: MotionForSummaryJudgmen
   if (!motion.filedDate) errors.push('Filed date is required');
   if (!motion.filingParty) errors.push('Filing party is required');
   if (!motion.opposingParty) errors.push('Opposing party is required');
-  if (!motion.caseInfo.caseNumber) errors.push('Case number is required');
-  if (!motion.caseInfo.courtName) errors.push('Court name is required');
-  if (!motion.caseInfo.jurisdiction) errors.push('Jurisdiction is required');
+  if (!motion.caseInfo) errors.push('Case information is required');
+  else {
+    if (!motion.caseInfo.caseNumber) errors.push('Case number is required');
+    if (!motion.caseInfo.courtName) errors.push('Court name is required');
+    if (!motion.caseInfo.jurisdiction) errors.push('Jurisdiction is required');
+  }
   if (!motion.legalAuthority || motion.legalAuthority.length === 0) errors.push('At least one legal authority is required');
   if (!motion.factualBasis) errors.push('Factual basis is required');
   if (!motion.reliefRequested) errors.push('Relief requested is required');
-  if (!motion.signatureBlock.attorneyName) errors.push('Attorney name is required in signature block');
-  if (!motion.signatureBlock.date) errors.push('Date is required in signature block');
+  if (!motion.signatureBlock) errors.push('Signature block is required');
+  else {
+    if (!motion.signatureBlock.attorneyName) errors.push('Attorney name is required in signature block');
+    if (!motion.signatureBlock.date) errors.push('Date is required in signature block');
+  }
 
-  if (!motion.standards.noGenuineDispute) errors.push('Standard: No genuine dispute must be acknowledged');
-  if (!motion.standards.materialFacts) errors.push('Standard: Material facts must be acknowledged');
-  if (!motion.standards.entitledToJudgment) errors.push('Standard: Entitled to judgment must be acknowledged');
+  if (!motion.standards) errors.push('Standards for summary judgment are required');
+  else {
+    if (!motion.standards.noGenuineDispute) errors.push('Standard: No genuine dispute must be acknowledged');
+    if (!motion.standards.materialFacts) errors.push('Standard: Material facts must be acknowledged');
+    if (!motion.standards.entitledToJudgment) errors.push('Standard: Entitled to judgment must be acknowledged');
+  }
 
   if (!motion.undisputedFacts || motion.undisputedFacts.length === 0) {
     errors.push('At least one undisputed fact is required');
@@ -266,14 +288,20 @@ export function validateMotionToCompel(motion: MotionToCompel): { isValid: boole
   if (!motion.filedDate) errors.push('Filed date is required');
   if (!motion.filingParty) errors.push('Filing party is required');
   if (!motion.opposingParty) errors.push('Opposing party is required');
-  if (!motion.caseInfo.caseNumber) errors.push('Case number is required');
-  if (!motion.caseInfo.courtName) errors.push('Court name is required');
-  if (!motion.caseInfo.jurisdiction) errors.push('Jurisdiction is required');
+  if (!motion.caseInfo) errors.push('Case information is required');
+  else {
+    if (!motion.caseInfo.caseNumber) errors.push('Case number is required');
+    if (!motion.caseInfo.courtName) errors.push('Court name is required');
+    if (!motion.caseInfo.jurisdiction) errors.push('Jurisdiction is required');
+  }
   if (!motion.legalAuthority || motion.legalAuthority.length === 0) errors.push('At least one legal authority is required');
   if (!motion.factualBasis) errors.push('Factual basis is required');
   if (!motion.reliefRequested) errors.push('Relief requested is required');
-  if (!motion.signatureBlock.attorneyName) errors.push('Attorney name is required in signature block');
-  if (!motion.signatureBlock.date) errors.push('Date is required in signature block');
+  if (!motion.signatureBlock) errors.push('Signature block is required');
+  else {
+    if (!motion.signatureBlock.attorneyName) errors.push('Attorney name is required in signature block');
+    if (!motion.signatureBlock.date) errors.push('Date is required in signature block');
+  }
 
   if (!motion.discoveryType) errors.push('Discovery type is required');
   if (!motion.discoverySought) errors.push('Discovery sought is required');

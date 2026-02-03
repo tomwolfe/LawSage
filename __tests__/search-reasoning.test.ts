@@ -1,13 +1,15 @@
 import { generateSearchQueries, executeSearchQueries, performMultiStepSearchReasoning } from '../lib/search-reasoning';
 
+const { describe, it, expect } = require('@jest/globals');
+
 // Mock the @google/genai module
 jest.mock('@google/genai', () => {
   return {
-    genai: {
-      Client: jest.fn().mockImplementation(() => {
-        return {
-          models: {
-            generateContent: jest.fn().mockResolvedValue({
+    GoogleGenerativeAI: jest.fn().mockImplementation((apiKey) => {
+      return {
+        getGenerativeModel: jest.fn().mockReturnValue({
+          generateContent: jest.fn().mockResolvedValue({
+            response: {
               text: jest.fn().mockReturnValue(
                 JSON.stringify([
                   "local rules of court California civil procedure",
@@ -15,11 +17,11 @@ jest.mock('@google/genai', () => {
                   "case law motion to dismiss standards"
                 ])
               )
-            })
-          }
-        };
-      })
-    }
+            }
+          })
+        })
+      };
+    })
   };
 });
 
@@ -41,19 +43,21 @@ describe('Search Reasoning Module', () => {
     });
 
     it('should return default queries if API call fails', async () => {
-      // Force an error scenario by bypassing the mock for this specific call
-      const { genai } = require('@google/genai');
-      genai.Client.mockImplementationOnce(() => ({
-        models: {
-          generateContent: jest.fn().mockRejectedValue(new Error('API Error'))
-        }
-      }));
+      // Force an error scenario by mocking generateContent to throw
+      const { GoogleGenerativeAI } = require('@google/genai');
+      GoogleGenerativeAI.mockImplementationOnce(() => {
+        return {
+          getGenerativeModel: jest.fn().mockReturnValue({
+            generateContent: jest.fn().mockRejectedValue(new Error('API Error'))
+          })
+        };
+      });
 
       const originalConsoleError = console.error;
       console.error = jest.fn();
 
       const queries = await generateSearchQueries('', '', '');
-      
+
       expect(queries).toHaveLength(3);
       expect(queries[0]).toContain('local rules of court');
       expect(queries[1]).toContain('statutory precedents');

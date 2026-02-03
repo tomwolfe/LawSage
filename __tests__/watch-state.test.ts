@@ -1,7 +1,7 @@
 import { watchStateAndSyncToUrl, resetWatcherState } from '../src/utils/state-sync';
 
 describe('watchStateAndSyncToUrl', () => {
-  let getState: jest.Mock;
+  let getState;
   
   beforeEach(() => {
     jest.useFakeTimers();

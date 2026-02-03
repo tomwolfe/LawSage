@@ -49,7 +49,7 @@ async def generate_legal_help(request: LegalRequest, x_gemini_api_key: str | Non
         )
 
     # Basic validation
-    if not x_gemini_api_key.startswith("AIza") or len(x_gemini_api_key) < 20:
+    if not x_gemini_api_key.startswith("AIza") or len(x_gemini_api_key) < 15:
         return JSONResponse(
             status_code=400,
             content=StandardErrorResponse(

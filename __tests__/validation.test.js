@@ -1,4 +1,5 @@
 const { ResponseValidator, SafetyValidator } = require('../lib/validation');
+const { describe, test, expect } = require('@jest/globals');
 
 describe('ResponseValidator', () => {
   describe('validateLegalOutput', () => {
@@ -6,18 +7,24 @@ describe('ResponseValidator', () => {
       const content = `
         STRATEGY:
         Your legal strategy goes here.
-        
+
+        OPPOSITION VIEW (RED-TEAM ANALYSIS):
+        The landlord may argue that the tenant abandoned the property. This is a significant weakness in our case.
+
         ROADMAP:
         1. First step
         2. Second step
         3. Third step
-        
+
+        COURTHOUSE INFORMATION & LOCAL LOGISTICS:
+        Filing fee is $435 at Stanley Mosk Courthouse.
+
         CITATIONS:
         - 12 U.S.C. § 345
         - Cal. Civ. Code § 1708
         - Rule 12(b)(6)
       `;
-      
+
       expect(ResponseValidator.validateLegalOutput(content)).toBe(true);
     });
 
@@ -56,18 +63,24 @@ describe('ResponseValidator', () => {
       const content = `
         STRATEGY:
         Your legal strategy goes here.
-        
+
+        OPPOSITION VIEW (RED-TEAM ANALYSIS):
+        The opposition will likely argue that the user failed to provide proper notice before initiating the lockout procedure, which could be a significant legal hurdle.
+
         ROADMAP:
         1. First step
         2. Second step
         3. Third step
-        
+
+        COURTHOUSE INFORMATION & LOCAL LOGISTICS:
+        Procedural info here. This is also a bit longer to ensure it is detected correctly by the validator.
+
         CITATIONS:
         - 12 U.S.C. § 345 (federal statute)
         - Cal. Civ. Code § 1708 (state code)
         - Rule 12(b)(6) (court rule)
       `;
-      
+
       expect(ResponseValidator.validateLegalOutput(content)).toBe(true);
     });
   });

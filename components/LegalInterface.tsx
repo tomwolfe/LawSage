@@ -4,10 +4,42 @@ import { useState, useEffect } from 'react';
 import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Upload, FileText } from 'lucide-react';
 import { processImageForOCR } from '../src/utils/image-processor';
 import { updateUrlWithState, getStateFromUrl, watchStateAndSyncToUrl, createVirtualCaseFolderState, restoreVirtualCaseFolderState } from '../src/utils/state-sync';
+import { getGLMAPIKey, shouldRouteToGLM } from '../src/utils/hybrid-router';
+import * as Tesseract from 'tesseract.js';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ResultDisplay from './ResultDisplay';
 import HistoryActions from './HistoryActions';
+
+declare global {
+  interface Window {
+    webkitSpeechRecognition: {
+      new (): SpeechRecognition;
+    };
+  }
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  onstart: () => void;
+  onend: () => void;
+  onerror: (event: unknown) => void;
+  onresult: (event: { results: { [key: number]: { [key: number]: { transcript: string } } } }) => void;
+  start: () => void;
+}
+
+interface DocumentData {
+  text: string;
+  timestamp: Date;
+  fileName: string;
+  fileType: string;
+}
+
+interface Source {
+  title: string | null;
+  uri: string | null;
+}
 
 declare global {
   interface Window {
@@ -82,6 +114,7 @@ export default function LegalInterface() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [caseLedger, setCaseLedger] = useState<CaseLedgerEntry[]>([]);
   const [apiKey, setApiKey] = useState('');
+  const [documents, setDocuments] = useState<DocumentData[]>([]);
 
   // Initialize state from URL fragment on component mount
   useEffect(() => {
@@ -261,46 +294,97 @@ export default function LegalInterface() {
       return;
     }
 
-    const apiKey = localStorage.getItem('GEMINI_API_KEY');
-    if (!apiKey) {
-      setError('Please set your Gemini API Key in Settings first.');
-      return;
-    }
-
     setLoading(true);
     setError('');
 
     try {
-      // Process the image to resize and compress it before sending to OCR
-      const processedImage = await processImageForOCR(selectedFile);
+      // Check if GLM hybrid mode is enabled
+      const isHybrid = await shouldRouteToGLM();
+      
+      let extractedText: string;
 
-      const response = await fetch('/api/ocr', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Gemini-API-Key': apiKey,
-        },
-        body: JSON.stringify({
-          image: processedImage,
-          jurisdiction
-        }),
-      });
-
-      if (!response.ok) {
-        if (response.status === 429) {
-          setError('Rate limit exceeded. Please check your API quota or try again later.');
+      if (isHybrid) {
+        // Use local OCR with Tesseract.js
+        const glmKey = getGLMAPIKey();
+        if (!glmKey) {
+          setError('Please set your GLM API Key in Settings first.');
+          setLoading(false);
           return;
-        } else if (response.status === 401) {
-          setError('Invalid API key. Please update your key in Settings.');
-          return;
-        } else {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to process image');
         }
+
+        try {
+          const { data: { text } } = await Tesseract.recognize(
+            selectedFile,
+            'eng',
+            {
+              logger: (m: any) => {
+                console.log('Tesseract progress:', m);
+              }
+            }
+          );
+
+          extractedText = text.trim();
+        } catch (err) {
+          console.error('Local OCR error:', err);
+          throw new Error('Local OCR failed. Please try again or check browser compatibility.');
+        }
+      } else {
+        // Use server-side OCR (Gemini multimodal)
+        const apiKey = localStorage.getItem('GEMINI_API_KEY');
+        if (!apiKey) {
+          setError('Please set your Gemini API Key in Settings first.');
+          setLoading(false);
+          return;
+        }
+
+        const processedImage = await processImageForOCR(selectedFile);
+
+        const response = await fetch('/api/ocr', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Gemini-API-Key': apiKey,
+          },
+          body: JSON.stringify({
+            image: processedImage,
+            jurisdiction
+          }),
+        });
+
+        if (!response.ok) {
+          if (response.status === 429) {
+            setError('Rate limit exceeded. Please check your API quota or try again later.');
+            setLoading(false);
+            return;
+          } else if (response.status === 401) {
+            setError('Invalid API key. Please update your key in Settings.');
+            setLoading(false);
+            return;
+          } else {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Failed to process image');
+          }
+        }
+
+        const data: LegalResult = await response.json();
+        extractedText = data.text;
       }
 
-      const data: LegalResult = await response.json();
-      setResult(data);
+      // Add to Virtual Case Folder state
+      setDocuments(prev => [...prev, {
+        text: extractedText,
+        timestamp: new Date(),
+        fileName: selectedFile.name,
+        fileType: selectedFile.type
+      }]);
+
+      // Create result from extracted text
+      const result: LegalResult = {
+        text: extractedText,
+        sources: []
+      };
+
+      setResult(result);
       setActiveTab('strategy');
 
       // Add to history
@@ -309,7 +393,7 @@ export default function LegalInterface() {
         timestamp: new Date(),
         jurisdiction,
         userInput: `OCR Analysis of: ${selectedFile.name}`,
-        result: data
+        result: result
       };
 
       const updatedHistory = [newHistoryItem, ...history];
