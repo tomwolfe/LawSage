@@ -9,10 +9,6 @@ interface NextRequest {
   };
 }
 
-// interface NextResponse {  // Removed unused interface
-//   json: (data: unknown) => unknown;
-// }
-
 export {};
 
 // Mock the fetch function to simulate API calls
@@ -43,7 +39,7 @@ jest.mock('@google/genai', () => ({
 }));
 
 // Import the function after mocking dependencies
-const { POST: AnalyzePOST } = (await import('../app/api/analyze/route')).POST;
+import { POST as AnalyzePOST } from '../app/api/analyze/route';
 
 describe('Template Injection Validation Tests', () => {
   beforeEach(() => {
