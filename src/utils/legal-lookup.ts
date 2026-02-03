@@ -31,6 +31,7 @@ interface ExParteNoticeRule {
 interface LegalLookupDatabase {
   pro_se_procedural_rules: LegalRule[];
   ex_parte_notice_rules: ExParteNoticeRule[];
+  local_rules_map?: Record<string, { filing_fee: string; response_time: string; ex_parte_notice: string }>;
 }
 
 let legalLookupDb: LegalLookupDatabase | null = null;
@@ -62,6 +63,17 @@ async function loadLegalLookupDb(): Promise<LegalLookupDatabase> {
       ex_parte_notice_rules: [] 
     };
   }
+}
+
+/**
+ * Gets local rules for a specific county
+ * @param countyName Name of the county (e.g., "Los Angeles County, CA")
+ * @returns Local rules for the county or null if not found
+ */
+export async function getLocalRules(countyName: string): Promise<{ filing_fee: string; response_time: string; ex_parte_notice: string } | null> {
+  const db = await loadLegalLookupDb();
+  if (!db.local_rules_map || !countyName) return null;
+  return db.local_rules_map[countyName] || null;
 }
 
 /**

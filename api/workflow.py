@@ -15,42 +15,17 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 SYSTEM_INSTRUCTION = """
 You are a proactive legal agent helping pro se litigants (people representing themselves).
 Your role is to provide actionable, structured legal guidance with clear next steps and timelines.
+
+CROSS-DOCUMENT CONFLICT DETECTION:
+If multiple documents are provided in the Virtual Case Folder, you MUST perform an adversarial check for factual contradictions. 
+Identify any discrepancies in:
+- Dates of incidents or filings
+- Financial amounts (rent, damages, etc.)
+- Party statements or admissions
+- Signatures or authorization dates
+If conflicts are detected, you MUST explicitly list them in a "conflicts" field in your JSON response.
+
 You MUST return your response in valid JSON format.
-
-Your JSON response MUST include:
-- "disclaimer": Mandatory legal disclaimer.
-- "strategy": Primary legal strategy and analysis.
-- "adversarial_strategy": A DETAILED red-team analysis of the user's case. Identify specific weaknesses and how the opposition will likely counter each of the user's main points. This section is MANDATORY and must be substantial.
-- "roadmap": A list of steps with:
-  * "step": Sequential number
-  * "title": Actionable title
-  * "description": Detailed description
-  * "estimated_time": Timeframe
-  * "required_documents": List of documents
-  * "status": "pending"
-  * "due_date_placeholder": "TBD"
-- "filing_template": A comprehensive template that includes TWO distinct sections:
-  (A) The Civil Complaint (grounded in relevant statutes like CC § 789.3 and CCP § 1160.2 for lockouts). When citing CC § 789.3, you MUST explicitly mention the mandatory minimum statutory penalty of $250 per violation as defined in subsection (c).
-  (B) The Ex Parte Application for TRO/OSC.
-  Include explicit placeholders for required Judicial Council forms like CM-010, MC-030, CIV-100, etc.
-- "citations": A list of objects with "text", "source", "url", and "is_verified". Use these EXACT formats:
-  * Federal statutes: "12 U.S.C. § 345"
-  * State codes: "Cal. Civ. Code § 1708"
-  * Court rules: "Rule 12(b)(6)"
-- "local_logistics": A dictionary with courthouse address, fees, hours, etc.
-- "procedural_checks": A list of procedural technicality checks.
-
-Example JSON structure:
-{
-  "disclaimer": "...",
-  "strategy": "...",
-  "adversarial_strategy": "...",
-  "roadmap": [...],
-  "filing_template": "COMPLAINT: ... \\n\\n EX PARTE APPLICATION: ...",
-  "citations": [...],
-  "local_logistics": {...},
-  "procedural_checks": [...]
-}
 """
 
 def is_retryable_exception(e):
@@ -210,7 +185,8 @@ Generate a comprehensive legal response in VALID JSON format.
 Your response MUST include:
 1. 'strategy': Overall legal strategy and analysis.
 2. 'adversarial_strategy': Red-team analysis of weaknesses. MANDATORY: Do not use placeholders.
-3. 'roadmap': Step-by-step next steps for {request.jurisdiction}.
+3. 'conflicts': List any identified document contradictions here.
+4. 'roadmap': Step-by-step next steps for {request.jurisdiction}.
 4. 'local_logistics': Specific courthouse info for {request.jurisdiction}.
 5. 'filing_template': A comprehensive template that includes TWO distinct sections:
    (A) The Civil Complaint (grounded in relevant statutes like CC § 789.3 and CCP § 1160.2 if applicable). MANDATORY: Explicitly mention the mandatory minimum statutory penalty of $250 per violation as defined in CC § 789.3(c).

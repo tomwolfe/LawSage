@@ -1,115 +1,885 @@
 {
   "pro_se_procedural_rules": [
-    { "id": 1, "rule_number": "FRCP 1", "title": "Scope of Rules", "description": "These rules govern procedure in the United States district courts.", "jurisdiction": "Federal", "category": "General" },
-    { "id": 2, "rule_number": "FRCP 4", "title": "Summons", "description": "Service of process requirements and methods for federal court.", "jurisdiction": "Federal", "category": "Service" },
-    { "id": 3, "rule_number": "FRCP 8", "title": "General Rules of Pleading", "description": "A pleading must contain a short and plain statement of the claim.", "jurisdiction": "Federal", "category": "Pleading" },
-    { "id": 4, "rule_number": "FRCP 12", "title": "Defenses and Objections", "description": "How to present defenses and objections by pleading or motion.", "jurisdiction": "Federal", "category": "Motions" },
-    { "id": 5, "rule_number": "FRCP 15", "title": "Amended Pleadings", "description": "Rules for amending pleadings once as a matter of course.", "jurisdiction": "Federal", "category": "Pleading" },
-    { "id": 6, "rule_number": "FRCP 26", "title": "Discovery", "description": "General provisions governing discovery and duty of disclosure.", "jurisdiction": "Federal", "category": "Discovery" },
-    { "id": 7, "rule_number": "FRCP 33", "title": "Interrogatories", "description": "Limits and procedures for serving interrogatories on parties.", "jurisdiction": "Federal", "category": "Discovery" },
-    { "id": 8, "rule_number": "FRCP 34", "title": "Production of Documents", "description": "Requests for production of documents and tangible things.", "jurisdiction": "Federal", "category": "Discovery" },
-    { "id": 9, "rule_number": "FRCP 36", "title": "Requests for Admission", "description": "Procedures for requesting admissions from other parties.", "jurisdiction": "Federal", "category": "Discovery" },
-    { "id": 10, "rule_number": "FRCP 56", "title": "Summary Judgment", "description": "Procedures for moving for summary judgment.", "jurisdiction": "Federal", "category": "Motions" },
-    { "id": 11, "rule_number": "CA CCP 412.20", "title": "Summons Response Time", "description": "A defendant has 30 days after the service of the summons to file a written response.", "jurisdiction": "California", "category": "Service" },
-    { "id": 12, "rule_number": "CA CCP 116.220", "title": "Small Claims Limit", "description": "Small claims jurisdiction limit is $12,500 for individuals.", "jurisdiction": "California", "category": "Small Claims" },
-    { "id": 13, "rule_number": "NY CPLR 320", "title": "Summons Response Time", "description": "Response due in 20 days if served personally in NY, 30 days otherwise.", "jurisdiction": "New York", "category": "Service" },
-    { "id": 14, "rule_number": "NY UJCA 1801", "title": "Small Claims Limit", "description": "Small claims limit is $3,000 in Town and Village Courts, $5,000 in City Courts.", "jurisdiction": "New York", "category": "Small Claims" },
-    { "id": 15, "rule_number": "TX RCP 99", "title": "Summons Response Time", "description": "Answer due by 10:00 AM on the Monday next following the expiration of 20 days after service.", "jurisdiction": "Texas", "category": "Service" },
-    { "id": 16, "rule_number": "TX Govt Code 28.003", "title": "Small Claims Limit", "description": "Small claims limit in Justice Courts is $20,000.", "jurisdiction": "Texas", "category": "Small Claims" },
-    { "id": 17, "rule_number": "FL RCP 1.140", "title": "Summons Response Time", "description": "A defendant shall serve an answer within 20 days after service of original process.", "jurisdiction": "Florida", "category": "Service" },
-    { "id": 18, "rule_number": "FL Stat 34.01", "title": "Small Claims Limit", "description": "Small claims limit is $8,000.", "jurisdiction": "Florida", "category": "Small Claims" },
-    { "id": 19, "rule_number": "PA RCP 1026", "title": "Summons Response Time", "description": "Every pleading subsequent to the complaint shall be filed within 20 days after service.", "jurisdiction": "Pennsylvania", "category": "Service" },
-    { "id": 20, "rule_number": "PA 42 Pa.C.S. 1515", "title": "Small Claims Limit", "description": "Magisterial District Courts limit is $12,000.", "jurisdiction": "Pennsylvania", "category": "Small Claims" },
-    { "id": 21, "rule_number": "IL S. Ct. R. 101", "title": "Summons Response Time", "description": "Appearance required within 30 days after service.", "jurisdiction": "Illinois", "category": "Service" },
-    { "id": 22, "rule_number": "IL 705 ILCS 105", "title": "Small Claims Limit", "description": "Small claims limit is $10,000.", "jurisdiction": "Illinois", "category": "Small Claims" },
-    { "id": 23, "rule_number": "OH Civ.R. 12", "title": "Summons Response Time", "description": "A defendant shall serve his answer within 28 days after service of the summons.", "jurisdiction": "Ohio", "category": "Service" },
-    { "id": 24, "rule_number": "OH R.C. 1925.02", "title": "Small Claims Limit", "description": "Small claims limit is $6,000.", "jurisdiction": "Ohio", "category": "Small Claims" },
-    { "id": 25, "rule_number": "GA Code 9-11-12", "title": "Summons Response Time", "description": "A defendant shall serve his answer within 30 days after the service of the summons.", "jurisdiction": "Georgia", "category": "Service" },
-    { "id": 26, "rule_number": "GA Code 15-10-2", "title": "Small Claims Limit", "description": "Magistrate court limit is $15,000.", "jurisdiction": "Georgia", "category": "Small Claims" },
-    { "id": 27, "rule_number": "NC GS 1A-1, Rule 12", "title": "Summons Response Time", "description": "A defendant shall serve his answer within 30 days after service of the summons.", "jurisdiction": "North Carolina", "category": "Service" },
-    { "id": 28, "rule_number": "NC GS 7A-210", "title": "Small Claims Limit", "description": "Small claims limit is $10,000.", "jurisdiction": "North Carolina", "category": "Small Claims" },
-    { "id": 29, "rule_number": "MI MCR 2.108", "title": "Summons Response Time", "description": "Answer due in 21 days if served personally, 28 days if served by mail or outside state.", "jurisdiction": "Michigan", "category": "Service" },
-    { "id": 30, "rule_number": "MI MCL 600.8401", "title": "Small Claims Limit", "description": "Small claims limit is $7,000.", "jurisdiction": "Michigan", "category": "Small Claims" },
-    { "id": 31, "rule_number": "NJ R. 4:6-1", "title": "Summons Response Time", "description": "A defendant shall serve an answer within 35 days after service of the summons.", "jurisdiction": "New Jersey", "category": "Service" },
-    { "id": 32, "rule_number": "NJ R. 6:1-2", "title": "Small Claims Limit", "description": "Small claims limit is $5,000.", "jurisdiction": "New Jersey", "category": "Small Claims" },
-    { "id": 33, "rule_number": "VA Code 8.01-277", "title": "Summons Response Time", "description": "Answer or other responsive pleading due within 21 days after service.", "jurisdiction": "Virginia", "category": "Service" },
-    { "id": 34, "rule_number": "VA Code 16.1-77", "title": "Small Claims Limit", "description": "Small claims limit is $5,000.", "jurisdiction": "Virginia", "category": "Small Claims" },
-    { "id": 35, "rule_number": "WA CR 12", "title": "Summons Response Time", "description": "Answer due in 20 days if served in state, 60 days if served out of state.", "jurisdiction": "Washington", "category": "Service" },
-    { "id": 36, "rule_number": "WA RCW 12.40.010", "title": "Small Claims Limit", "description": "Small claims limit is $10,000.", "jurisdiction": "Washington", "category": "Small Claims" },
-    { "id": 37, "rule_number": "AZ R. Civ. P. 12", "title": "Summons Response Time", "description": "Answer due in 20 days if served in state, 30 days if served out of state.", "jurisdiction": "Arizona", "category": "Service" },
-    { "id": 38, "rule_number": "AZ ARS 22-503", "title": "Small Claims Limit", "description": "Small claims limit in Justice Courts is $3,500.", "jurisdiction": "Arizona", "category": "Small Claims" },
-    { "id": 39, "rule_number": "MA MRCP 12", "title": "Summons Response Time", "description": "A defendant shall serve his answer within 20 days after service of the summons.", "jurisdiction": "Massachusetts", "category": "Service" },
-    { "id": 40, "rule_number": "MA GL c.218 s.21", "title": "Small Claims Limit", "description": "Small claims limit is $7,000.", "jurisdiction": "Massachusetts", "category": "Small Claims" },
-    { "id": 41, "rule_number": "TN TRCP 12.01", "title": "Summons Response Time", "description": "A defendant shall serve an answer within 30 days after service of the summons.", "jurisdiction": "Tennessee", "category": "Service" },
-    { "id": 42, "rule_number": "TN TCA 16-15-501", "title": "Small Claims Limit", "description": "General Sessions Court limit is $25,000.", "jurisdiction": "Tennessee", "category": "Small Claims" },
-    { "id": 43, "rule_number": "IN Trial Rule 6", "title": "Summons Response Time", "description": "A defendant shall serve his answer within 20 days after service of the summons.", "jurisdiction": "Indiana", "category": "Service" },
-    { "id": 44, "rule_number": "IN IC 33-34-3-2", "title": "Small Claims Limit", "description": "Small claims limit is $10,000.", "jurisdiction": "Indiana", "category": "Small Claims" },
-    { "id": 45, "rule_number": "MO Rule 55.25", "title": "Summons Response Time", "description": "A defendant shall file an answer within 30 days after the service of the summons.", "jurisdiction": "Missouri", "category": "Service" },
-    { "id": 46, "rule_number": "MO RSMo 482.305", "title": "Small Claims Limit", "description": "Small claims limit is $5,000.", "jurisdiction": "Missouri", "category": "Small Claims" },
-    { "id": 47, "rule_number": "MD Rule 2-321", "title": "Summons Response Time", "description": "Answer due in 30 days if served in state, 60-90 days otherwise.", "jurisdiction": "Maryland", "category": "Service" },
-    { "id": 48, "rule_number": "MD Cts & Jud Proc 4-405", "title": "Small Claims Limit", "description": "Small claims limit is $5,000.", "jurisdiction": "Maryland", "category": "Small Claims" },
-    { "id": 49, "rule_number": "WI Stat 802.06", "title": "Summons Response Time", "description": "Answer due in 20 or 45 days depending on the type of claim and defendant.", "jurisdiction": "Wisconsin", "category": "Service" },
-    { "id": 50, "rule_number": "WI Stat 799.01", "title": "Small Claims Limit", "description": "Small claims limit is $10,000.", "jurisdiction": "Wisconsin", "category": "Small Claims" },
-    { "id": 51, "rule_number": "CO CRCP 12", "title": "Summons Response Time", "description": "Answer due within 21 days after service.", "jurisdiction": "Colorado", "category": "Service" },
-    { "id": 52, "rule_number": "CO CRS 13-6-403", "title": "Small Claims Limit", "description": "Small claims limit is $7,500.", "jurisdiction": "Colorado", "category": "Small Claims" },
-    { "id": 53, "rule_number": "MN Rule 12.01", "title": "Summons Response Time", "description": "A defendant shall serve an answer within 20 days after service of the summons.", "jurisdiction": "Minnesota", "category": "Service" },
-    { "id": 54, "rule_number": "MN Stat 491A.01", "title": "Small Claims Limit", "description": "Conciliation court limit is $15,000.", "jurisdiction": "Minnesota", "category": "Small Claims" },
-    { "id": 55, "rule_number": "SC SCRCP 12", "title": "Summons Response Time", "description": "A defendant shall serve an answer within 30 days after service of the summons.", "jurisdiction": "South Carolina", "category": "Service" },
-    { "id": 56, "rule_number": "SC Code 22-3-10", "title": "Small Claims Limit", "description": "Magistrate court limit is $7,500.", "jurisdiction": "South Carolina", "category": "Small Claims" },
-    { "id": 57, "rule_number": "AL ARCP 12", "title": "Summons Response Time", "description": "A defendant shall serve an answer within 30 days after service of the summons.", "jurisdiction": "Alabama", "category": "Service" },
-    { "id": 58, "rule_number": "AL Code 12-12-31", "title": "Small Claims Limit", "description": "Small claims limit is $6,000.", "jurisdiction": "Alabama", "category": "Small Claims" },
-    { "id": 59, "rule_number": "LA CCP art. 1001", "title": "Summons Response Time", "description": "A defendant shall file his answer within 15 days after service of citation.", "jurisdiction": "Louisiana", "category": "Service" },
-    { "id": 60, "rule_number": "LA RS 13:5202", "title": "Small Claims Limit", "description": "Small claims limit is $5,000.", "jurisdiction": "Louisiana", "category": "Small Claims" },
-    { "id": 61, "rule_number": "KY CR 12.01", "title": "Summons Response Time", "description": "A defendant shall serve an answer within 20 days after service of the summons.", "jurisdiction": "Kentucky", "category": "Service" },
-    { "id": 62, "rule_number": "KY KRS 24A.230", "title": "Small Claims Limit", "description": "Small claims limit is $2,500.", "jurisdiction": "Kentucky", "category": "Small Claims" },
-    { "id": 63, "rule_number": "OR ORCP 7", "title": "Summons Response Time", "description": "Answer due within 30 days after service.", "jurisdiction": "Oregon", "category": "Service" },
-    { "id": 64, "rule_number": "OR ORS 46.405", "title": "Small Claims Limit", "description": "Small claims limit is $10,000.", "jurisdiction": "Oregon", "category": "Small Claims" },
-    { "id": 65, "rule_number": "OK 12 OS 2012", "title": "Summons Response Time", "description": "A defendant shall serve an answer within 20 days after service of the summons.", "jurisdiction": "Oklahoma", "category": "Service" },
-    { "id": 66, "rule_number": "OK 12 OS 1751", "title": "Small Claims Limit", "description": "Small claims limit is $10,000.", "jurisdiction": "Oklahoma", "category": "Small Claims" },
-    { "id": 67, "rule_number": "CT PB 10-8", "title": "Summons Response Time", "description": "Pleadings due in 30 days after the return day.", "jurisdiction": "Connecticut", "category": "Service" },
-    { "id": 68, "rule_number": "CT CGS 51-15", "title": "Small Claims Limit", "description": "Small claims limit is $5,000.", "jurisdiction": "Connecticut", "category": "Small Claims" },
-    { "id": 69, "rule_number": "UT URCP 12", "title": "Summons Response Time", "description": "Answer due in 21 days if served in state, 30 days if served out of state.", "jurisdiction": "Utah", "category": "Service" },
-    { "id": 70, "rule_number": "UT Code 78A-8-102", "title": "Small Claims Limit", "description": "Small claims limit is $15,000.", "jurisdiction": "Utah", "category": "Small Claims" },
-    { "id": 71, "rule_number": "IA Rule 1.303", "title": "Summons Response Time", "description": "Answer due within 20 days after service.", "jurisdiction": "Iowa", "category": "Service" },
-    { "id": 72, "rule_number": "IA Code 631.1", "title": "Small Claims Limit", "description": "Small claims limit is $6,500.", "jurisdiction": "Iowa", "category": "Small Claims" },
-    { "id": 73, "rule_number": "NV NRCP 12", "title": "Summons Response Time", "description": "A defendant shall serve an answer within 20 days after service of the summons.", "jurisdiction": "Nevada", "category": "Service" },
-    { "id": 74, "rule_number": "NV NRS 73.010", "title": "Small Claims Limit", "description": "Small claims limit is $10,000.", "jurisdiction": "Nevada", "category": "Small Claims" },
-    { "id": 75, "rule_number": "AR ARCP 12", "title": "Summons Response Time", "description": "Answer due within 30 days after service (60 days if out of state).", "jurisdiction": "Arkansas", "category": "Service" },
-    { "id": 76, "rule_number": "AR Code 16-17-602", "title": "Small Claims Limit", "description": "Small claims limit is $5,000.", "jurisdiction": "Arkansas", "category": "Small Claims" },
-    { "id": 77, "rule_number": "MS MRCP 12", "title": "Summons Response Time", "description": "A defendant shall serve an answer within 30 days after service of the summons.", "jurisdiction": "Mississippi", "category": "Service" },
-    { "id": 78, "rule_number": "MS Code 9-11-9", "title": "Small Claims Limit", "description": "Justice court limit is $3,500.", "jurisdiction": "Mississippi", "category": "Small Claims" },
-    { "id": 79, "rule_number": "KS KSA 60-212", "title": "Summons Response Time", "description": "Answer due within 21 days after service.", "jurisdiction": "Kansas", "category": "Service" },
-    { "id": 80, "rule_number": "KS KSA 61-2703", "title": "Small Claims Limit", "description": "Small claims limit is $4,000.", "jurisdiction": "Kansas", "category": "Small Claims" },
-    { "id": 81, "rule_number": "NM Rule 1-012", "title": "Summons Response Time", "description": "Answer due within 30 days after service.", "jurisdiction": "New Mexico", "category": "Service" },
-    { "id": 82, "rule_number": "NM Stat 35-10-1", "title": "Small Claims Limit", "description": "Magistrate court limit is $10,000.", "jurisdiction": "New Mexico", "category": "Small Claims" },
-    { "id": 83, "rule_number": "NE Rule 6-1112", "title": "Summons Response Time", "description": "Answer due within 30 days after service.", "jurisdiction": "Nebraska", "category": "Service" },
-    { "id": 84, "rule_number": "NE Stat 25-2802", "title": "Small Claims Limit", "description": "Small claims limit is $3,900.", "jurisdiction": "Nebraska", "category": "Small Claims" },
-    { "id": 85, "rule_number": "WV R.C.P. 12", "title": "Summons Response Time", "description": "Answer due within 20 days after service.", "jurisdiction": "West Virginia", "category": "Service" },
-    { "id": 86, "rule_number": "WV Code 50-2-1", "title": "Small Claims Limit", "description": "Magistrate court limit is $10,000.", "jurisdiction": "West Virginia", "category": "Small Claims" },
-    { "id": 87, "rule_number": "ID IRCP 12", "title": "Summons Response Time", "description": "Answer due within 21 days after service.", "jurisdiction": "Idaho", "category": "Service" },
-    { "id": 88, "rule_number": "ID Code 1-2301", "title": "Small Claims Limit", "description": "Small claims limit is $5,000.", "jurisdiction": "Idaho", "category": "Small Claims" },
-    { "id": 90, "rule_number": "HI HRCP 12", "title": "Summons Response Time", "description": "Answer due within 20 days after service.", "jurisdiction": "Hawaii", "category": "Service" },
-    { "id": 91, "rule_number": "HI HRS 633-27", "title": "Small Claims Limit", "description": "Small claims limit is $5,000.", "jurisdiction": "Hawaii", "category": "Small Claims" },
-    { "id": 92, "rule_number": "NH Rule 9", "title": "Summons Response Time", "description": "Appearance and answer due within 30 days after service.", "jurisdiction": "New Hampshire", "category": "Service" },
-    { "id": 93, "rule_number": "NH RSA 503:1", "title": "Small Claims Limit", "description": "Small claims limit is $10,000.", "jurisdiction": "New Hampshire", "category": "Small Claims" },
-    { "id": 94, "rule_number": "ME MRCP 12", "title": "Summons Response Time", "description": "Answer due within 20 days after service.", "jurisdiction": "Maine", "category": "Service" },
-    { "id": 95, "rule_number": "ME 14 MRS 7482", "title": "Small Claims Limit", "description": "Small claims limit is $6,000.", "jurisdiction": "Maine", "category": "Small Claims" },
-    { "id": 96, "rule_number": "RI RCP 12", "title": "Summons Response Time", "description": "Answer due within 20 days after service.", "jurisdiction": "Rhode Island", "category": "Service" },
-    { "id": 97, "rule_number": "RI GL 10-16-1", "title": "Small Claims Limit", "description": "Small claims limit is $5,000.", "jurisdiction": "Rhode Island", "category": "Small Claims" },
-    { "id": 98, "rule_number": "MT MRCP 12", "title": "Summons Response Time", "description": "Answer due within 21 days after service.", "jurisdiction": "Montana", "category": "Service" },
-    { "id": 99, "rule_number": "MT MCA 25-35-502", "title": "Small Claims Limit", "description": "Small claims limit is $7,000.", "jurisdiction": "Montana", "category": "Small Claims" },
-    { "id": 100, "rule_number": "DE Super. Ct. Civ. R. 12", "title": "Summons Response Time", "description": "Answer due within 20 days after service.", "jurisdiction": "Delaware", "category": "Service" },
-    { "id": 101, "rule_number": "DE 10 Del. C. 9301", "title": "Small Claims Limit", "description": "Justice of the Peace Court limit is $25,000.", "jurisdiction": "Delaware", "category": "Small Claims" },
-    { "id": 102, "rule_number": "SD RCP 15-6-12", "title": "Summons Response Time", "description": "Answer due within 30 days after service.", "jurisdiction": "South Dakota", "category": "Service" },
-    { "id": 103, "rule_number": "SD CL 16-12C-13", "title": "Small Claims Limit", "description": "Small claims limit is $12,000.", "jurisdiction": "South Dakota", "category": "Small Claims" },
-    { "id": 104, "rule_number": "ND Rule 12", "title": "Summons Response Time", "description": "Answer due within 21 days after service.", "jurisdiction": "North Dakota", "category": "Service" },
-    { "id": 105, "rule_number": "ND Cent. Code 27-08.1-01", "title": "Small Claims Limit", "description": "Small claims limit is $15,000.", "jurisdiction": "North Dakota", "category": "Small Claims" },
-    { "id": 106, "rule_number": "AK Rule 12", "title": "Summons Response Time", "description": "Answer due within 20 days after service.", "jurisdiction": "Alaska", "category": "Service" },
-    { "id": 107, "rule_number": "AK Stat 22.15.040", "title": "Small Claims Limit", "description": "Small claims limit is $10,000.", "jurisdiction": "Alaska", "category": "Small Claims" },
-    { "id": 108, "rule_number": "VT VRCP 12", "title": "Summons Response Time", "description": "Answer due within 21 days after service.", "jurisdiction": "Vermont", "category": "Service" },
-    { "id": 109, "rule_number": "VT 12 VSA 5531", "title": "Small Claims Limit", "description": "Small claims limit is $10,000.", "jurisdiction": "Vermont", "category": "Small Claims" },
-    { "id": 110, "rule_number": "WY WRCP 12", "title": "Summons Response Time", "description": "Answer due within 20 days after service (30 days if out of state).", "jurisdiction": "Wyoming", "category": "Service" },
-    { "id": 111, "rule_number": "WY Stat 1-21-201", "title": "Small Claims Limit", "description": "Small claims limit is $6,000.", "jurisdiction": "Wyoming", "category": "Small Claims" }
+    {
+      "id": 1,
+      "rule_number": "FRCP 1",
+      "title": "Scope of Rules",
+      "description": "These rules govern procedure in the United States district courts.",
+      "jurisdiction": "Federal",
+      "category": "General"
+    },
+    {
+      "id": 2,
+      "rule_number": "FRCP 4",
+      "title": "Summons",
+      "description": "Service of process requirements and methods for federal court.",
+      "jurisdiction": "Federal",
+      "category": "Service"
+    },
+    {
+      "id": 3,
+      "rule_number": "FRCP 8",
+      "title": "General Rules of Pleading",
+      "description": "A pleading must contain a short and plain statement of the claim.",
+      "jurisdiction": "Federal",
+      "category": "Pleading"
+    },
+    {
+      "id": 4,
+      "rule_number": "FRCP 12",
+      "title": "Defenses and Objections",
+      "description": "How to present defenses and objections by pleading or motion.",
+      "jurisdiction": "Federal",
+      "category": "Motions"
+    },
+    {
+      "id": 5,
+      "rule_number": "FRCP 15",
+      "title": "Amended Pleadings",
+      "description": "Rules for amending pleadings once as a matter of course.",
+      "jurisdiction": "Federal",
+      "category": "Pleading"
+    },
+    {
+      "id": 6,
+      "rule_number": "FRCP 26",
+      "title": "Discovery",
+      "description": "General provisions governing discovery and duty of disclosure.",
+      "jurisdiction": "Federal",
+      "category": "Discovery"
+    },
+    {
+      "id": 7,
+      "rule_number": "FRCP 33",
+      "title": "Interrogatories",
+      "description": "Limits and procedures for serving interrogatories on parties.",
+      "jurisdiction": "Federal",
+      "category": "Discovery"
+    },
+    {
+      "id": 8,
+      "rule_number": "FRCP 34",
+      "title": "Production of Documents",
+      "description": "Requests for production of documents and tangible things.",
+      "jurisdiction": "Federal",
+      "category": "Discovery"
+    },
+    {
+      "id": 9,
+      "rule_number": "FRCP 36",
+      "title": "Requests for Admission",
+      "description": "Procedures for requesting admissions from other parties.",
+      "jurisdiction": "Federal",
+      "category": "Discovery"
+    },
+    {
+      "id": 10,
+      "rule_number": "FRCP 56",
+      "title": "Summary Judgment",
+      "description": "Procedures for moving for summary judgment.",
+      "jurisdiction": "Federal",
+      "category": "Motions"
+    },
+    {
+      "id": 11,
+      "rule_number": "CA CCP 412.20",
+      "title": "Summons Response Time",
+      "description": "A defendant has 30 days after the service of the summons to file a written response.",
+      "jurisdiction": "California",
+      "category": "Service"
+    },
+    {
+      "id": 12,
+      "rule_number": "CA CCP 116.220",
+      "title": "Small Claims Limit",
+      "description": "Small claims jurisdiction limit is $12,500 for individuals.",
+      "jurisdiction": "California",
+      "category": "Small Claims"
+    },
+    {
+      "id": 13,
+      "rule_number": "NY CPLR 320",
+      "title": "Summons Response Time",
+      "description": "Response due in 20 days if served personally in NY, 30 days otherwise.",
+      "jurisdiction": "New York",
+      "category": "Service"
+    },
+    {
+      "id": 14,
+      "rule_number": "NY UJCA 1801",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $3,000 in Town and Village Courts, $5,000 in City Courts.",
+      "jurisdiction": "New York",
+      "category": "Small Claims"
+    },
+    {
+      "id": 15,
+      "rule_number": "TX RCP 99",
+      "title": "Summons Response Time",
+      "description": "Answer due by 10:00 AM on the Monday next following the expiration of 20 days after service.",
+      "jurisdiction": "Texas",
+      "category": "Service"
+    },
+    {
+      "id": 16,
+      "rule_number": "TX Govt Code 28.003",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit in Justice Courts is $20,000.",
+      "jurisdiction": "Texas",
+      "category": "Small Claims"
+    },
+    {
+      "id": 17,
+      "rule_number": "FL RCP 1.140",
+      "title": "Summons Response Time",
+      "description": "A defendant shall serve an answer within 20 days after service of original process.",
+      "jurisdiction": "Florida",
+      "category": "Service"
+    },
+    {
+      "id": 18,
+      "rule_number": "FL Stat 34.01",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $8,000.",
+      "jurisdiction": "Florida",
+      "category": "Small Claims"
+    },
+    {
+      "id": 19,
+      "rule_number": "PA RCP 1026",
+      "title": "Summons Response Time",
+      "description": "Every pleading subsequent to the complaint shall be filed within 20 days after service.",
+      "jurisdiction": "Pennsylvania",
+      "category": "Service"
+    },
+    {
+      "id": 20,
+      "rule_number": "PA 42 Pa.C.S. 1515",
+      "title": "Small Claims Limit",
+      "description": "Magisterial District Courts limit is $12,000.",
+      "jurisdiction": "Pennsylvania",
+      "category": "Small Claims"
+    },
+    {
+      "id": 21,
+      "rule_number": "IL S. Ct. R. 101",
+      "title": "Summons Response Time",
+      "description": "Appearance required within 30 days after service.",
+      "jurisdiction": "Illinois",
+      "category": "Service"
+    },
+    {
+      "id": 22,
+      "rule_number": "IL 705 ILCS 105",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $10,000.",
+      "jurisdiction": "Illinois",
+      "category": "Small Claims"
+    },
+    {
+      "id": 23,
+      "rule_number": "OH Civ.R. 12",
+      "title": "Summons Response Time",
+      "description": "A defendant shall serve his answer within 28 days after service of the summons.",
+      "jurisdiction": "Ohio",
+      "category": "Service"
+    },
+    {
+      "id": 24,
+      "rule_number": "OH R.C. 1925.02",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $6,000.",
+      "jurisdiction": "Ohio",
+      "category": "Small Claims"
+    },
+    {
+      "id": 25,
+      "rule_number": "GA Code 9-11-12",
+      "title": "Summons Response Time",
+      "description": "A defendant shall serve his answer within 30 days after the service of the summons.",
+      "jurisdiction": "Georgia",
+      "category": "Service"
+    },
+    {
+      "id": 26,
+      "rule_number": "GA Code 15-10-2",
+      "title": "Small Claims Limit",
+      "description": "Magistrate court limit is $15,000.",
+      "jurisdiction": "Georgia",
+      "category": "Small Claims"
+    },
+    {
+      "id": 27,
+      "rule_number": "NC GS 1A-1, Rule 12",
+      "title": "Summons Response Time",
+      "description": "A defendant shall serve his answer within 30 days after service of the summons.",
+      "jurisdiction": "North Carolina",
+      "category": "Service"
+    },
+    {
+      "id": 28,
+      "rule_number": "NC GS 7A-210",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $10,000.",
+      "jurisdiction": "North Carolina",
+      "category": "Small Claims"
+    },
+    {
+      "id": 29,
+      "rule_number": "MI MCR 2.108",
+      "title": "Summons Response Time",
+      "description": "Answer due in 21 days if served personally, 28 days if served by mail or outside state.",
+      "jurisdiction": "Michigan",
+      "category": "Service"
+    },
+    {
+      "id": 30,
+      "rule_number": "MI MCL 600.8401",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $7,000.",
+      "jurisdiction": "Michigan",
+      "category": "Small Claims"
+    },
+    {
+      "id": 31,
+      "rule_number": "NJ R. 4:6-1",
+      "title": "Summons Response Time",
+      "description": "A defendant shall serve an answer within 35 days after service of the summons.",
+      "jurisdiction": "New Jersey",
+      "category": "Service"
+    },
+    {
+      "id": 32,
+      "rule_number": "NJ R. 6:1-2",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $5,000.",
+      "jurisdiction": "New Jersey",
+      "category": "Small Claims"
+    },
+    {
+      "id": 33,
+      "rule_number": "VA Code 8.01-277",
+      "title": "Summons Response Time",
+      "description": "Answer or other responsive pleading due within 21 days after service.",
+      "jurisdiction": "Virginia",
+      "category": "Service"
+    },
+    {
+      "id": 34,
+      "rule_number": "VA Code 16.1-77",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $5,000.",
+      "jurisdiction": "Virginia",
+      "category": "Small Claims"
+    },
+    {
+      "id": 35,
+      "rule_number": "WA CR 12",
+      "title": "Summons Response Time",
+      "description": "Answer due in 20 days if served in state, 60 days if served out of state.",
+      "jurisdiction": "Washington",
+      "category": "Service"
+    },
+    {
+      "id": 36,
+      "rule_number": "WA RCW 12.40.010",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $10,000.",
+      "jurisdiction": "Washington",
+      "category": "Small Claims"
+    },
+    {
+      "id": 37,
+      "rule_number": "AZ R. Civ. P. 12",
+      "title": "Summons Response Time",
+      "description": "Answer due in 20 days if served in state, 30 days if served out of state.",
+      "jurisdiction": "Arizona",
+      "category": "Service"
+    },
+    {
+      "id": 38,
+      "rule_number": "AZ ARS 22-503",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit in Justice Courts is $3,500.",
+      "jurisdiction": "Arizona",
+      "category": "Small Claims"
+    },
+    {
+      "id": 39,
+      "rule_number": "MA MRCP 12",
+      "title": "Summons Response Time",
+      "description": "A defendant shall serve his answer within 20 days after service of the summons.",
+      "jurisdiction": "Massachusetts",
+      "category": "Service"
+    },
+    {
+      "id": 40,
+      "rule_number": "MA GL c.218 s.21",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $7,000.",
+      "jurisdiction": "Massachusetts",
+      "category": "Small Claims"
+    },
+    {
+      "id": 41,
+      "rule_number": "TN TRCP 12.01",
+      "title": "Summons Response Time",
+      "description": "A defendant shall serve an answer within 30 days after service of the summons.",
+      "jurisdiction": "Tennessee",
+      "category": "Service"
+    },
+    {
+      "id": 42,
+      "rule_number": "TN TCA 16-15-501",
+      "title": "Small Claims Limit",
+      "description": "General Sessions Court limit is $25,000.",
+      "jurisdiction": "Tennessee",
+      "category": "Small Claims"
+    },
+    {
+      "id": 43,
+      "rule_number": "IN Trial Rule 6",
+      "title": "Summons Response Time",
+      "description": "A defendant shall serve his answer within 20 days after service of the summons.",
+      "jurisdiction": "Indiana",
+      "category": "Service"
+    },
+    {
+      "id": 44,
+      "rule_number": "IN IC 33-34-3-2",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $10,000.",
+      "jurisdiction": "Indiana",
+      "category": "Small Claims"
+    },
+    {
+      "id": 45,
+      "rule_number": "MO Rule 55.25",
+      "title": "Summons Response Time",
+      "description": "A defendant shall file an answer within 30 days after the service of the summons.",
+      "jurisdiction": "Missouri",
+      "category": "Service"
+    },
+    {
+      "id": 46,
+      "rule_number": "MO RSMo 482.305",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $5,000.",
+      "jurisdiction": "Missouri",
+      "category": "Small Claims"
+    },
+    {
+      "id": 47,
+      "rule_number": "MD Rule 2-321",
+      "title": "Summons Response Time",
+      "description": "Answer due in 30 days if served in state, 60-90 days otherwise.",
+      "jurisdiction": "Maryland",
+      "category": "Service"
+    },
+    {
+      "id": 48,
+      "rule_number": "MD Cts & Jud Proc 4-405",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $5,000.",
+      "jurisdiction": "Maryland",
+      "category": "Small Claims"
+    },
+    {
+      "id": 49,
+      "rule_number": "WI Stat 802.06",
+      "title": "Summons Response Time",
+      "description": "Answer due in 20 or 45 days depending on the type of claim and defendant.",
+      "jurisdiction": "Wisconsin",
+      "category": "Service"
+    },
+    {
+      "id": 50,
+      "rule_number": "WI Stat 799.01",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $10,000.",
+      "jurisdiction": "Wisconsin",
+      "category": "Small Claims"
+    },
+    {
+      "id": 51,
+      "rule_number": "CO CRCP 12",
+      "title": "Summons Response Time",
+      "description": "Answer due within 21 days after service.",
+      "jurisdiction": "Colorado",
+      "category": "Service"
+    },
+    {
+      "id": 52,
+      "rule_number": "CO CRS 13-6-403",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $7,500.",
+      "jurisdiction": "Colorado",
+      "category": "Small Claims"
+    },
+    {
+      "id": 53,
+      "rule_number": "MN Rule 12.01",
+      "title": "Summons Response Time",
+      "description": "A defendant shall serve an answer within 20 days after service of the summons.",
+      "jurisdiction": "Minnesota",
+      "category": "Service"
+    },
+    {
+      "id": 54,
+      "rule_number": "MN Stat 491A.01",
+      "title": "Small Claims Limit",
+      "description": "Conciliation court limit is $15,000.",
+      "jurisdiction": "Minnesota",
+      "category": "Small Claims"
+    },
+    {
+      "id": 55,
+      "rule_number": "SC SCRCP 12",
+      "title": "Summons Response Time",
+      "description": "A defendant shall serve an answer within 30 days after service of the summons.",
+      "jurisdiction": "South Carolina",
+      "category": "Service"
+    },
+    {
+      "id": 56,
+      "rule_number": "SC Code 22-3-10",
+      "title": "Small Claims Limit",
+      "description": "Magistrate court limit is $7,500.",
+      "jurisdiction": "South Carolina",
+      "category": "Small Claims"
+    },
+    {
+      "id": 57,
+      "rule_number": "AL ARCP 12",
+      "title": "Summons Response Time",
+      "description": "A defendant shall serve an answer within 30 days after service of the summons.",
+      "jurisdiction": "Alabama",
+      "category": "Service"
+    },
+    {
+      "id": 58,
+      "rule_number": "AL Code 12-12-31",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $6,000.",
+      "jurisdiction": "Alabama",
+      "category": "Small Claims"
+    },
+    {
+      "id": 59,
+      "rule_number": "LA CCP art. 1001",
+      "title": "Summons Response Time",
+      "description": "A defendant shall file his answer within 15 days after service of citation.",
+      "jurisdiction": "Louisiana",
+      "category": "Service"
+    },
+    {
+      "id": 60,
+      "rule_number": "LA RS 13:5202",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $5,000.",
+      "jurisdiction": "Louisiana",
+      "category": "Small Claims"
+    },
+    {
+      "id": 61,
+      "rule_number": "KY CR 12.01",
+      "title": "Summons Response Time",
+      "description": "A defendant shall serve an answer within 20 days after service of the summons.",
+      "jurisdiction": "Kentucky",
+      "category": "Service"
+    },
+    {
+      "id": 62,
+      "rule_number": "KY KRS 24A.230",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $2,500.",
+      "jurisdiction": "Kentucky",
+      "category": "Small Claims"
+    },
+    {
+      "id": 63,
+      "rule_number": "OR ORCP 7",
+      "title": "Summons Response Time",
+      "description": "Answer due within 30 days after service.",
+      "jurisdiction": "Oregon",
+      "category": "Service"
+    },
+    {
+      "id": 64,
+      "rule_number": "OR ORS 46.405",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $10,000.",
+      "jurisdiction": "Oregon",
+      "category": "Small Claims"
+    },
+    {
+      "id": 65,
+      "rule_number": "OK 12 OS 2012",
+      "title": "Summons Response Time",
+      "description": "A defendant shall serve an answer within 20 days after service of the summons.",
+      "jurisdiction": "Oklahoma",
+      "category": "Service"
+    },
+    {
+      "id": 66,
+      "rule_number": "OK 12 OS 1751",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $10,000.",
+      "jurisdiction": "Oklahoma",
+      "category": "Small Claims"
+    },
+    {
+      "id": 67,
+      "rule_number": "CT PB 10-8",
+      "title": "Summons Response Time",
+      "description": "Pleadings due in 30 days after the return day.",
+      "jurisdiction": "Connecticut",
+      "category": "Service"
+    },
+    {
+      "id": 68,
+      "rule_number": "CT CGS 51-15",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $5,000.",
+      "jurisdiction": "Connecticut",
+      "category": "Small Claims"
+    },
+    {
+      "id": 69,
+      "rule_number": "UT URCP 12",
+      "title": "Summons Response Time",
+      "description": "Answer due in 21 days if served in state, 30 days if served out of state.",
+      "jurisdiction": "Utah",
+      "category": "Service"
+    },
+    {
+      "id": 70,
+      "rule_number": "UT Code 78A-8-102",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $15,000.",
+      "jurisdiction": "Utah",
+      "category": "Small Claims"
+    },
+    {
+      "id": 71,
+      "rule_number": "IA Rule 1.303",
+      "title": "Summons Response Time",
+      "description": "Answer due within 20 days after service.",
+      "jurisdiction": "Iowa",
+      "category": "Service"
+    },
+    {
+      "id": 72,
+      "rule_number": "IA Code 631.1",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $6,500.",
+      "jurisdiction": "Iowa",
+      "category": "Small Claims"
+    },
+    {
+      "id": 73,
+      "rule_number": "NV NRCP 12",
+      "title": "Summons Response Time",
+      "description": "A defendant shall serve an answer within 20 days after service of the summons.",
+      "jurisdiction": "Nevada",
+      "category": "Service"
+    },
+    {
+      "id": 74,
+      "rule_number": "NV NRS 73.010",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $10,000.",
+      "jurisdiction": "Nevada",
+      "category": "Small Claims"
+    },
+    {
+      "id": 75,
+      "rule_number": "AR ARCP 12",
+      "title": "Summons Response Time",
+      "description": "Answer due within 30 days after service (60 days if out of state).",
+      "jurisdiction": "Arkansas",
+      "category": "Service"
+    },
+    {
+      "id": 76,
+      "rule_number": "AR Code 16-17-602",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $5,000.",
+      "jurisdiction": "Arkansas",
+      "category": "Small Claims"
+    },
+    {
+      "id": 77,
+      "rule_number": "MS MRCP 12",
+      "title": "Summons Response Time",
+      "description": "A defendant shall serve an answer within 30 days after service of the summons.",
+      "jurisdiction": "Mississippi",
+      "category": "Service"
+    },
+    {
+      "id": 78,
+      "rule_number": "MS Code 9-11-9",
+      "title": "Small Claims Limit",
+      "description": "Justice court limit is $3,500.",
+      "jurisdiction": "Mississippi",
+      "category": "Small Claims"
+    },
+    {
+      "id": 79,
+      "rule_number": "KS KSA 60-212",
+      "title": "Summons Response Time",
+      "description": "Answer due within 21 days after service.",
+      "jurisdiction": "Kansas",
+      "category": "Service"
+    },
+    {
+      "id": 80,
+      "rule_number": "KS KSA 61-2703",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $4,000.",
+      "jurisdiction": "Kansas",
+      "category": "Small Claims"
+    },
+    {
+      "id": 81,
+      "rule_number": "NM Rule 1-012",
+      "title": "Summons Response Time",
+      "description": "Answer due within 30 days after service.",
+      "jurisdiction": "New Mexico",
+      "category": "Service"
+    },
+    {
+      "id": 82,
+      "rule_number": "NM Stat 35-10-1",
+      "title": "Small Claims Limit",
+      "description": "Magistrate court limit is $10,000.",
+      "jurisdiction": "New Mexico",
+      "category": "Small Claims"
+    },
+    {
+      "id": 83,
+      "rule_number": "NE Rule 6-1112",
+      "title": "Summons Response Time",
+      "description": "Answer due within 30 days after service.",
+      "jurisdiction": "Nebraska",
+      "category": "Service"
+    },
+    {
+      "id": 84,
+      "rule_number": "NE Stat 25-2802",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $3,900.",
+      "jurisdiction": "Nebraska",
+      "category": "Small Claims"
+    },
+    {
+      "id": 85,
+      "rule_number": "WV R.C.P. 12",
+      "title": "Summons Response Time",
+      "description": "Answer due within 20 days after service.",
+      "jurisdiction": "West Virginia",
+      "category": "Service"
+    },
+    {
+      "id": 86,
+      "rule_number": "WV Code 50-2-1",
+      "title": "Small Claims Limit",
+      "description": "Magistrate court limit is $10,000.",
+      "jurisdiction": "West Virginia",
+      "category": "Small Claims"
+    },
+    {
+      "id": 87,
+      "rule_number": "ID IRCP 12",
+      "title": "Summons Response Time",
+      "description": "Answer due within 21 days after service.",
+      "jurisdiction": "Idaho",
+      "category": "Service"
+    },
+    {
+      "id": 88,
+      "rule_number": "ID Code 1-2301",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $5,000.",
+      "jurisdiction": "Idaho",
+      "category": "Small Claims"
+    },
+    {
+      "id": 90,
+      "rule_number": "HI HRCP 12",
+      "title": "Summons Response Time",
+      "description": "Answer due within 20 days after service.",
+      "jurisdiction": "Hawaii",
+      "category": "Service"
+    },
+    {
+      "id": 91,
+      "rule_number": "HI HRS 633-27",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $5,000.",
+      "jurisdiction": "Hawaii",
+      "category": "Small Claims"
+    },
+    {
+      "id": 92,
+      "rule_number": "NH Rule 9",
+      "title": "Summons Response Time",
+      "description": "Appearance and answer due within 30 days after service.",
+      "jurisdiction": "New Hampshire",
+      "category": "Service"
+    },
+    {
+      "id": 93,
+      "rule_number": "NH RSA 503:1",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $10,000.",
+      "jurisdiction": "New Hampshire",
+      "category": "Small Claims"
+    },
+    {
+      "id": 94,
+      "rule_number": "ME MRCP 12",
+      "title": "Summons Response Time",
+      "description": "Answer due within 20 days after service.",
+      "jurisdiction": "Maine",
+      "category": "Service"
+    },
+    {
+      "id": 95,
+      "rule_number": "ME 14 MRS 7482",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $6,000.",
+      "jurisdiction": "Maine",
+      "category": "Small Claims"
+    },
+    {
+      "id": 96,
+      "rule_number": "RI RCP 12",
+      "title": "Summons Response Time",
+      "description": "Answer due within 20 days after service.",
+      "jurisdiction": "Rhode Island",
+      "category": "Service"
+    },
+    {
+      "id": 97,
+      "rule_number": "RI GL 10-16-1",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $5,000.",
+      "jurisdiction": "Rhode Island",
+      "category": "Small Claims"
+    },
+    {
+      "id": 98,
+      "rule_number": "MT MRCP 12",
+      "title": "Summons Response Time",
+      "description": "Answer due within 21 days after service.",
+      "jurisdiction": "Montana",
+      "category": "Service"
+    },
+    {
+      "id": 99,
+      "rule_number": "MT MCA 25-35-502",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $7,000.",
+      "jurisdiction": "Montana",
+      "category": "Small Claims"
+    },
+    {
+      "id": 100,
+      "rule_number": "DE Super. Ct. Civ. R. 12",
+      "title": "Summons Response Time",
+      "description": "Answer due within 20 days after service.",
+      "jurisdiction": "Delaware",
+      "category": "Service"
+    },
+    {
+      "id": 101,
+      "rule_number": "DE 10 Del. C. 9301",
+      "title": "Small Claims Limit",
+      "description": "Justice of the Peace Court limit is $25,000.",
+      "jurisdiction": "Delaware",
+      "category": "Small Claims"
+    },
+    {
+      "id": 102,
+      "rule_number": "SD RCP 15-6-12",
+      "title": "Summons Response Time",
+      "description": "Answer due within 30 days after service.",
+      "jurisdiction": "South Dakota",
+      "category": "Service"
+    },
+    {
+      "id": 103,
+      "rule_number": "SD CL 16-12C-13",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $12,000.",
+      "jurisdiction": "South Dakota",
+      "category": "Small Claims"
+    },
+    {
+      "id": 104,
+      "rule_number": "ND Rule 12",
+      "title": "Summons Response Time",
+      "description": "Answer due within 21 days after service.",
+      "jurisdiction": "North Dakota",
+      "category": "Service"
+    },
+    {
+      "id": 105,
+      "rule_number": "ND Cent. Code 27-08.1-01",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $15,000.",
+      "jurisdiction": "North Dakota",
+      "category": "Small Claims"
+    },
+    {
+      "id": 106,
+      "rule_number": "AK Rule 12",
+      "title": "Summons Response Time",
+      "description": "Answer due within 20 days after service.",
+      "jurisdiction": "Alaska",
+      "category": "Service"
+    },
+    {
+      "id": 107,
+      "rule_number": "AK Stat 22.15.040",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $10,000.",
+      "jurisdiction": "Alaska",
+      "category": "Small Claims"
+    },
+    {
+      "id": 108,
+      "rule_number": "VT VRCP 12",
+      "title": "Summons Response Time",
+      "description": "Answer due within 21 days after service.",
+      "jurisdiction": "Vermont",
+      "category": "Service"
+    },
+    {
+      "id": 109,
+      "rule_number": "VT 12 VSA 5531",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $10,000.",
+      "jurisdiction": "Vermont",
+      "category": "Small Claims"
+    },
+    {
+      "id": 110,
+      "rule_number": "WY WRCP 12",
+      "title": "Summons Response Time",
+      "description": "Answer due within 20 days after service (30 days if out of state).",
+      "jurisdiction": "Wyoming",
+      "category": "Service"
+    },
+    {
+      "id": 111,
+      "rule_number": "WY Stat 1-21-201",
+      "title": "Small Claims Limit",
+      "description": "Small claims limit is $6,000.",
+      "jurisdiction": "Wyoming",
+      "category": "Small Claims"
+    }
   ],
   "ex_parte_notice_rules": [
     {
@@ -147,5 +917,257 @@
       "notice_time": "Reasonable Notice",
       "rule": "Rule 680 - No TRO shall be granted without notice unless it clearly appears from specific facts that immediate and irreparable injury will result."
     }
-  ]
+  ],
+  "local_rules_map": {
+    "Los Angeles County, CA": {
+      "filing_fee": "$435",
+      "response_time": "30 days",
+      "ex_parte_notice": "10:00 AM court day before"
+    },
+    "Cook County, IL": {
+      "filing_fee": "$337",
+      "response_time": "30 days",
+      "ex_parte_notice": "By 4:00 PM day before"
+    },
+    "Harris County, TX": {
+      "filing_fee": "$297",
+      "response_time": "Monday following 20 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "Maricopa County, AZ": {
+      "filing_fee": "$333",
+      "response_time": "20 days",
+      "ex_parte_notice": "By 3:00 PM day before"
+    },
+    "San Diego County, CA": {
+      "filing_fee": "$435",
+      "response_time": "30 days",
+      "ex_parte_notice": "10:00 AM court day before"
+    },
+    "Orange County, CA": {
+      "filing_fee": "$435",
+      "response_time": "30 days",
+      "ex_parte_notice": "10:00 AM court day before"
+    },
+    "Miami-Dade County, FL": {
+      "filing_fee": "$401",
+      "response_time": "20 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "Dallas County, TX": {
+      "filing_fee": "$297",
+      "response_time": "Monday following 20 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "Kings County, NY": {
+      "filing_fee": "$210",
+      "response_time": "20-30 days",
+      "ex_parte_notice": "OSC required"
+    },
+    "Riverside County, CA": {
+      "filing_fee": "$435",
+      "response_time": "30 days",
+      "ex_parte_notice": "10:00 AM court day before"
+    },
+    "Queens County, NY": {
+      "filing_fee": "$210",
+      "response_time": "20-30 days",
+      "ex_parte_notice": "OSC required"
+    },
+    "King County, WA": {
+      "filing_fee": "$240",
+      "response_time": "20 days",
+      "ex_parte_notice": "By 12:00 PM day before"
+    },
+    "Clark County, NV": {
+      "filing_fee": "$270",
+      "response_time": "20 days",
+      "ex_parte_notice": "By 12:00 PM day before"
+    },
+    "San Bernardino County, CA": {
+      "filing_fee": "$435",
+      "response_time": "30 days",
+      "ex_parte_notice": "10:00 AM court day before"
+    },
+    "Tarrant County, TX": {
+      "filing_fee": "$297",
+      "response_time": "Monday following 20 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "Bexar County, TX": {
+      "filing_fee": "$297",
+      "response_time": "Monday following 20 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "Broward County, FL": {
+      "filing_fee": "$401",
+      "response_time": "20 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "Santa Clara County, CA": {
+      "filing_fee": "$435",
+      "response_time": "30 days",
+      "ex_parte_notice": "10:00 AM court day before"
+    },
+    "New York County, NY": {
+      "filing_fee": "$210",
+      "response_time": "20-30 days",
+      "ex_parte_notice": "OSC required"
+    },
+    "Wayne County, MI": {
+      "filing_fee": "$175",
+      "response_time": "21-28 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "Alameda County, CA": {
+      "filing_fee": "$435",
+      "response_time": "30 days",
+      "ex_parte_notice": "10:00 AM court day before"
+    },
+    "Middlesex County, MA": {
+      "filing_fee": "$285",
+      "response_time": "20 days",
+      "ex_parte_notice": "By 2:00 PM day before"
+    },
+    "Philadelphia County, PA": {
+      "filing_fee": "$333",
+      "response_time": "20 days",
+      "ex_parte_notice": "By 10:00 AM day of"
+    },
+    "Sacramento County, CA": {
+      "filing_fee": "$435",
+      "response_time": "30 days",
+      "ex_parte_notice": "10:00 AM court day before"
+    },
+    "Palm Beach County, FL": {
+      "filing_fee": "$401",
+      "response_time": "20 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "Suffolk County, NY": {
+      "filing_fee": "$210",
+      "response_time": "20-30 days",
+      "ex_parte_notice": "OSC required"
+    },
+    "Hillsborough County, FL": {
+      "filing_fee": "$401",
+      "response_time": "20 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "Orange County, FL": {
+      "filing_fee": "$401",
+      "response_time": "20 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "Nassau County, NY": {
+      "filing_fee": "$210",
+      "response_time": "20-30 days",
+      "ex_parte_notice": "OSC required"
+    },
+    "Franklin County, OH": {
+      "filing_fee": "$250",
+      "response_time": "28 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "Travis County, TX": {
+      "filing_fee": "$297",
+      "response_time": "Monday following 20 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "Hennepin County, MN": {
+      "filing_fee": "$285",
+      "response_time": "20 days",
+      "ex_parte_notice": "By 12:00 PM day before"
+    },
+    "Oakland County, MI": {
+      "filing_fee": "$175",
+      "response_time": "21-28 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "Cuyahoga County, OH": {
+      "filing_fee": "$250",
+      "response_time": "28 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "Allegheny County, PA": {
+      "filing_fee": "$150",
+      "response_time": "20 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "Salt Lake County, UT": {
+      "filing_fee": "$375",
+      "response_time": "21 days",
+      "ex_parte_notice": "By 12:00 PM day before"
+    },
+    "Contra Costa County, CA": {
+      "filing_fee": "$435",
+      "response_time": "30 days",
+      "ex_parte_notice": "10:00 AM court day before"
+    },
+    "Fairfax County, VA": {
+      "filing_fee": "$150",
+      "response_time": "21 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "Wake County, NC": {
+      "filing_fee": "$200",
+      "response_time": "30 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "Mecklenburg County, NC": {
+      "filing_fee": "$200",
+      "response_time": "30 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "Fulton County, GA": {
+      "filing_fee": "$215",
+      "response_time": "30 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "Montgomery County, MD": {
+      "filing_fee": "$165",
+      "response_time": "30 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "Pima County, AZ": {
+      "filing_fee": "$269",
+      "response_time": "20 days",
+      "ex_parte_notice": "By 3:00 PM day before"
+    },
+    "Collin County, TX": {
+      "filing_fee": "$297",
+      "response_time": "Monday following 20 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "St. Louis County, MO": {
+      "filing_fee": "$100",
+      "response_time": "30 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "Pinellas County, FL": {
+      "filing_fee": "$401",
+      "response_time": "20 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "Honolulu County, HI": {
+      "filing_fee": "$200",
+      "response_time": "20 days",
+      "ex_parte_notice": "Reasonable notice"
+    },
+    "DuPage County, IL": {
+      "filing_fee": "$337",
+      "response_time": "30 days",
+      "ex_parte_notice": "By 4:00 PM day before"
+    },
+    "Westchester County, NY": {
+      "filing_fee": "$210",
+      "response_time": "20-30 days",
+      "ex_parte_notice": "OSC required"
+    },
+    "Marion County, IN": {
+      "filing_fee": "$157",
+      "response_time": "20 days",
+      "ex_parte_notice": "Reasonable notice"
+    }
+  }
 }

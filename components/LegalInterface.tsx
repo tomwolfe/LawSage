@@ -3,11 +3,13 @@
 import { useState, useEffect } from 'react';
 import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Upload, FileText } from 'lucide-react';
 import { processImageForOCR } from '../src/utils/image-processor';
-import { updateUrlWithState, getStateFromUrl, watchStateAndSyncToUrl, createVirtualCaseFolderState, restoreVirtualCaseFolderState } from '../src/utils/state-sync';
+import { updateUrlWithState, getStateFromUrl, watchStateAndSyncToUrl, createVirtualCaseFolderState, restoreVirtualCaseFolderState, type CasePhase } from '../src/utils/state-sync';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ResultDisplay from './ResultDisplay';
 import HistoryActions from './HistoryActions';
+import TokenBudgetDisplay from './TokenBudgetDisplay';
+import { hasCredits, incrementTokenUsage } from '../src/utils/token-budget';
 
 declare global {
   interface Window {
@@ -82,6 +84,7 @@ export default function LegalInterface() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [caseLedger, setCaseLedger] = useState<CaseLedgerEntry[]>([]);
   const [apiKey, setApiKey] = useState('');
+  const [phase, setPhase] = useState<CasePhase>('Analysis');
 
   // Initialize state from URL fragment on component mount
   useEffect(() => {
@@ -101,6 +104,7 @@ export default function LegalInterface() {
         if (caseFolder.history !== undefined) setHistory(caseFolder.history);
         if (caseFolder.selectedHistoryItem !== undefined) setSelectedHistoryItem(caseFolder.selectedHistoryItem);
         if (caseFolder.backendUnreachable !== undefined) setBackendUnreachable(caseFolder.backendUnreachable);
+        if (caseFolder.phase !== undefined) setPhase(caseFolder.phase);
 
         if (analysisResult !== undefined) setResult(analysisResult);
 
@@ -145,7 +149,7 @@ export default function LegalInterface() {
       history,
       selectedHistoryItem,
       backendUnreachable
-    }, result, caseLedger);
+    }, result, caseLedger, phase);
 
     // Use debounced watcher for ongoing state changes
     const debouncedUpdate = watchStateAndSyncToUrl(getStateToSync, 1000);
@@ -156,7 +160,7 @@ export default function LegalInterface() {
       // On unmount, ensure latest state is saved immediately
       updateUrlWithState(getStateToSync());
     };
-  }, [userInput, jurisdiction, result, activeTab, history, selectedHistoryItem, backendUnreachable, caseLedger]);
+  }, [userInput, jurisdiction, result, activeTab, history, selectedHistoryItem, backendUnreachable, caseLedger, phase]);
 
   useEffect(() => {
     const checkHealth = async (retries = 3, delay = 1000) => {
@@ -326,12 +330,18 @@ export default function LegalInterface() {
   };
 
   const handleSubmit = async () => {
-    setError(''); // Ensure error is cleared at start
+    setError('');
     const apiKey = localStorage.getItem('GEMINI_API_KEY');
     if (!apiKey) {
       setError('Please set your Gemini API Key in Settings first.');
       return;
     }
+
+    if (!hasCredits()) {
+      setError('Daily analysis quota reached (20/20). Please try again tomorrow.');
+      return;
+    }
+
     if (!userInput.trim() && !selectedFile) {
       setError('Please describe your legal situation or upload an image.');
       return;
@@ -339,61 +349,31 @@ export default function LegalInterface() {
 
     setLoading(true);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
 
     try {
+      let data: LegalResult;
+      let finalUserInput = userInput;
+
       if (selectedFile) {
-        // Process uploaded image with OCR using the image processor
-        try {
-          // Process the image to resize and compress it before sending to OCR
-          const processedImage = await processImageForOCR(selectedFile);
+        const processedImage = await processImageForOCR(selectedFile);
+        const response = await fetch('/api/ocr', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Gemini-API-Key': apiKey,
+          },
+          body: JSON.stringify({ image: processedImage, jurisdiction }),
+          signal: controller.signal,
+        });
 
-          const response = await fetch('/api/ocr', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Gemini-API-Key': apiKey,
-            },
-            body: JSON.stringify({
-              image: processedImage,
-              jurisdiction
-            }),
-          });
-
-          if (!response.ok) {
-            if (response.status === 429) {
-              setError('Rate limit exceeded. Please check your API quota or try again later.');
-              return;
-            } else if (response.status === 401) {
-              setError('Invalid API key. Please update your key in Settings.');
-              return;
-            } else {
-              const errorData = await response.json();
-              throw new Error(errorData.detail || 'Failed to process image');
-            }
-          }
-
-          const data: LegalResult = await response.json();
-          setResult(data);
-          setActiveTab('strategy');
-
-          // Add to history
-          const newHistoryItem: CaseHistoryItem = {
-            id: Date.now().toString(),
-            timestamp: new Date(),
-            jurisdiction,
-            userInput: `OCR Analysis of: ${selectedFile.name}`,
-            result: data
-          };
-
-          const updatedHistory = [newHistoryItem, ...history];
-          setHistory(updatedHistory);
-          localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
-        } catch (err) {
-          setError(err instanceof Error ? err.message : 'An unknown error occurred during OCR processing');
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Failed to process image');
         }
+        data = await response.json();
+        finalUserInput = `OCR Analysis of: ${selectedFile.name}`;
       } else {
-        // Process text input normally
         const response = await fetch('/api/analyze', {
           method: 'POST',
           headers: {
@@ -404,62 +384,47 @@ export default function LegalInterface() {
           signal: controller.signal,
         });
 
-        clearTimeout(timeoutId);
-
-        const contentType = response.headers.get('content-type');
         if (!response.ok) {
           if (response.status === 429) {
             setError('Rate limit exceeded. Please check your API quota or try again later.');
+            setLoading(false);
             return;
-          } else if (response.status === 401) {
-            setError('Invalid API key. Please update your key in Settings.');
-            return;
-          } else {
-            let errorMessage = 'Failed to generate response';
-            if (contentType && contentType.includes('application/json')) {
-              const errData = await response.json();
-              errorMessage = errData.detail || errorMessage;
-            } else {
-              const textError = await response.text();
-              errorMessage = `Server Error (${response.status}): ${textError.slice(0, 100)}...`;
-            }
-            throw new Error(errorMessage);
           }
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Failed to analyze case');
         }
-
-        if (!contentType || !contentType.includes('application/json')) {
-          const textBody = await response.text();
-          throw new Error(`Expected JSON response but received ${contentType}. Body: ${textBody.slice(0, 100)}...`);
-        }
-
-        const data: LegalResult = await response.json();
-        setResult(data);
-        setActiveTab('strategy');
-
-        // Add to history
-        const newHistoryItem: CaseHistoryItem = {
-          id: Date.now().toString(),
-          timestamp: new Date(),
-          jurisdiction,
-          userInput,
-          result: data
-        };
-
-        const updatedHistory = [newHistoryItem, ...history];
-        setHistory(updatedHistory);
-        localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
-
-        // Add to case ledger
-        addToCaseLedger('complaint_filed', `Initial analysis submitted for: ${userInput.substring(0, 50)}${userInput.length > 50 ? '...' : ''}`);
+        data = await response.json();
       }
+
+      setResult(data);
+      setActiveTab('strategy');
+      
+      // Transition phases
+      if (phase === 'Analysis') setPhase('Strategy');
+      else if (phase === 'Strategy') setPhase('Drafting');
+
+      // Increment usage
+      incrementTokenUsage();
+      window.dispatchEvent(new Event('tokenUsageUpdated'));
+
+      const newHistoryItem: CaseHistoryItem = {
+        id: Date.now().toString(),
+        timestamp: new Date(),
+        jurisdiction,
+        userInput: finalUserInput,
+        result: data
+      };
+
+      const updatedHistory = [newHistoryItem, ...history];
+      setHistory(updatedHistory);
+      localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
+      
+      addToCaseLedger('complaint_filed', `Analysis performed: ${finalUserInput.substring(0, 50)}`);
     } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        setError('Request timed out. Please try again.');
-      } else {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
-      }
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
     } finally {
       setLoading(false);
+      clearTimeout(timeoutId);
     }
   };
 
@@ -568,6 +533,23 @@ export default function LegalInterface() {
 
       {/* Input Section */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+        {/* Phase Indicator */}
+        <div className="flex items-center gap-4 mb-6">
+          {(['Analysis', 'Strategy', 'Drafting'] as CasePhase[]).map((p) => (
+            <div 
+              key={p}
+              className={cn(
+                "flex-1 text-center py-2 rounded-lg border-2 font-bold transition-all",
+                phase === p 
+                  ? "border-indigo-600 bg-indigo-50 text-indigo-700"
+                  : "border-slate-100 bg-slate-50 text-slate-400 opacity-50"
+              )}
+            >
+              {p}
+            </div>
+          ))}
+        </div>
+
         <div className="flex flex-col md:flex-row gap-4 mb-4">
           <div className="flex-1">
             <label className="block text-sm font-semibold text-slate-700 mb-2">Your Situation</label>
@@ -638,7 +620,9 @@ export default function LegalInterface() {
               ))}
             </select>
 
-            <div className="mt-6 flex flex-col gap-2">
+            <div className="mt-6 flex flex-col gap-4">
+              <TokenBudgetDisplay />
+              
               <button
                 onClick={handleVoice}
                 className={cn(
@@ -652,7 +636,7 @@ export default function LegalInterface() {
 
               <button
                 onClick={handleSubmit}
-                disabled={loading}
+                disabled={loading || !hasCredits()}
                 className="flex items-center justify-center gap-2 py-3 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 disabled:bg-slate-300 transition-colors"
               >
                 {loading ? <Loader2 className="animate-spin" /> : <Send size={18} />}

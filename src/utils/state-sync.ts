@@ -84,14 +84,17 @@ export function getStateFromUrl(): any {
   }
 }
 
+export type CasePhase = 'Analysis' | 'Strategy' | 'Drafting';
+
 /**
- * Enhanced state synchronization that handles Virtual Case Folder metadata and summaries
+ * Enhanced state synchronization that handles Virtual Case Folder metadata, summaries, and phase transitions
  * @param caseFolder The Virtual Case Folder state to sync
  * @param analysisResult The analysis result to sync
  * @param ledger The case ledger containing chronological case events
+ * @param phase The current phase of the case (Analysis, Strategy, Drafting)
  * @returns A combined state object with both case folder, analysis result, and ledger
  */
-export function createVirtualCaseFolderState(caseFolder: any, analysisResult: any, ledger?: any[]): any {
+export function createVirtualCaseFolderState(caseFolder: any, analysisResult: any, ledger?: any[], phase: CasePhase = 'Analysis'): any {
   // Deeper compression for document summaries and results
   const compressResult = (res: any) => {
     if (!res || !res.text) return res;
@@ -110,12 +113,13 @@ export function createVirtualCaseFolderState(caseFolder: any, analysisResult: an
   return {
     caseFolder: {
       ...caseFolder,
-      history: compressedHistory
+      history: compressedHistory,
+      phase: phase
     },
     analysisResult: compressResult(analysisResult),
     ledger: ledger || [],
     timestamp: Date.now(),
-    version: '1.1'
+    version: '1.2'
   };
 }
 
