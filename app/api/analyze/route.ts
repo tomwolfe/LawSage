@@ -94,7 +94,7 @@ Your response MUST be in valid JSON format with the following structure:
       "required_documents": ["List of documents needed"]
     }
   ],
-  "filing_template": "A comprehensive template that includes TWO distinct sections:\\n(A) The Civil Complaint (grounded in relevant statutes like CC § 789.3 and CCP § 1160.2 for California lockouts). MANDATORY: When citing CC § 789.3, explicitly mention the mandatory minimum statutory penalty of $250 per violation as defined in subsection (c).\\n(B) The Ex Parte Application for TRO/OSC.\\nInclude explicit placeholders for required Judicial Council forms like CM-010, MC-030, and CIV-100.",
+  "filing_template": "A comprehensive template that includes TWO distinct sections:\\n(A) The Civil Complaint (grounded in relevant statutes like CC § 789.3 and CCP § 1160.2 for California lockouts). MANDATORY: When citing CC § 789.3, explicitly mention the statutory penalty structure: $250 per violation (substantial damages) PLUS $100 per day from the date of violation (substantial damages per Civil Code § 789.3(c)(3)).\\n(B) The Ex Parte Application for TRO/OSC.\\nInclude explicit placeholders for required Judicial Council forms like CM-010, MC-030, and CIV-100.",
   "citations": [
     {
       "text": "12 U.S.C. § 345",
@@ -268,26 +268,27 @@ export async function POST(req: NextRequest) {
     }
 
 const prompt = `
-${documentsText}
-${exParteRulesText}
+ ${documentsText}
+ ${exParteRulesText}
 
-User Situation: ${user_input}
-Jurisdiction: ${jurisdiction}
+ User Situation: ${user_input}
+ Jurisdiction: ${jurisdiction}
 
-You must return a SINGLE JSON object containing:
-1. 'strategy': Overall legal strategy.
-2. 'adversarial_strategy': Red-team analysis of weaknesses. MANDATORY: Do not use placeholders. Identify specific counter-arguments the opposition will use.
-3. 'roadmap': Step-by-step next steps for ${jurisdiction}. If this is an emergency (e.g., lockout), include specific Ex Parte notice times from the provided rules.
-4. 'local_logistics': Specific courthouse info for ${jurisdiction}. For LASC, prioritize Stanley Mosk Courthouse (111 N. Hill St) for housing TROs.
-5. 'filing_template': Generate TWO distinct templates: 
-   (A) The Civil Complaint (grounded in CC § 789.3 and CCP § 1160.2 if applicable).
-   (B) The Ex Parte Application for TRO/OSC. 
-   Include explicit placeholders for required Judicial Council forms like CM-010 and MC-030.
-   ${templateContent ? "Base these on this content: " + templateContent : ""}
-6. 'citations': At least 3 verified citations relevant to the subject matter and jurisdiction (e.g., Cal. Civ. Code § 789.3).
+ You must return a SINGLE JSON object containing:
+ 1. 'strategy': Overall legal strategy.
+ 2. 'adversarial_strategy': Red-team analysis of weaknesses. MANDATORY: Do not use placeholders. Identify specific counter-arguments the opposition will use. CRITICAL: Must identify at least TWO fact-specific defenses based on the user's input (e.g., if user mentions a "notice," the red-team should suggest the opposition will claim it was a valid "Notice of Belief of Abandonment").
+ 3. 'roadmap': Step-by-step next steps for ${jurisdiction}. If this is an emergency (e.g., lockout), include specific Ex Parte notice times from the provided rules.
+ 4. 'local_logistics': Specific courthouse info for ${jurisdiction}. For LASC, prioritize Stanley Mosk Courthouse (111 N. Hill St) for housing TROs.
+ 5. 'filing_template': Generate TWO distinct templates:
+    (A) The Civil Complaint (grounded in CC § 789.3 and CCP § 1160.2 if applicable). MANDATORY: When citing CC § 789.3, explicitly mention the statutory penalty structure: $250 per violation PLUS $100 per day from the date of violation (as permitted by Civil Code § 789.3(c)(3)).
+    (B) The Ex Parte Application for TRO/OSC.
+    Include explicit placeholders for required Judicial Council forms like CM-010 and MC-030.
+    ${templateContent ? "Base these on this content: " + templateContent : ""}
+ 6. 'citations': At least 3 verified citations relevant to the subject matter and jurisdiction (e.g., Cal. Civ. Code § 789.3).
+ 7. 'procedural_checks': Results of procedural technicality checks against Local Rules of Court. For Los Angeles County: MUST include check for mandatory e-filing requirement for civil complaints and the Ex Parte filing window (typically 8:30 AM - 10:00 AM).
 
-Return only valid JSON.
-`;
+ Return only valid JSON.
+ `;
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({

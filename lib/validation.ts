@@ -77,6 +77,23 @@ export class SafetyValidator {
       }
     }
 
+    // Contextual Red-Teaming: Check for fact-specific defense triggers in user input
+    const factSpecificKeywords = [
+      "notice", "eviction", "abandonment", "lockout", "changed locks", "harassment",
+      "discrimination", "retaliation", "overcharging", "unreasonable rent", "repair",
+      "repair and deduct", "bed bug", "pest", "mold", "lead", "asbestos",
+      "safety hazard", "military", "federal", "state", "county", "city",
+      "discriminatory", "verbal", "written", "email", "text", "phone call"
+    ];
+
+    const factSpecificCount = factSpecificKeywords.filter(keyword => 
+      inputLower.includes(keyword.toLowerCase())
+    ).length;
+
+    if (factSpecificCount < 2) {
+      console.log(`RED TEAM AUDIT: Limited fact-specific defense triggers detected (found ${factSpecificCount} keywords). Consider prompting for more details.`);
+    }
+
     return true;
   }
 }
