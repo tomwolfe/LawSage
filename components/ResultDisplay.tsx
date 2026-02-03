@@ -6,7 +6,7 @@ import { twMerge } from 'tailwind-merge';
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { validateDisclaimer, validateCitations, validateLegalStructure, validateAdversarialStrategy, validateProceduralChecks } from '../src/utils/reliability';
+import { validateLegalStructure } from '../src/utils/reliability';
 import { LegalMotion, MotionToDismiss, MotionForDiscovery, validateLegalMotion } from '../lib/schemas/motions';
 
 function cn(...inputs: ClassValue[]) {
@@ -355,12 +355,15 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
 
       const data = await response.json();
       return data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error verifying citation:', error);
+      const errorMessage = typeof error === 'object' && error !== null && 'message' in error
+        ? String((error as Record<string, unknown>).message)
+        : 'Verification failed';
       return {
         is_verified: false,
         verification_source: 'Error',
-        status_message: error.message || 'Verification failed'
+        status_message: errorMessage
       };
     }
   };
@@ -423,7 +426,16 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
 
   // Helper function to create a California-style pleading header
   const createCaliforniaFilingHeader = async (
-    { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType }: any,
+    { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType }: {
+      Paragraph: any;
+      TextRun: any;
+      Table: any;
+      TableRow: any;
+      TableCell: any;
+      WidthType: any;
+      BorderStyle: any;
+      AlignmentType: any;
+    },
     caseInfo: { attorneyName?: string; barNumber?: string; firmName?: string; partyName?: string; courtName?: string; caseNumber?: string; plaintiff?: string; defendant?: string; documentTitle?: string }
   ) => {
     return [
@@ -525,7 +537,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
     const { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle } = docx;
 
     const isCalifornia = jurisdiction.toLowerCase().includes('california');
-    let children: any[] = [];
+    let children: (typeof docx.Paragraph | typeof docx.Table)[] = [];
 
     if (isCalifornia) {
       const header = await createCaliforniaFilingHeader(docx, {
@@ -606,7 +618,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
     const { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle } = docx;
 
     const isCalifornia = motion.caseInfo.jurisdiction.toLowerCase().includes('california');
-    let children: any[] = [];
+    let children: (typeof docx.Paragraph | typeof docx.Table)[] = [];
 
     if (isCalifornia) {
       const header = await createCaliforniaFilingHeader(docx, {

@@ -3,23 +3,22 @@ import { generateSearchQueries, executeSearchQueries, performMultiStepSearchReas
 // Mock the @google/genai module
 jest.mock('@google/genai', () => {
   return {
-    genai: {
-      Client: jest.fn().mockImplementation(() => {
-        return {
-          models: {
-            generateContent: jest.fn().mockResolvedValue({
-              text: jest.fn().mockReturnValue(
-                JSON.stringify([
-                  "local rules of court California civil procedure",
-                  "statutory precedents breach of contract California",
-                  "case law motion to dismiss standards"
-                ])
-              )
-            })
-          }
-        };
-      })
-    }
+    GoogleGenAI: jest.fn().mockImplementation(() => {
+      return {
+        getGenerativeModel: jest.fn().mockReturnValue({
+          generateContent: jest.fn().mockResolvedValue({
+            response: {
+              text: () => JSON.stringify([
+                "local rules of court California civil procedure",
+                "statutory precedents breach of contract California",
+                "case law motion to dismiss standards"
+              ])
+            }
+          }),
+          generateContentStream: jest.fn()
+        })
+      };
+    })
   };
 });
 
@@ -42,18 +41,20 @@ describe('Search Reasoning Module', () => {
 
     it('should return default queries if API call fails', async () => {
       // Force an error scenario by bypassing the mock for this specific call
-      const { genai } = require('@google/genai');
-      genai.Client.mockImplementationOnce(() => ({
-        models: {
-          generateContent: jest.fn().mockRejectedValue(new Error('API Error'))
-        }
-      }));
+      const { GoogleGenAI } = require('@google/genai');
+      GoogleGenAI.mockImplementationOnce(() => {
+        return {
+          getGenerativeModel: jest.fn().mockReturnValue({
+            generateContent: jest.fn().mockRejectedValue(new Error('API Error'))
+          })
+        };
+      });
 
       const originalConsoleError = console.error;
       console.error = jest.fn();
 
       const queries = await generateSearchQueries('', '', '');
-      
+
       expect(queries).toHaveLength(3);
       expect(queries[0]).toContain('local rules of court');
       expect(queries[1]).toContain('statutory precedents');

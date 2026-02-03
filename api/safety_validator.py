@@ -17,7 +17,7 @@ class SafetyValidator:
         """
         # If no grounding data is available, we can't validate grounding
         if not grounding_data:
-            return True  # Allow the response to proceed without grounding validation
+            return False  # Cannot validate grounding without sources
 
         # If we have fewer than 3 sources, we still proceed but log the issue
         # The requirement of 3 citations is checked in the response validator

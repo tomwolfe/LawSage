@@ -8,7 +8,7 @@ import * as LZString from 'lz-string';
  * @param state The case folder state to serialize
  * @returns A compressed and encoded string suitable for URL fragment
  */
-export function compressStateToUrlFragment(state: any): string {
+export function compressStateToUrlFragment(state: Record<string, unknown>): string {
   try {
     // Serialize the state to JSON
     const jsonString = JSON.stringify(state);

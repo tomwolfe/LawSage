@@ -166,11 +166,15 @@ export async function POST(req: NextRequest) {
 
     // Return the response
     return NextResponse.json(ocrResult);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in OCR API route:", error);
 
     // Handle specific error types
-    if (error.message?.includes("429") || error.message?.toLowerCase().includes("quota")) {
+    const errorMessage = typeof error === 'object' && error !== null && 'message' in error
+      ? String((error as Record<string, unknown>).message)
+      : 'Unknown error occurred';
+
+    if (errorMessage.includes("429") || errorMessage.toLowerCase().includes("quota")) {
       return NextResponse.json(
         {
           type: "RateLimitError",
@@ -178,11 +182,11 @@ export async function POST(req: NextRequest) {
         } satisfies StandardErrorResponse,
         { status: 429 }
       );
-    } else if (error.message?.includes("400") || error.message?.includes("invalid")) {
+    } else if (errorMessage.includes("400") || errorMessage.includes("invalid")) {
       return NextResponse.json(
         {
           type: "AIClientError",
-          detail: error.message || "Invalid request to AI service"
+          detail: errorMessage || "Invalid request to AI service"
         } satisfies StandardErrorResponse,
         { status: 400 }
       );

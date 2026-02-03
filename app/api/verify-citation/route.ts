@@ -143,13 +143,17 @@ export async function POST(req: NextRequest) {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error verifying citation:', error);
-    
+
+    const errorMessage = typeof error === 'object' && error !== null && 'message' in error
+      ? String((error as Record<string, unknown>).message)
+      : 'Unknown error occurred';
+
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: 'Failed to verify citation',
-        details: error.message || 'Unknown error occurred'
+        details: errorMessage
       }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );

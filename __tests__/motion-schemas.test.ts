@@ -1,8 +1,6 @@
-import { 
-  validateMotionToDismiss, 
-  validateMotionForDiscovery, 
-  validateMotionForSummaryJudgment, 
-  validateMotionToCompel,
+import {
+  validateMotionToDismiss,
+  validateMotionForDiscovery,
   validateLegalMotion,
   MotionToDismiss,
   MotionForDiscovery
@@ -52,10 +50,20 @@ describe('Motion Schemas Validation', () => {
     });
 
     it('should fail validation for MotionToDismiss without required fields', () => {
-      const invalidMotion: any = {
+      const invalidMotion: Partial<MotionToDismiss> = {
         id: '',
         title: '',
         type: 'motion_to_dismiss',
+        caseInfo: {
+          caseNumber: '',
+          courtName: '',
+          jurisdiction: ''
+        },
+        signatureBlock: {
+          attorneyName: '',
+          attorneyBarNumber: '',
+          date: ''
+        },
         grounds: {
           lackOfSubjectMatterJurisdiction: false,
           lackOfPersonalJurisdiction: false,
@@ -124,10 +132,20 @@ describe('Motion Schemas Validation', () => {
     });
 
     it('should fail validation for MotionForDiscovery without required fields', () => {
-      const invalidMotion: any = {
+      const invalidMotion: Partial<MotionForDiscovery> = {
         id: '',
         title: '',
         type: 'motion_for_discovery',
+        caseInfo: {
+          caseNumber: '',
+          courtName: '',
+          jurisdiction: ''
+        },
+        signatureBlock: {
+          attorneyName: '',
+          attorneyBarNumber: '',
+          date: ''
+        },
         discoveryType: 'requests_for_production',
         discoveryRequests: [],
         protectiveOrderRequested: false,
@@ -186,7 +204,7 @@ describe('Motion Schemas Validation', () => {
     });
 
     it('should return error for unknown motion type', () => {
-      const unknownMotion: any = {
+      const unknownMotion: { type: string } = {
         type: 'unknown_motion_type'
       };
 

@@ -23,10 +23,12 @@ def test_response_validator_with_dict_input():
     input_dict = {
         "disclaimer": "LEGAL DISCLAIMER: This is legal information...",
         "strategy": "Strategy content...",
+        "adversarial_strategy": "Opposition view and red-team analysis...",
         "roadmap": roadmap_items,
         "filing_template": "Filing template content...",
         "citations": citations,
-        "sources": ["https://example.com/src1", "https://example.com/src2"]
+        "sources": ["https://example.com/src1", "https://example.com/src2"],
+        "procedural_checks": ["Check local rules", "Verify filing deadlines"]
     }
 
     result = ResponseValidator.validate_and_fix(input_dict)
@@ -53,10 +55,12 @@ def test_response_validator_with_insufficient_citations():
     input_dict = {
         "disclaimer": "LEGAL DISCLAIMER: This is legal information...",
         "strategy": "Strategy content...",
+        "adversarial_strategy": "Opposition view and red-team analysis...",
         "roadmap": [{"step": 1, "title": "Step 1", "description": "Description 1"}],
         "filing_template": "Filing template content...",
         "citations": [{"text": "12 U.S.C. § 345", "source": "USC", "url": "https://example.com/1"}],  # Only 1 citation
-        "sources": ["https://example.com/src1"]
+        "sources": ["https://example.com/src1"],
+        "procedural_checks": ["Check local rules", "Verify filing deadlines"]
     }
 
     with pytest.raises(ValueError) as exc_info:
@@ -101,6 +105,7 @@ def test_validate_legal_output_with_dict_input():
     input_dict = {
         "disclaimer": "LEGAL DISCLAIMER: This is legal information...",
         "strategy": "Strategy content...",
+        "adversarial_strategy": "Opposition view and red-team analysis...",
         "roadmap": [StrategyItem(step=1, title="Step 1", description="Description 1")],
         "filing_template": "Filing template content...",
         "citations": [
@@ -108,7 +113,8 @@ def test_validate_legal_output_with_dict_input():
             Citation(text="Rule 12(b)(6)", source="Federal Rules", url="https://example.com/2"),
             Citation(text="Cal. Civ. Code § 1708", source="California Code", url="https://example.com/3")
         ],
-        "sources": ["https://example.com/src1"]
+        "sources": ["https://example.com/src1"],
+        "procedural_checks": ["Check local rules", "Verify filing deadlines"]
     }
     
     result = ResponseValidator.validate_legal_output(input_dict)
@@ -120,10 +126,12 @@ def test_validate_legal_output_with_insufficient_citations_dict():
     input_dict = {
         "disclaimer": "LEGAL DISCLAIMER: This is legal information...",
         "strategy": "Strategy content...",
+        "adversarial_strategy": "Opposition view and red-team analysis...",
         "roadmap": [StrategyItem(step=1, title="Step 1", description="Description 1")],
         "filing_template": "Filing template content...",
         "citations": [Citation(text="12 U.S.C. § 345", source="USC", url="https://example.com/1")],  # Only 1 citation
-        "sources": ["https://example.com/src1"]
+        "sources": ["https://example.com/src1"],
+        "procedural_checks": ["Check local rules", "Verify filing deadlines"]
     }
     
     result = ResponseValidator.validate_legal_output(input_dict)
@@ -135,6 +143,7 @@ def test_validate_legal_output_with_no_roadmap():
     input_dict = {
         "disclaimer": "LEGAL DISCLAIMER: This is legal information...",
         "strategy": "Strategy content...",
+        "adversarial_strategy": "Opposition view and red-team analysis...",
         "roadmap": [],  # No roadmap items
         "filing_template": "Filing template content...",
         "citations": [
@@ -142,7 +151,8 @@ def test_validate_legal_output_with_no_roadmap():
             Citation(text="Rule 12(b)(6)", source="Federal Rules", url="https://example.com/2"),
             Citation(text="Cal. Civ. Code § 1708", source="California Code", url="https://example.com/3")
         ],
-        "sources": ["https://example.com/src1"]
+        "sources": ["https://example.com/src1"],
+        "procedural_checks": ["Check local rules", "Verify filing deadlines"]
     }
 
     result = ResponseValidator.validate_legal_output(input_dict)
@@ -167,7 +177,9 @@ def test_validate_and_fix_with_estimated_time_and_documents():
             {"text": "Rule 12(b)(6)", "source": "Federal Rules", "url": "https://example.com/2"},
             {"text": "Cal. Civ. Code § 1708", "source": "California Code", "url": "https://example.com/3"}
         ],
-        "sources": ["https://example.com/src1"]
+        "sources": ["https://example.com/src1"],
+        "adversarial_strategy": "Opposition view and red-team analysis...",
+        "procedural_checks": ["Check local rules", "Verify filing deadlines"]
     }
 
     result = ResponseValidator.validate_and_fix(input_dict)
@@ -206,7 +218,9 @@ def test_validate_and_fix_with_existing_disclaimer():
             {"text": "Rule 12(b)(6)", "source": "Federal Rules", "url": "https://example.com/2"},
             {"text": "Cal. Civ. Code § 1708", "source": "California Code", "url": "https://example.com/3"}
         ],
-        "sources": ["https://example.com/src1"]
+        "sources": ["https://example.com/src1"],
+        "adversarial_strategy": "Opposition view and red-team analysis...",
+        "procedural_checks": ["Check local rules", "Verify filing deadlines"]
     }
 
     result = ResponseValidator.validate_and_fix(input_dict)

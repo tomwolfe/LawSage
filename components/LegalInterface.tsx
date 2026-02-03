@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Upload, FileText } from 'lucide-react';
+import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Upload } from 'lucide-react';
 import { processImageForOCR } from '../src/utils/image-processor';
-import { updateUrlWithState, getStateFromUrl, watchStateAndSyncToUrl, createVirtualCaseFolderState, restoreVirtualCaseFolderState } from '../src/utils/state-sync';
+import { updateUrlWithState, watchStateAndSyncToUrl, createVirtualCaseFolderState, restoreVirtualCaseFolderState } from '../src/utils/state-sync';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ResultDisplay from './ResultDisplay';
@@ -107,7 +107,7 @@ export default function LegalInterface() {
         // Restore case ledger if present
         if (savedState.ledger !== undefined) {
           // Convert timestamp strings back to Date objects if needed
-          const ledgerWithDates = savedState.ledger.map((entry: any) => ({
+          const ledgerWithDates = savedState.ledger.map((entry: CaseLedgerEntry) => ({
             ...entry,
             timestamp: new Date(entry.timestamp),
             dueDate: entry.dueDate ? new Date(entry.dueDate) : undefined
@@ -255,75 +255,6 @@ export default function LegalInterface() {
     fileInput?.click();
   };
 
-  const handleOCRSubmit = async () => {
-    if (!selectedFile) {
-      setError('Please select an image file first');
-      return;
-    }
-
-    const apiKey = localStorage.getItem('GEMINI_API_KEY');
-    if (!apiKey) {
-      setError('Please set your Gemini API Key in Settings first.');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      // Process the image to resize and compress it before sending to OCR
-      const processedImage = await processImageForOCR(selectedFile);
-
-      const response = await fetch('/api/ocr', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Gemini-API-Key': apiKey,
-        },
-        body: JSON.stringify({
-          image: processedImage,
-          jurisdiction
-        }),
-      });
-
-      if (!response.ok) {
-        if (response.status === 429) {
-          setError('Rate limit exceeded. Please check your API quota or try again later.');
-          return;
-        } else if (response.status === 401) {
-          setError('Invalid API key. Please update your key in Settings.');
-          return;
-        } else {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to process image');
-        }
-      }
-
-      const data: LegalResult = await response.json();
-      setResult(data);
-      setActiveTab('strategy');
-
-      // Add to history
-      const newHistoryItem: CaseHistoryItem = {
-        id: Date.now().toString(),
-        timestamp: new Date(),
-        jurisdiction,
-        userInput: `OCR Analysis of: ${selectedFile.name}`,
-        result: data
-      };
-
-      const updatedHistory = [newHistoryItem, ...history];
-      setHistory(updatedHistory);
-      localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
-
-      // Add to case ledger
-      addToCaseLedger('complaint_filed', `OCR analysis of document: ${selectedFile.name}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred during OCR processing');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSubmit = async () => {
     setError(''); // Ensure error is cleared at start
@@ -504,14 +435,6 @@ export default function LegalInterface() {
     setCaseLedger(prev => [...prev, newEntry]);
   };
 
-  // Function to update the status of a ledger entry
-  const updateLedgerEntryStatus = (id: string, status: CaseLedgerEntry['status']) => {
-    setCaseLedger(prev =>
-      prev.map(entry =>
-        entry.id === id ? { ...entry, status } : entry
-      )
-    );
-  };
 
   return (
     <div className="space-y-8">

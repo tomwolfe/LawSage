@@ -1,34 +1,43 @@
-import { NextRequest } from 'next/server';
-import { POST as AnalyzePOST } from '../app/api/analyze/route';
+// Define minimal NextRequest interface for testing
+interface NextRequest {
+  json: () => Promise<any>;
+  headers: {
+    get: (name: string) => string | null;
+  };
+  nextUrl: {
+    origin: string;
+  };
+}
 
 // Mock the fetch function to simulate API calls
 global.fetch = jest.fn();
 
 // Mock the Google Generative AI module
 jest.mock('@google/genai', () => ({
-  genai: {
-    Client: jest.fn(() => ({
-      models: {
-        generateContentStream: jest.fn(() => ({
-          stream: {
-            [Symbol.asyncIterator]: () => {
-              const chunks = [{ text: () => '{"disclaimer":"test","strategy":"test","filing_template":"test template","citations":[],"sources":[],"procedural_roadmap":[],"local_logistics":{},"procedural_checks":[]}' }];
-              let index = 0;
-              return {
-                next: () => {
-                  if (index < chunks.length) {
-                    return Promise.resolve({ done: false, value: chunks[index++] });
-                  }
-                  return Promise.resolve({ done: true, value: undefined });
-                }
-              };
+  GoogleGenAI: jest.fn().mockImplementation(() => ({
+    getGenerativeModel: jest.fn().mockReturnValue({
+      generateContentStream: jest.fn().mockReturnValue({
+        [Symbol.asyncIterator]: () => {
+          const chunks = [{
+            text: () => '{"disclaimer":"test","strategy":"test","filing_template":"test template","citations":[],"sources":[],"procedural_roadmap":[],"local_logistics":{},"procedural_checks":[]}'
+          }];
+          let index = 0;
+          return {
+            next: () => {
+              if (index < chunks.length) {
+                return Promise.resolve({ done: false, value: chunks[index++] });
+              }
+              return Promise.resolve({ done: true, value: undefined });
             }
-          }
-        }))
-      }
-    }))
-  }
+          };
+        }
+      })
+    })
+  }))
 }));
+
+// Import the function after mocking dependencies
+const { POST: AnalyzePOST } = require('../app/api/analyze/route');
 
 describe('Template Injection Validation Tests', () => {
   beforeEach(() => {
@@ -50,11 +59,11 @@ describe('Template Injection Validation Tests', () => {
             }
           ]
         })
-      } as any)
+      })
       .mockResolvedValueOnce({
         ok: true,
         text: () => Promise.resolve("# MOTION TO DISMISS\n\nContent of the motion to dismiss template.")
-      } as any);
+      });
   });
 
   test('should validate that generated output contains injected template structure', async () => {
@@ -119,11 +128,11 @@ describe('Template Injection Validation Tests', () => {
       .mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve({ templates: mockTemplates })
-      } as any)
+      })
       .mockResolvedValueOnce({
         ok: true,
         text: () => Promise.resolve("# MOTION TO DISMISS\n\nContent of the motion to dismiss template.")
-      } as any);
+      });
 
     const response = await AnalyzePOST(mockRequest);
     const result = await response.json();
@@ -162,7 +171,7 @@ describe('Template Injection Validation Tests', () => {
             }
           ]
         })
-      } as any);
+      });
 
     const response = await AnalyzePOST(mockRequest);
     const result = await response.json();
@@ -201,11 +210,11 @@ describe('Template Injection Validation Tests', () => {
             }
           ]
         })
-      } as any)
+      })
       .mockResolvedValueOnce({
         ok: true,
         text: () => Promise.resolve("# CONTRACT REVIEW CHECKLIST\n\nChecklist content here.")
-      } as any);
+      });
 
     const response = await AnalyzePOST(mockRequest);
     const result = await response.json();
@@ -255,11 +264,11 @@ describe('Template Injection Validation Tests', () => {
               }
             ]
           })
-        } as any)
+        })
         .mockResolvedValueOnce({
           ok: true,
           text: () => Promise.resolve(`${testCase.templateTitle}\n\nContent for ${testCase.expectedTemplate}`)
-        } as any);
+        });
 
       const mockRequest = {
         json: () => Promise.resolve({

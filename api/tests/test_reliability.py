@@ -108,9 +108,16 @@ def test_validate_legal_output_logic():
     Here is your strategy:
     According to 12 U.S.C. § 345, Cal. Civ. Code § 1708, and Rule 12(b)(6), you have rights.
 
+    OPPOSITION VIEW (RED-TEAM ANALYSIS):
+    The opposition might argue that...
+
     Procedural Roadmap:
     1. File the form.
     2. Serve the papers.
+
+    PROCEDURAL CHECKS:
+    - Check local rules
+    - Verify filing deadlines
 
     ---
     Template document here.

@@ -8,38 +8,35 @@ import { GoogleGenAI } from '@google/genai';
  * @returns Array of 3 search queries
  */
 export async function generateSearchQueries(
-  userInput: string, 
-  jurisdiction: string, 
+  userInput: string,
+  jurisdiction: string,
   geminiApiKey: string
 ): Promise<string[]> {
-  const client = new GoogleGenAI({ apiKey: geminiApiKey });
-  const model = 'gemini-2.5-flash-preview-09-2025';
-
-  const systemInstruction = `You are a legal research specialist. Given a user's legal situation and jurisdiction,
+  const genAI = new GoogleGenAI({ apiKey: geminiApiKey });
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.5-flash-preview-09-2025',
+    systemInstruction: `You are a legal research specialist. Given a user's legal situation and jurisdiction,
     generate exactly 3 targeted search queries that would help find relevant legal precedents,
     statutory law, and local court rules. Focus on queries that would find:
     1. Local Rules of Court specific to the jurisdiction
     2. Statutory precedents relevant to the legal issue
     3. Case law or procedural requirements for the specific type of case
 
-    Return ONLY an array of 3 search queries as a JSON array, nothing else.`;
+    Return ONLY an array of 3 search queries as a JSON array, nothing else.`
+  });
 
   const prompt = `
     User Situation: ${userInput}
     Jurisdiction: ${jurisdiction}
-    
+
     Generate exactly 3 targeted search queries to research this legal matter thoroughly.
     Focus on local rules, statutory precedents, and procedural requirements.
-    
+
     Respond with ONLY a JSON array of 3 search queries, nothing else.
   `;
 
   try {
-    const result = await client.models.generateContent({
-      model,
-      contents: prompt,
-      config: { systemInstruction }
-    });
+    const result = await model.generateContent(prompt);
     const responseText = result.text?.trim() ?? '';
     
     // Try to extract JSON from response
@@ -95,20 +92,19 @@ export async function generateSearchQueries(
  * @returns Combined search results
  */
 export async function executeSearchQueries(
-  queries: string[], 
+  queries: string[],
   geminiApiKey: string
-): Promise<any[]> {
-  const client = new GoogleGenAI({ apiKey: geminiApiKey });
-  const model = 'gemini-2.5-flash-preview-09-2025';
+): Promise<unknown[]> {
+  const genAI = new GoogleGenAI({ apiKey: geminiApiKey });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-09-2025' });
 
-  const results: any[] = [];
+  const results: unknown[] = [];
 
   for (const query of queries) {
     try {
-      const result = await client.models.generateContent({
-        model,
+      const result = await model.generateContent({
         contents: `Search for: ${query}`,
-        config: {
+        generationConfig: {
           tools: [{ googleSearch: {} }]
         }
       });
@@ -151,7 +147,7 @@ export async function performMultiStepSearchReasoning(
   geminiApiKey: string
 ): Promise<{
   initial_queries: string[],
-  search_results: any[],
+  search_results: unknown[],
   synthesized_context: string
 }> {
   // Step 1: Generate targeted search queries

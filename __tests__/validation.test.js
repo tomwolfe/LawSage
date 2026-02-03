@@ -6,18 +6,26 @@ describe('ResponseValidator', () => {
       const content = `
         STRATEGY:
         Your legal strategy goes here.
-        
+
         ROADMAP:
         1. First step
         2. Second step
         3. Third step
-        
+
+        ADVERSARIAL STRATEGY:
+        Consider the opposing party's potential arguments and counter them.
+
+        PROCEDURAL CHECKS:
+        - Check local court rules
+        - Verify filing deadlines
+        - Confirm service requirements
+
         CITATIONS:
         - 12 U.S.C. § 345
         - Cal. Civ. Code § 1708
         - Rule 12(b)(6)
       `;
-      
+
       expect(ResponseValidator.validateLegalOutput(content)).toBe(true);
     });
 
@@ -56,18 +64,26 @@ describe('ResponseValidator', () => {
       const content = `
         STRATEGY:
         Your legal strategy goes here.
-        
+
         ROADMAP:
         1. First step
         2. Second step
         3. Third step
-        
+
+        ADVERSARIAL STRATEGY:
+        Consider the opposing party's potential arguments and counter them.
+
+        PROCEDURAL CHECKS:
+        - Check local court rules
+        - Verify filing deadlines
+        - Confirm service requirements
+
         CITATIONS:
         - 12 U.S.C. § 345 (federal statute)
         - Cal. Civ. Code § 1708 (state code)
         - Rule 12(b)(6) (court rule)
       `;
-      
+
       expect(ResponseValidator.validateLegalOutput(content)).toBe(true);
     });
   });

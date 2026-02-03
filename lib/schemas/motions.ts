@@ -299,7 +299,7 @@ export function validateLegalMotion(motion: LegalMotion): { isValid: boolean; er
     default:
       return {
         isValid: false,
-        errors: [`Unknown motion type: ${(motion as any).type}`]
+        errors: [`Unknown motion type: ${(motion as { type?: string }).type}`]
       };
   }
 }
