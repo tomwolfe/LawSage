@@ -12,7 +12,7 @@ export async function generateSearchQueries(
   jurisdiction: string,
   geminiApiKey: string
 ): Promise<string[]> {
-  const genAI = new GoogleGenAI({ apiKey: geminiApiKey }) as unknown;
+  const genAI = new GoogleGenAI({ apiKey: geminiApiKey }) as any;
   const model = genAI.getGenerativeModel({
     model: 'gemini-2.5-flash-preview-09-2025',
     systemInstruction: `You are a legal research specialist. Given a user's legal situation and jurisdiction,
@@ -95,7 +95,7 @@ export async function executeSearchQueries(
   queries: string[],
   geminiApiKey: string
 ): Promise<unknown[]> {
-  const genAI = new GoogleGenAI({ apiKey: geminiApiKey }) as unknown;
+  const genAI = new GoogleGenAI({ apiKey: geminiApiKey }) as any;
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-09-2025' });
 
   const results: unknown[] = [];

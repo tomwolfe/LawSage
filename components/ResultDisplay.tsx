@@ -386,7 +386,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
   // Function to download as Word document
   const handleExportToWord = async () => {
     // Check if the result contains a structured motion
-    let doc;
+    let doc: unknown;
     if (structured && structured.filing_template) {
       // Try to parse the filing template as a motion schema
       try {
@@ -411,7 +411,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
 
     // Export the document
     const { Packer } = await import('docx');
-    const blob = await Packer.toBlob(doc);
+    const blob = await Packer.toBlob(doc as any);
     const url = URL.createObjectURL(blob);
 
     // Create a download link
@@ -426,26 +426,18 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
 
   // Helper function to create a California-style pleading header
   const createCaliforniaFilingHeader = async (
-    { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType }: {
-      Paragraph: unknown;
-      TextRun: unknown;
-      Table: unknown;
-      TableRow: unknown;
-      TableCell: unknown;
-      WidthType: unknown;
-      BorderStyle: unknown;
-      AlignmentType: unknown;
-    },
+    docx: any,
     caseInfo: { attorneyName?: string; barNumber?: string; firmName?: string; partyName?: string; courtName?: string; caseNumber?: string; plaintiff?: string; defendant?: string; documentTitle?: string }
-  ): Promise<unknown[]> => {
-    const newParagraph = (options: { text?: string; children?: unknown[]; alignment?: unknown }) => {
+  ): Promise<any[]> => {
+    const { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType } = docx;
+    const newParagraph = (options: { text?: string; children?: any[]; alignment?: string }) => {
       if (options.children) {
         return new Paragraph({
           children: options.children,
-          alignment: options.alignment
-        }) as unknown;
+          alignment: options.alignment as any
+        }) as any;
       }
-      return new Paragraph({ text: options.text || "" }) as unknown;
+      return new Paragraph({ text: options.text || "" }) as any;
     };
 
     const newTextRun = (options: { text?: string; bold?: boolean }) => {
@@ -620,7 +612,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
             },
           },
         },
-        children,
+        children: children as any,
       }],
     });
   };
@@ -832,7 +824,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
             },
           },
         },
-        children,
+        children: children as any,
       }],
     });
   };

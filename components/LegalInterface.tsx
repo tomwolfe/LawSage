@@ -50,6 +50,15 @@ export interface CaseLedgerEntry {
   dueDate?: Date;
 }
 
+export interface CaseFolderState {
+  userInput: string;
+  jurisdiction: string;
+  activeTab: string;
+  history: CaseHistoryItem[];
+  selectedHistoryItem: string | null;
+  backendUnreachable: boolean;
+}
+
 interface CaseHistoryItem {
   id: string;
   timestamp: Date;
@@ -88,41 +97,51 @@ export default function LegalInterface() {
     const hash = window.location.hash.substring(1);
     const savedState = restoreVirtualCaseFolderState(hash);
     
-    if (savedState) {
+    if (savedState && typeof savedState === 'object' && savedState !== null) {
+      const savedStateRecord = savedState as Record<string, unknown>;
+      const caseFolder = savedStateRecord.caseFolder as CaseFolderState | undefined;
+      const analysisResult = savedStateRecord.analysisResult;
+      const ledger = savedStateRecord.ledger;
+
       // Check if this is the enhanced Virtual Case Folder state format
-      if (savedState.caseFolder && savedState.analysisResult) {
+      if (caseFolder && analysisResult !== undefined) {
         // Restore from Virtual Case Folder state
-        const caseFolder = savedState.caseFolder;
-        const analysisResult = savedState.analysisResult;
 
         if (caseFolder.userInput !== undefined) setUserInput(caseFolder.userInput);
         if (caseFolder.jurisdiction !== undefined) setJurisdiction(caseFolder.jurisdiction);
-        if (caseFolder.activeTab !== undefined) setActiveTab(caseFolder.activeTab);
+        if (caseFolder.activeTab !== undefined) setActiveTab(caseFolder.activeTab as "strategy" | "filings" | "sources" | "survival-guide" | "opposition-view");
         if (caseFolder.history !== undefined) setHistory(caseFolder.history);
         if (caseFolder.selectedHistoryItem !== undefined) setSelectedHistoryItem(caseFolder.selectedHistoryItem);
         if (caseFolder.backendUnreachable !== undefined) setBackendUnreachable(caseFolder.backendUnreachable);
 
-        if (analysisResult !== undefined) setResult(analysisResult);
+        if (analysisResult !== undefined) setResult(analysisResult as LegalResult);
 
         // Restore case ledger if present
-        if (savedState.ledger !== undefined) {
+        if (ledger !== undefined && Array.isArray(ledger)) {
           // Convert timestamp strings back to Date objects if needed
-          const ledgerWithDates = savedState.ledger.map((entry: CaseLedgerEntry) => ({
-            ...entry,
-            timestamp: new Date(entry.timestamp),
-            dueDate: entry.dueDate ? new Date(entry.dueDate) : undefined
-          }));
-          setCaseLedger(ledgerWithDates);
+          const ledgerWithDates = ledger.map((entry: unknown) => {
+            if (typeof entry === 'object' && entry !== null && 'timestamp' in entry) {
+              const entryRecord = entry as Record<string, unknown>;
+              return {
+                ...entryRecord,
+                timestamp: new Date(entryRecord.timestamp as string),
+                dueDate: entryRecord.dueDate ? new Date(entryRecord.dueDate as string) : undefined
+              };
+            }
+            return entry;
+          });
+          setCaseLedger(ledgerWithDates as CaseLedgerEntry[]);
         }
       } else {
         // Restore from legacy state format
-        if (savedState.userInput !== undefined) setUserInput(savedState.userInput);
-        if (savedState.jurisdiction !== undefined) setJurisdiction(savedState.jurisdiction);
-        if (savedState.result !== undefined) setResult(savedState.result);
-        if (savedState.activeTab !== undefined) setActiveTab(savedState.activeTab);
-        if (savedState.history !== undefined) setHistory(savedState.history);
-        if (savedState.selectedHistoryItem !== undefined) setSelectedHistoryItem(savedState.selectedHistoryItem);
-        if (savedState.backendUnreachable !== undefined) setBackendUnreachable(savedState.backendUnreachable);
+        const legacyState = savedStateRecord;
+        if (legacyState.userInput !== undefined) setUserInput(legacyState.userInput as string);
+        if (legacyState.jurisdiction !== undefined) setJurisdiction(legacyState.jurisdiction as string);
+        if (legacyState.result !== undefined) setResult(legacyState.result as LegalResult);
+        if (legacyState.activeTab !== undefined) setActiveTab(legacyState.activeTab as "strategy" | "filings" | "sources" | "survival-guide" | "opposition-view");
+        if (legacyState.history !== undefined) setHistory(legacyState.history as CaseHistoryItem[]);
+        if (legacyState.selectedHistoryItem !== undefined) setSelectedHistoryItem(legacyState.selectedHistoryItem as string | null);
+        if (legacyState.backendUnreachable !== undefined) setBackendUnreachable(legacyState.backendUnreachable as boolean);
       }
 
       // Note: We don't restore file selection as that would require re-reading the file
