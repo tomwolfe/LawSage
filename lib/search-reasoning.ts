@@ -13,17 +13,6 @@ export async function generateSearchQueries(
   geminiApiKey: string
 ): Promise<string[]> {
   const genAI = new GoogleGenAI({ apiKey: geminiApiKey });
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash-preview-09-2025',
-    systemInstruction: `You are a legal research specialist. Given a user's legal situation and jurisdiction,
-    generate exactly 3 targeted search queries that would help find relevant legal precedents,
-    statutory law, and local court rules. Focus on queries that would find:
-    1. Local Rules of Court specific to the jurisdiction
-    2. Statutory precedents relevant to the legal issue
-    3. Case law or procedural requirements for the specific type of case
-
-    Return ONLY an array of 3 search queries as a JSON array, nothing else.`
-  });
 
   const prompt = `
     User Situation: ${userInput}
@@ -36,8 +25,25 @@ export async function generateSearchQueries(
   `;
 
   try {
-    const result = await model.generateContent(prompt);
-    const responseText = result.text?.trim() ?? '';
+    const result = await genAI.models.generateContentStream({
+      model: 'gemini-2.5-flash-preview-09-2025',
+      contents: prompt,
+      config: {
+        systemInstruction: `You are a legal research specialist. Given a user's legal situation and jurisdiction,
+        generate exactly 3 targeted search queries that would help find relevant legal precedents,
+        statutory law, and local court rules. Focus on queries that would find:
+        1. Local Rules of Court specific to the jurisdiction
+        2. Statutory precedents relevant to the legal issue
+        3. Case law or procedural requirements for the specific type of case
+
+        Return ONLY an array of 3 search queries as a JSON array, nothing else.`
+      }
+    });
+    let rawOutput = '';
+    for await (const chunk of result) {
+      rawOutput += chunk.text ?? '';
+    }
+    const responseText = rawOutput.trim();
     
     // Try to extract JSON from response
     const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
@@ -96,15 +102,15 @@ export async function executeSearchQueries(
   geminiApiKey: string
 ): Promise<unknown[]> {
   const genAI = new GoogleGenAI({ apiKey: geminiApiKey });
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-09-2025' });
 
   const results: unknown[] = [];
 
   for (const query of queries) {
     try {
-      const result = await model.generateContent({
+      const result = await genAI.models.generateContent({
+        model: 'gemini-2.5-flash-preview-09-2025',
         contents: `Search for: ${query}`,
-        generationConfig: {
+        config: {
           tools: [{ googleSearch: {} }]
         }
       });
