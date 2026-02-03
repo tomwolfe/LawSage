@@ -562,6 +562,8 @@ export default function LegalInterface() {
                     src={previewUrl}
                     alt="Preview"
                     className="max-h-32 object-contain border rounded-lg"
+                    width={128}
+                    height={128}
                   />
                 </div>
               )}

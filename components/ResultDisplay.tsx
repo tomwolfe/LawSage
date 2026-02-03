@@ -141,7 +141,7 @@ function parseLegalOutput(text: string): { strategy: string; filings: string; st
         structured: parsed
       };
     }
-  } catch (_e) {
+  } catch (_error) {
     // If JSON parsing fails, fall back to delimiter-based parsing
   }
 
@@ -345,7 +345,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
         try {
           const errorData = await response.json();
           errorMsg = errorData.details || errorData.error || errorMsg;
-        } catch (_e) {
+        } catch (_error) {
           // Fallback to text if JSON parse fails
           const text = await response.text();
           if (text) errorMsg = text.slice(0, 100);
@@ -400,7 +400,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
           // If parsing fails, fall back to the original approach
           doc = await createStandardDocument();
         }
-      } catch (_e) {
+      } catch (_error) {
         // If parsing fails, fall back to the original approach
         doc = await createStandardDocument();
       }
@@ -410,7 +410,9 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
     }
 
     // Export the document
-    const { Packer } = await import('docx');
+    const docxModule = await import('docx');
+    const { Packer } = docxModule;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const blob = await Packer.toBlob(doc as any);
     const url = URL.createObjectURL(blob);
 
@@ -426,22 +428,25 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
 
   // Helper function to create a California-style pleading header
   const createCaliforniaFilingHeader = async (
-    docx: any,
+    docx: any, // eslint-disable-line @typescript-eslint/no-explicit-any
     caseInfo: { attorneyName?: string; barNumber?: string; firmName?: string; partyName?: string; courtName?: string; caseNumber?: string; plaintiff?: string; defendant?: string; documentTitle?: string }
-  ): Promise<any[]> => {
+  ): Promise<any[]> => { // eslint-disable-line @typescript-eslint/no-explicit-any
     const { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType } = docx;
-    const newParagraph = (options: { text?: string; children?: any[]; alignment?: string }) => {
+    const newParagraph = (options: { text?: string; children?: any[] /* eslint-disable-line @typescript-eslint/no-explicit-any */; alignment?: string }) => {
       if (options.children) {
         return new Paragraph({
           children: options.children,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           alignment: options.alignment as any
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         }) as any;
       }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return new Paragraph({ text: options.text || "" }) as any;
     };
 
     const newTextRun = (options: { text?: string; bold?: boolean }) => {
-      return new TextRun({ text: options.text || "", bold: options.bold || false }) as unknown;
+      return new TextRun({ text: options.text || "", bold: options.bold || false }) as unknown; // eslint-disable-line @typescript-eslint/no-explicit-any
     };
 
     return [
@@ -612,7 +617,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
             },
           },
         },
-        children: children as any,
+        children: children as any[], // eslint-disable-line @typescript-eslint/no-explicit-any
       }],
     });
   };
@@ -824,7 +829,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
             },
           },
         },
-        children: children as any,
+        children: children as any[], // eslint-disable-line @typescript-eslint/no-explicit-any
       }],
     });
   };

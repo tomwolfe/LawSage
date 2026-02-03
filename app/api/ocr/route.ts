@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
-import { SafetyValidator, ResponseValidator, Source } from '../../../lib/validation';
+import { SafetyValidator, Source } from '../../../lib/validation';
+// import { ResponseValidator } from '../../../lib/validation'; // Removed unused import
 
 // Define types
 interface OCRRequest {

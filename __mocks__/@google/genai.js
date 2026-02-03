@@ -1,7 +1,7 @@
 // __mocks__/@google/genai.js
-const GoogleGenAI = jest.fn().mockImplementation((apiKey) => {
+const GoogleGenAI = jest.fn().mockImplementation((_apiKey) => {
   return {
-    getGenerativeModel: jest.fn().mockImplementation((options) => {
+    getGenerativeModel: jest.fn().mockImplementation((_options) => {
       return {
         generateContent: jest.fn().mockResolvedValue({
           response: {

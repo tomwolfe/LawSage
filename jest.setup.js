@@ -44,8 +44,8 @@ window.IntersectionObserver = jest.fn().mockImplementation(() => ({
 
 // Mock GoogleGenAI globally
 global.GoogleGenAI = class {
-  constructor(options) {
-    this.apiKey = options.apiKey;
+  constructor(_options) {
+    this.apiKey = _options.apiKey;
   }
 
   getGenerativeModel(_options) {

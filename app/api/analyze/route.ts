@@ -3,10 +3,10 @@ import { GoogleGenAI } from '@google/genai';
 import { SafetyValidator, Source } from '../../../lib/validation';
 
 // Mandatory safety disclosure hardcoded for the response stream
-const _LEGAL_DISCLAIMER = (
-  "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. " +
-  "This is legal information, not legal advice. Always consult with a qualified attorney.\n\n"
-);
+// const _LEGAL_DISCLAIMER = (  // Commented out unused variable
+//   "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. " +
+//   "This is legal information, not legal advice. Always consult with a qualified attorney.\n\n"
+// );
 
 // Define types to match the Python models
 interface LegalRequest {

@@ -9,9 +9,9 @@ interface NextRequest {
   };
 }
 
-interface NextResponse {
-  json: (data: unknown) => unknown;
-}
+// interface NextResponse {  // Removed unused interface
+//   json: (data: unknown) => unknown;
+// }
 
 export {};
 

@@ -11,9 +11,9 @@ interface NextRequest {
   };
 }
 
-interface NextResponse {
-  json: (data: unknown) => unknown;
-}
+// interface NextResponse {  // Removed unused interface
+//   json: (data: unknown) => unknown;
+// }
 
 export async function POST(_req: NextRequest): Promise<unknown> {
   // Mock implementation that returns a predictable response
@@ -51,7 +51,7 @@ export async function POST(_req: NextRequest): Promise<unknown> {
   };
 }
 
-export async function GET(req: NextRequest): Promise<unknown> {
+export async function GET(_req: NextRequest): Promise<unknown> {
   return {
     json: () => Promise.resolve({
       status: "ok",

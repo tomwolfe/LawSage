@@ -168,7 +168,7 @@ export class ResponseValidator {
 
         return formattedOutput;
       }
-    } catch (_e) {
+    } catch (_error) {
       // If JSON parsing fails, fall back to legacy approach
     }
 
