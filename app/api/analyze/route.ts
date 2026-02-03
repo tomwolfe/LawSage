@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
-import { SafetyValidator, ResponseValidator, Source } from '../../../lib/validation';
+import { SafetyValidator, Source } from '../../../lib/validation';
 
 // Mandatory safety disclosure hardcoded for the response stream
-const LEGAL_DISCLAIMER = (
+const _LEGAL_DISCLAIMER = (
   "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. " +
   "This is legal information, not legal advice. Always consult with a qualified attorney.\n\n"
 );
@@ -374,7 +374,7 @@ const prompt = `
   }
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   // Health check endpoint
   return NextResponse.json({
     status: "ok",
@@ -382,7 +382,7 @@ export async function GET(req: NextRequest) {
   });
 }
 
-export async function HEAD(req: NextRequest) {
+export async function HEAD(_req: NextRequest) {
   // Health check endpoint for HEAD requests
   return new NextResponse(null, {
     status: 200,

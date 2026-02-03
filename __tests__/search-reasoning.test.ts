@@ -41,7 +41,7 @@ describe('Search Reasoning Module', () => {
 
     it('should return default queries if API call fails', async () => {
       // Force an error scenario by bypassing the mock for this specific call
-      const { GoogleGenAI } = require('@google/genai');
+      const { GoogleGenAI } = await import('@google/genai');
       GoogleGenAI.mockImplementationOnce(() => {
         return {
           getGenerativeModel: jest.fn().mockReturnValue({

@@ -1,6 +1,6 @@
 // Define minimal NextRequest interface for testing
 interface NextRequest {
-  json: () => Promise<any>;
+  json: () => Promise<unknown>;
   headers: {
     get: (name: string) => string | null;
   };
@@ -8,6 +8,12 @@ interface NextRequest {
     origin: string;
   };
 }
+
+interface NextResponse {
+  json: (data: unknown) => unknown;
+}
+
+export {};
 
 // Mock the fetch function to simulate API calls
 global.fetch = jest.fn();
@@ -37,7 +43,7 @@ jest.mock('@google/genai', () => ({
 }));
 
 // Import the function after mocking dependencies
-const { POST: AnalyzePOST } = require('../app/api/analyze/route');
+const { POST: AnalyzePOST } = (await import('../app/api/analyze/route')).POST;
 
 describe('Template Injection Validation Tests', () => {
   beforeEach(() => {

@@ -12,7 +12,7 @@ export async function generateSearchQueries(
   jurisdiction: string,
   geminiApiKey: string
 ): Promise<string[]> {
-  const genAI = new GoogleGenAI({ apiKey: geminiApiKey }) as any;
+  const genAI = new GoogleGenAI({ apiKey: geminiApiKey }) as unknown;
   const model = genAI.getGenerativeModel({
     model: 'gemini-2.5-flash-preview-09-2025',
     systemInstruction: `You are a legal research specialist. Given a user's legal situation and jurisdiction,
@@ -95,7 +95,7 @@ export async function executeSearchQueries(
   queries: string[],
   geminiApiKey: string
 ): Promise<unknown[]> {
-  const genAI = new GoogleGenAI({ apiKey: geminiApiKey }) as any;
+  const genAI = new GoogleGenAI({ apiKey: geminiApiKey }) as unknown;
   const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-09-2025' });
 
   const results: unknown[] = [];
@@ -158,7 +158,10 @@ export async function performMultiStepSearchReasoning(
   
   // Step 3: Synthesize the search results into contextual information
   const synthesizedContext = searchResults
-    .map((result: any) => `Query: ${(result as any).query}\nResults: ${(result as any).search_results}`)
+    .map((result: unknown) => {
+      const r = result as Record<string, unknown>;
+      return `Query: ${r.query}\nResults: ${r.search_results}`;
+    })
     .join('\n\n---\n\n');
   
   return {

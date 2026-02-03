@@ -2,7 +2,7 @@
 
 // Define minimal NextRequest interface for testing
 interface NextRequest {
-  json: () => Promise<any>;
+  json: () => Promise<unknown>;
   headers: {
     get: (name: string) => string | null;
   };
@@ -12,12 +12,12 @@ interface NextRequest {
 }
 
 interface NextResponse {
-  json: (data: any) => any;
+  json: (data: unknown) => unknown;
 }
 
-export async function POST(req: NextRequest): Promise<any> {
+export async function POST(_req: NextRequest): Promise<unknown> {
   // Mock implementation that returns a predictable response
-  const requestData = await req.json();
+  const requestData = await _req.json();
 
   // Return a mock response similar to the real API
   // For different test cases, return different content
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest): Promise<any> {
   };
 }
 
-export async function GET(req: NextRequest): Promise<any> {
+export async function GET(req: NextRequest): Promise<unknown> {
   return {
     json: () => Promise.resolve({
       status: "ok",

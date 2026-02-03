@@ -124,9 +124,9 @@ export function findMostSimilarTemplate(userInput: string, templates: Array<{
   
   let bestMatch = null;
   let highestSimilarity = -1;
-  
+
   // Combine user input with its keywords for better matching
-  const userInputWithKeywords = userInput + ' ' + userInput.split(/\W+/).join(' ');
+  const _userInputWithKeywords = userInput + ' ' + userInput.split(/\W+/).join(' ');
   
   for (const template of templates) {
     // Calculate similarity with title

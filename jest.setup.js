@@ -48,7 +48,7 @@ global.GoogleGenAI = class {
     this.apiKey = options.apiKey;
   }
 
-  getGenerativeModel(options) {
+  getGenerativeModel(_options) {
     return {
       generateContent: jest.fn().mockResolvedValue({
         response: {

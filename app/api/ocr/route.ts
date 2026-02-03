@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
         bytes[i] = binaryString.charCodeAt(i);
       }
       imageData = bytes;
-    } catch (error) {
+    } catch (_error) {
       return NextResponse.json(
         {
           type: "ValidationError",

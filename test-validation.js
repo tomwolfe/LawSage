@@ -1,6 +1,6 @@
 // test-validation.js - Simple test script to verify validation logic
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
 
 // Since we can't directly import TypeScript files, let's just check that they exist and have the right content
 console.log('Checking validation library...');

@@ -1,4 +1,4 @@
-const { ResponseValidator, SafetyValidator } = require('../lib/validation');
+import { ResponseValidator, SafetyValidator } from '../lib/validation.js';
 
 describe('ResponseValidator', () => {
   describe('validateLegalOutput', () => {

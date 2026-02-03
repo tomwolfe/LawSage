@@ -8,14 +8,14 @@ import * as LZString from 'lz-string';
  * @param state The case folder state to serialize
  * @returns A compressed and encoded string suitable for URL fragment
  */
-export function compressStateToUrlFragment(state: Record<string, unknown>): string {
+export function compressStateToUrlFragment(state: unknown): string {
   try {
     // Serialize the state to JSON
     const jsonString = JSON.stringify(state);
-    
+
     // Compress the JSON string
     const compressed = LZString.compressToEncodedURIComponent(jsonString);
-    
+
     return compressed;
   } catch (error) {
     console.error('Error compressing state to URL fragment:', error);
@@ -28,19 +28,19 @@ export function compressStateToUrlFragment(state: Record<string, unknown>): stri
  * @param fragment The compressed URL fragment
  * @returns The decompressed state object
  */
-export function decompressStateFromUrlFragment(fragment: string): any {
+export function decompressStateFromUrlFragment(fragment: string): unknown {
   try {
     if (!fragment) {
       return null;
     }
-    
+
     // Decompress the fragment
     const decompressed = LZString.decompressFromEncodedURIComponent(fragment);
-    
+
     if (!decompressed) {
       return null;
     }
-    
+
     // Parse the JSON string
     return JSON.parse(decompressed);
   } catch (error) {
@@ -53,7 +53,7 @@ export function decompressStateFromUrlFragment(fragment: string): any {
  * Updates the URL hash with the compressed state
  * @param state The state to compress and store in the URL
  */
-export function updateUrlWithState(state: any): void {
+export function updateUrlWithState(state: unknown): void {
   try {
     const compressedState = compressStateToUrlFragment(state);
 
@@ -69,7 +69,7 @@ export function updateUrlWithState(state: any): void {
  * Retrieves the state from the URL hash
  * @returns The decompressed state object or null if not found
  */
-export function getStateFromUrl(): any {
+export function getStateFromUrl(): unknown {
   try {
     const hash = window.location.hash.substring(1); // Remove the '#' character
 
@@ -91,32 +91,44 @@ export function getStateFromUrl(): any {
  * @param ledger The case ledger containing chronological case events
  * @returns A combined state object with both case folder, analysis result, and ledger
  */
-export function createVirtualCaseFolderState(caseFolder: any, analysisResult: any, ledger?: any[]): any {
+export function createVirtualCaseFolderState(caseFolder: unknown, analysisResult: unknown, ledger?: unknown[]): Record<string, unknown> {
   // Deeper compression for document summaries and results
-  const compressResult = (res: any) => {
-    if (!res || !res.text) return res;
+  const compressResult = (res: unknown): Record<string, unknown> | unknown => {
+    if (!res || typeof res !== 'object' || !('text' in res)) return res;
+    const textValue = (res as Record<string, unknown>).text as string;
     return {
       ...res,
-      text: LZString.compressToBase64(res.text),
+      text: LZString.compressToBase64(textValue),
       _c: true // flag indicating it's compressed
     };
   };
 
-  const compressedHistory = caseFolder.history?.map((item: any) => ({
-    ...item,
-    result: compressResult(item.result)
-  }));
+  let history: Record<string, unknown>[] = [];
+  if (caseFolder && typeof caseFolder === 'object' && 'history' in caseFolder) {
+    const folderWithHistory = caseFolder as Record<string, unknown>;
+    const historyArray = folderWithHistory.history as unknown[];
+    history = historyArray?.map((item: unknown) => {
+      const itemRecord = item as Record<string, unknown>;
+      const itemResult = itemRecord.result as unknown;
+      return {
+        ...itemRecord,
+        result: compressResult(itemResult)
+      };
+    }) || [];
+  }
 
-  return {
+  const caseFolderRecord = caseFolder as Record<string, unknown>;
+  const result: Record<string, unknown> = {
     caseFolder: {
-      ...caseFolder,
-      history: compressedHistory
+      ...caseFolderRecord,
+      history
     },
     analysisResult: compressResult(analysisResult),
     ledger: ledger || [],
     timestamp: Date.now(),
     version: '1.1'
   };
+  return result;
 }
 
 /**
@@ -124,7 +136,7 @@ export function createVirtualCaseFolderState(caseFolder: any, analysisResult: an
  * @param urlHash The URL hash containing the compressed state
  * @returns The restored state object with case folder and analysis result
  */
-export function restoreVirtualCaseFolderState(urlHash: string): any {
+export function restoreVirtualCaseFolderState(urlHash: string): Record<string, unknown> | null {
   try {
     if (!urlHash) {
       return null;
@@ -137,155 +149,78 @@ export function restoreVirtualCaseFolderState(urlHash: string): any {
     }
 
     // Decompress the fields that were compressed in createVirtualCaseFolderState
-    const decompressResult = (res: any) => {
-      if (!res || !res._c || !res.text) return res;
-      return {
+    const decompressResult = (res: unknown): Record<string, unknown> | unknown => {
+      if (!res || typeof res !== 'object' || !('_c' in res) || !('text' in res)) return res;
+      const textValue = (res as Record<string, unknown>).text as string;
+      const result: Record<string, unknown> = {
         ...res,
-        text: LZString.decompressFromBase64(res.text),
+        text: LZString.decompressFromBase64(textValue),
         _c: undefined
       };
+      return result;
     };
 
-    if (decompressedState.caseFolder && decompressedState.caseFolder.history) {
-      decompressedState.caseFolder.history = decompressedState.caseFolder.history.map((item: any) => ({
-        ...item,
-        result: decompressResult(item.result)
-      }));
+    const result = decompressedState as Record<string, unknown> | null;
+    if (result && 'caseFolder' in result && result.caseFolder && typeof result.caseFolder === 'object' && 'history' in result.caseFolder && result.caseFolder.history) {
+      const folderHistory = result.caseFolder.history as unknown[];
+      result.caseFolder.history = folderHistory.map((item: unknown) => {
+        const itemRecord = item as Record<string, unknown>;
+        const itemResult = itemRecord.result as unknown;
+        const itemResultResult = decompressResult(itemResult);
+        const finalItem = itemRecord as Record<string, unknown>;
+        if (itemResultResult && typeof itemResultResult === 'object') {
+          finalItem.result = itemResultResult;
+        }
+        return finalItem;
+      });
     }
 
-    if (decompressedState.analysisResult) {
-      decompressedState.analysisResult = decompressResult(decompressedState.analysisResult);
-    }
-
-    return decompressedState;
+    return result;
   } catch (error) {
     console.error('Error restoring Virtual Case Folder state from URL:', error);
     return null;
   }
 }
 
-let globalWatcherTimeoutId: any = null;
+let globalWatcherTimeoutId: unknown = null;
 
 let globalLastStateHash: string | null = null;
 
-
-
-/**
-
-
-
- * Resets the global watcher state (mainly for testing)
-
-
-
- */
-
-
-
 export function resetWatcherState(): void {
-
-
-
   if (globalWatcherTimeoutId) {
-
-
-
-    clearTimeout(globalWatcherTimeoutId);
-
-
-
-    globalWatcherTimeoutId = null;
-
-
-
+    clearTimeout(globalWatcherTimeoutId as ReturnType<typeof setTimeout>);
+    globalWatcherTimeoutId = null as unknown;
   }
-
-
-
   globalLastStateHash = null;
-
-
-
 }
 
-
-
-
-
-
-
-/**
-
-
-
- * Watches for state changes and updates the URL accordingly
-
-
-
-
-
- * @param getState A function that returns the current state to be synced
-
- * @param debounceMs Debounce time in milliseconds to avoid excessive updates (default: 1000ms)
-
- * @returns A function to trigger the debounced update
-
- */
-
-export function watchStateAndSyncToUrl(getState: () => any, debounceMs: number = 1000): () => void {
-
+export function watchStateAndSyncToUrl(getState: () => unknown, debounceMs: number = 1000): () => void {
   const updateUrl = () => {
-
     try {
-
       const currentState = getState();
 
       if (!currentState) return;
 
-      
-
       // Create a hash of the current state to avoid unnecessary updates
-
       const currentStateJson = JSON.stringify(currentState);
-
       const currentStateHash = btoa(encodeURIComponent(currentStateJson)).substring(0, 32);
 
-      
-
       // Only update if the state has actually changed
-
       if (currentStateHash !== globalLastStateHash) {
-
         updateUrlWithState(currentState);
-
         globalLastStateHash = currentStateHash;
-
       }
-
     } catch (error) {
-
       console.error('Error in state watcher:', error);
-
     }
-
   };
-
-  
 
   // Debounced version of the update function
-
   return () => {
-
     if (globalWatcherTimeoutId) {
-
-      clearTimeout(globalWatcherTimeoutId);
-
+      clearTimeout(globalWatcherTimeoutId as ReturnType<typeof setTimeout>);
     }
 
-    
-
-    globalWatcherTimeoutId = setTimeout(updateUrl, debounceMs);
-
+    globalWatcherTimeoutId = setTimeout(updateUrl, debounceMs) as unknown;
   };
-
 }
