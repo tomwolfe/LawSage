@@ -537,7 +537,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
     const { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle } = docx;
 
     const isCalifornia = jurisdiction.toLowerCase().includes('california');
-    let children: (typeof docx.Paragraph | typeof docx.Table)[] = [];
+    let children: (any)[] = [];
 
     if (isCalifornia) {
       const header = await createCaliforniaFilingHeader(docx, {
@@ -618,7 +618,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
     const { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle } = docx;
 
     const isCalifornia = motion.caseInfo.jurisdiction.toLowerCase().includes('california');
-    let children: (typeof docx.Paragraph | typeof docx.Table)[] = [];
+    let children: (any)[] = [];
 
     if (isCalifornia) {
       const header = await createCaliforniaFilingHeader(docx, {

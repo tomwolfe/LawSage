@@ -116,6 +116,7 @@ export function findMostSimilarTemplate(userInput: string, templates: Array<{
   title: string;
   description: string;
   keywords: string[];
+  similarity?: number;
 } | null {
   if (!userInput || !templates || templates.length === 0) {
     return null;
