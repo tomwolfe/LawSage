@@ -4,6 +4,35 @@
 import * as LZString from 'lz-string';
 
 /**
+ * Phase types for prompt chaining workflow
+ */
+export type AnalysisPhase = 'Analysis' | 'Strategy' | 'Drafting' | 'Complete';
+
+/**
+ * State transition metadata for tracking phase progression
+ */
+export interface PhaseTransition {
+  from: AnalysisPhase;
+  to: AnalysisPhase;
+  timestamp: number;
+  trigger: string;
+}
+
+/**
+ * Prompt chain state interface
+ */
+export interface PromptChainState {
+  currentPhase: AnalysisPhase;
+  phaseHistory: PhaseTransition[];
+  analysisResult?: any;
+  strategyResult?: any;
+  draftingResult?: any;
+  phaseData: {
+    [key in AnalysisPhase]?: any;
+  };
+}
+
+/**
  * Compresses and encodes the case folder state to a URL fragment
  * @param state The case folder state to serialize
  * @returns A compressed and encoded string suitable for URL fragment
@@ -167,6 +196,149 @@ export function restoreVirtualCaseFolderState(urlHash: string): any {
 let globalWatcherTimeoutId: any = null;
 
 let globalLastStateHash: string | null = null;
+
+// Prompt chaining state management
+let globalPromptChainState: PromptChainState = {
+  currentPhase: 'Analysis',
+  phaseHistory: [],
+  phaseData: {}
+};
+
+/**
+ * Initializes a new prompt chain for the Analysis -> Strategy -> Drafting workflow
+ * @returns The initialized prompt chain state
+ */
+export function initializePromptChain(): PromptChainState {
+  globalPromptChainState = {
+    currentPhase: 'Analysis',
+    phaseHistory: [],
+    phaseData: {}
+  };
+  return globalPromptChainState;
+}
+
+/**
+ * Transitions to the next phase in the prompt chain
+ * @param currentPhase The current phase
+ * @param phaseData Data to store for the current phase
+ * @param trigger The action that triggered the transition
+ * @returns The updated prompt chain state
+ */
+export function transitionToPhase(
+  currentPhase: AnalysisPhase,
+  phaseData: any,
+  trigger: string
+): PromptChainState {
+  const phaseOrder: AnalysisPhase[] = ['Analysis', 'Strategy', 'Drafting', 'Complete'];
+  const currentIndex = phaseOrder.indexOf(currentPhase);
+  const nextPhase = phaseOrder[currentIndex + 1] || 'Complete';
+
+  const transition: PhaseTransition = {
+    from: currentPhase,
+    to: nextPhase,
+    timestamp: Date.now(),
+    trigger
+  };
+
+  globalPromptChainState = {
+    ...globalPromptChainState,
+    currentPhase: nextPhase,
+    phaseHistory: [...globalPromptChainState.phaseHistory, transition],
+    phaseData: {
+      ...globalPromptChainState.phaseData,
+      [currentPhase]: phaseData
+    },
+    [`${currentPhase.toLowerCase()}Result`]: phaseData
+  };
+
+  return globalPromptChainState;
+}
+
+/**
+ * Compresses and encodes the prompt chain state to a URL fragment
+ * @param chainState The prompt chain state to serialize
+ * @returns A compressed and encoded string suitable for URL fragment
+ */
+export function compressChainStateToUrl(chainState: PromptChainState): string {
+  try {
+    const jsonString = JSON.stringify(chainState);
+    const compressed = LZString.compressToEncodedURIComponent(jsonString);
+    return compressed;
+  } catch (error) {
+    console.error('Error compressing chain state to URL fragment:', error);
+    return '';
+  }
+}
+
+/**
+ * Decompresses and decodes the prompt chain state from a URL fragment
+ * @param fragment The compressed URL fragment
+ * @returns The decompressed prompt chain state or null if invalid
+ */
+export function decompressChainStateFromUrl(fragment: string): PromptChainState | null {
+  try {
+    if (!fragment) {
+      return null;
+    }
+    const decompressed = LZString.decompressFromEncodedURIComponent(fragment);
+    if (!decompressed) {
+      return null;
+    }
+    const parsed = JSON.parse(decompressed);
+    globalPromptChainState = parsed;
+    return parsed;
+  } catch (error) {
+    console.error('Error decompressing chain state from URL fragment:', error);
+    return null;
+  }
+}
+
+/**
+ * Updates the URL hash with the compressed prompt chain state
+ * @param chainState The chain state to compress and store in the URL
+ */
+export function updateUrlWithChainState(chainState: PromptChainState): void {
+  try {
+    const compressedState = compressChainStateToUrl(chainState);
+    const newUrl = `${window.location.pathname}${window.location.search}#${compressedState}`;
+    window.history.replaceState({}, '', newUrl);
+  } catch (error) {
+    console.error('Error updating URL with chain state:', error);
+  }
+}
+
+/**
+ * Retrieves the current prompt chain state
+ * @returns The current prompt chain state
+ */
+export function getPromptChainState(): PromptChainState {
+  return globalPromptChainState;
+}
+
+/**
+ * Gets the accumulated context from all previous phases
+ * @returns An object containing data from all completed phases
+ */
+export function getAccumulatedPhaseContext(): any {
+  const { phaseData, analysisResult, strategyResult, draftingResult } = globalPromptChainState;
+  return {
+    analysis: analysisResult || phaseData['Analysis'],
+    strategy: strategyResult || phaseData['Strategy'],
+    drafting: draftingResult || phaseData['Drafting'],
+    currentPhase: globalPromptChainState.currentPhase
+  };
+}
+
+/**
+ * Resets the prompt chain state to initial state
+ */
+export function resetPromptChain(): void {
+  globalPromptChainState = {
+    currentPhase: 'Analysis',
+    phaseHistory: [],
+    phaseData: {}
+  };
+}
 
 
 

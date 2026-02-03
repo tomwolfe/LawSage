@@ -33,7 +33,32 @@ interface LegalLookupDatabase {
   ex_parte_notice_rules: ExParteNoticeRule[];
 }
 
+interface LocalRule {
+  rank: number;
+  county: string;
+  state: string;
+  courthouse: string;
+  address: string;
+  phone: string;
+  local_rules: {
+    ex_parte_notice_time: string;
+    ex_parte_rule: string;
+    filing_hours: string;
+    electronic_filing: string;
+    fee_waiver_forms: string[];
+    self_help_center: string;
+    url: string;
+  };
+}
+
+interface LocalRulesMap {
+  description: string;
+  last_updated: string;
+  counties: LocalRule[];
+}
+
 let legalLookupDb: LegalLookupDatabase | null = null;
+let localRulesMap: LocalRulesMap | null = null;
 
 /**
  * Loads the legal lookup database from the public data folder
@@ -117,6 +142,140 @@ export async function searchExParteRules(jurisdiction: string): Promise<ExParteN
   return db.ex_parte_notice_rules.filter(rule => {
     return rule.jurisdiction.toLowerCase().includes(searchTerm);
   });
+}
+
+/**
+ * Loads the local rules map from the utils folder
+ * @returns Promise resolving to the local rules map
+ */
+async function loadLocalRulesMap(): Promise<LocalRulesMap> {
+  if (localRulesMap) {
+    return localRulesMap;
+  }
+
+  try {
+    // In a Next.js environment, we need to fetch from the public directory
+    // Using dynamic import for JSON to avoid issues
+    const response = await fetch('/data/local-rules-map.json');
+    if (!response.ok) {
+      // Fallback: try to import directly
+      const data = await import('./local-rules-map.json');
+      localRulesMap = data.local_rules_map as LocalRulesMap;
+      return localRulesMap;
+    }
+
+    const data = await response.json();
+    localRulesMap = data.local_rules_map as LocalRulesMap;
+    return localRulesMap;
+  } catch (error) {
+    console.error('Error loading local rules map:', error);
+    // Fallback: try direct import
+    try {
+      const data = await import('./local-rules-map.json');
+      localRulesMap = data.local_rules_map as LocalRulesMap;
+      return localRulesMap;
+    } catch {
+      return {
+        description: "Procedural rules for the top 50 most populous U.S. counties",
+        last_updated: "2026-02-02",
+        counties: []
+      };
+    }
+  }
+}
+
+/**
+ * Searches the local rules map for a specific county
+ * @param countyName The name of the county to search for
+ * @returns The county's local rules or null if not found
+ */
+export async function searchLocalRulesByCounty(countyName: string): Promise<LocalRule | null> {
+  const map = await loadLocalRulesMap();
+  
+  if (!countyName || !map?.counties) {
+    return null;
+  }
+
+  const searchTerm = countyName.toLowerCase().trim();
+  
+  const match = map.counties.find(county => 
+    county.county.toLowerCase().includes(searchTerm) ||
+    county.state.toLowerCase().includes(searchTerm)
+  );
+  
+  return match || null;
+}
+
+/**
+ * Searches the local rules map by state
+ * @param stateName The name of the state to search for
+ * @returns Array of counties in that state
+ */
+export async function searchLocalRulesByState(stateName: string): Promise<LocalRule[]> {
+  const map = await loadLocalRulesMap();
+  
+  if (!stateName || !map?.counties) {
+    return [];
+  }
+
+  const searchTerm = stateName.toLowerCase().trim();
+  
+  return map.counties.filter(county => 
+    county.state.toLowerCase().includes(searchTerm)
+  );
+}
+
+/**
+ * Gets local rules for a specific jurisdiction (county or state)
+ * @param jurisdiction The jurisdiction to search for (county name or state)
+ * @returns Formatted local rules result or null if not found
+ */
+export async function getLocalRulesResponse(jurisdiction: string): Promise<LegalResult | null> {
+  // First try searching by county
+  let countyMatch = await searchLocalRulesByCounty(jurisdiction);
+  
+  // If no county match, try by state
+  if (!countyMatch) {
+    const stateMatches = await searchLocalRulesByState(jurisdiction);
+    if (stateMatches.length > 0) {
+      countyMatch = stateMatches[0]; // Return first match for state
+    }
+  }
+  
+  if (!countyMatch) {
+    return null;
+  }
+
+  // Format the local rules into a legal result
+  const rules = countyMatch.local_rules;
+  
+  let responseText = `LOCAL COURT RULES FOR ${countyMatch.county.toUpperCase()}, ${countyMatch.state.toUpperCase()}\n\n`;
+  responseText += `Courthouse: ${countyMatch.courthouse}\n`;
+  responseText += `Address: ${countyMatch.address}\n`;
+  responseText += `Phone: ${countyMatch.phone}\n\n`;
+  
+  responseText += `PROCEDURAL INFORMATION:\n`;
+  responseText += `- Ex Parte Notice Time: ${rules.ex_parte_notice_time}\n`;
+  responseText += `- Rule: ${rules.ex_parte_rule}\n`;
+  responseText += `- Filing Hours: ${rules.filing_hours}\n`;
+  responseText += `- Electronic Filing: ${rules.electronic_filing}\n\n`;
+  
+  responseText += `SELF-HELP RESOURCES:\n`;
+  responseText += `- Self-Help Center: ${rules.self_help_center}\n`;
+  responseText += `- Fee Waiver Forms: ${rules.fee_waiver_forms.join(', ')}\n\n`;
+  
+  responseText += `More info: ${rules.url}\n\n`;
+  responseText += `DISCLAIMER: This is legal information, not legal advice. Consult with a qualified attorney.\n`;
+
+  return {
+    text: responseText,
+    sources: [
+      {
+        title: `${countyMatch.county} Local Rules`,
+        uri: rules.url
+      }
+    ]
+  };
 }
 
 /**

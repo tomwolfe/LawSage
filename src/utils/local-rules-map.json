@@ -1,0 +1,858 @@
+{
+  "local_rules_map": {
+    "description": "Procedural rules for the top 50 most populous U.S. counties",
+    "last_updated": "2026-02-02",
+    "counties": [
+      {
+        "rank": 1,
+        "county": "Los Angeles County",
+        "state": "California",
+        "courthouse": "Stanley Mosk Courthouse",
+        "address": "111 N. Hill St, Los Angeles, CA 90012",
+        "phone": "(213) 830-0803",
+        "local_rules": {
+          "ex_parte_notice_time": "10:00 AM",
+          "ex_parte_rule": "LASC Local Rule 3.202 - Notice must be given by 10:00 AM the court day before for housing TROs",
+          "filing_hours": "8:30 AM - 4:30 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["FW-001", "FW-003"],
+          "self_help_center": "Room 210, 2nd Floor",
+          "url": "https://www.lacourt.org/"
+        }
+      },
+      {
+        "rank": 2,
+        "county": "Cook County",
+        "state": "Illinois",
+        "courthouse": "Richard J. Daley Center",
+        "address": "50 W. Washington St, Chicago, IL 60602",
+        "phone": "(312) 603-5030",
+        "local_rules": {
+          "ex_parte_notice_time": "24 hours",
+          "ex_parte_rule": "Notice required 24 hours before hearing unless emergency",
+          "filing_hours": "8:30 AM - 5:00 PM",
+          "electronic_filing": "Mandatory",
+          "fee_waiver_forms": ["AOP-FW-001"],
+          "self_help_center": "8th Floor, Room 802",
+          "url": "https://www.cookcountycourt.org/"
+        }
+      },
+      {
+        "rank": 3,
+        "county": "Harris County",
+        "state": "Texas",
+        "courthouse": "Civil Courthouse",
+        "address": "201 Caroline St, Houston, TX 77002",
+        "phone": "(713) 274-8600",
+        "local_rules": {
+          "ex_parte_notice_time": "Reasonable Notice",
+          "ex_parte_rule": "Rule 680 - No TRO without notice unless immediate and irreparable injury",
+          "filing_hours": "8:00 AM - 5:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Affidavit of Inability to Pay"],
+          "self_help_center": "Basement Level",
+          "url": "https://www.hcdistrictclerk.com/"
+        }
+      },
+      {
+        "rank": 4,
+        "county": "Maricopa County",
+        "state": "Arizona",
+        "courthouse": "Central Court Building",
+        "address": "201 W. Jefferson St, Phoenix, AZ 85003",
+        "phone": "(602) 506-3204",
+        "local_rules": {
+          "ex_parte_notice_time": "24 hours",
+          "ex_parte_rule": "Notice required unless imminent harm",
+          "filing_hours": "8:00 AM - 5:00 PM",
+          "electronic_filing": "Mandatory",
+          "fee_waiver_forms": ["DRS14f"],
+          "self_help_center": "1st Floor, Self-Service Center",
+          "url": "https://www.clerkofcourt.maricopa.gov/"
+        }
+      },
+      {
+        "rank": 5,
+        "county": "San Diego County",
+        "state": "California",
+        "courthouse": "Central Courthouse",
+        "address": "220 W. Broadway, San Diego, CA 92101",
+        "phone": "(619) 450-5700",
+        "local_rules": {
+          "ex_parte_notice_time": "10:00 AM",
+          "ex_parte_rule": "CRC 3.1203 - Notice due by 10:00 AM court day before",
+          "filing_hours": "8:30 AM - 4:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["FW-001", "FW-003"],
+          "self_help_center": "3rd Floor",
+          "url": "https://www.sdcourt.ca.gov/"
+        }
+      },
+      {
+        "rank": 6,
+        "county": "Orange County",
+        "state": "California",
+        "courthouse": "Central Justice Center",
+        "address": "700 Civic Center Dr W, Santa Ana, CA 92701",
+        "phone": "(657) 622-6878",
+        "local_rules": {
+          "ex_parte_notice_time": "10:00 AM",
+          "ex_parte_rule": "CRC 3.1203 - Notice due by 10:00 AM court day before",
+          "filing_hours": "8:00 AM - 4:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["FW-001", "FW-003"],
+          "self_help_center": "Self-Help Center on Ground Floor",
+          "url": "https://www.occourts.org/"
+        }
+      },
+      {
+        "rank": 7,
+        "county": "Miami-Dade County",
+        "state": "Florida",
+        "courthouse": "Dade County Courthouse",
+        "address": "73 W. Flagler St, Miami, FL 33130",
+        "phone": "(305) 275-1155",
+        "local_rules": {
+          "ex_parte_notice_time": "48 hours",
+          "ex_parte_rule": "Notice required 48 hours before hearing",
+          "filing_hours": "8:00 AM - 4:30 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Application for Indigent Status"],
+          "self_help_center": "11th Floor",
+          "url": "https://www.miamidade.gov/"
+        }
+      },
+      {
+        "rank": 8,
+        "county": "Kings County",
+        "state": "New York",
+        "courthouse": "Kings County Supreme Court",
+        "address": "360 Adams St, Brooklyn, NY 11201",
+        "phone": "(347) 404-9000",
+        "local_rules": {
+          "ex_parte_notice_time": "Order to Show Cause required",
+          "ex_parte_rule": "CPLR 2214 - OSC usually required for ex parte relief",
+          "filing_hours": "9:00 AM - 5:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Application for Poor Person Relief"],
+          "self_help_center": "Room 100",
+          "url": "https://www.nycourts.gov/courts/1jd/kings/"
+        }
+      },
+      {
+        "rank": 9,
+        "county": "Dallas County",
+        "state": "Texas",
+        "courthouse": "George L. Allen Sr. Courts Building",
+        "address": "600 Commerce St, Dallas, TX 75202",
+        "phone": "(214) 653-6000",
+        "local_rules": {
+          "ex_parte_notice_time": "Reasonable Notice",
+          "ex_parte_rule": "Rule 680 - Notice required unless immediate harm",
+          "filing_hours": "8:00 AM - 5:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Statement of Inability to Afford Payment"],
+          "self_help_center": "1st Floor",
+          "url": "https://www.dallascounty.org/"
+        }
+      },
+      {
+        "rank": 10,
+        "county": "Riverside County",
+        "state": "California",
+        "courthouse": "Riverside Historic Courthouse",
+        "address": "4050 Main St, Riverside, CA 92501",
+        "phone": "(951) 222-0384",
+        "local_rules": {
+          "ex_parte_notice_time": "10:00 AM",
+          "ex_parte_rule": "CRC 3.1203 - Notice due by 10:00 AM court day before",
+          "filing_hours": "7:30 AM - 4:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["FW-001", "FW-003"],
+          "self_help_center": "Lower Level",
+          "url": "https://riverside.courts.ca.gov/"
+        }
+      },
+      {
+        "rank": 11,
+        "county": "Queens County",
+        "state": "New York",
+        "courthouse": "Queens Supreme Court",
+        "address": "88-11 Sutphin Blvd, Jamaica, NY 11435",
+        "phone": "(718) 298-1000",
+        "local_rules": {
+          "ex_parte_notice_time": "Order to Show Cause required",
+          "ex_parte_rule": "CPLR 2214 - OSC usually required",
+          "filing_hours": "9:00 AM - 5:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Application for Poor Person Relief"],
+          "self_help_center": "Ground Floor",
+          "url": "https://www.nycourts.gov/courts/11jd/queens/"
+        }
+      },
+      {
+        "rank": 12,
+        "county": "Clark County",
+        "state": "Nevada",
+        "courthouse": "Regional Justice Center",
+        "address": "200 Lewis Ave, Las Vegas, NV 89101",
+        "phone": "(702) 671-4500",
+        "local_rules": {
+          "ex_parte_notice_time": "24 hours",
+          "ex_parte_rule": "EDCR 2.60 - Notice required 24 hours before",
+          "filing_hours": "8:00 AM - 5:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Application to Proceed In Forma Pauperis"],
+          "self_help_center": "2nd Floor, Self-Help Center",
+          "url": "https://www.clarkcountycourts.us/"
+        }
+      },
+      {
+        "rank": 13,
+        "county": "King County",
+        "state": "Washington",
+        "courthouse": "King County Courthouse",
+        "address": "516 3rd Ave, Seattle, WA 98104",
+        "phone": "(206) 477-1400",
+        "local_rules": {
+          "ex_parte_notice_time": "24 hours",
+          "ex_parte_rule": "LGR 7 - Notice required 24 hours before hearing",
+          "filing_hours": "8:30 AM - 4:30 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["WPF DR 01.0100"],
+          "self_help_center": "4th Floor, Family Law Self-Help Center",
+          "url": "https://www.kingcounty.gov/courts/"
+        }
+      },
+      {
+        "rank": 14,
+        "county": "San Bernardino County",
+        "state": "California",
+        "courthouse": "San Bernardino Justice Center",
+        "address": "247 W. 3rd St, San Bernardino, CA 92415",
+        "phone": "(909) 708-8665",
+        "local_rules": {
+          "ex_parte_notice_time": "10:00 AM",
+          "ex_parte_rule": "CRC 3.1203 - Notice due by 10:00 AM court day before",
+          "filing_hours": "8:00 AM - 4:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["FW-001", "FW-003"],
+          "self_help_center": "1st Floor",
+          "url": "https://sb-court.org/"
+        }
+      },
+      {
+        "rank": 15,
+        "county": "Tarrant County",
+        "state": "Texas",
+        "courthouse": "Tarrant County Courthouse",
+        "address": "100 W. Weatherford St, Fort Worth, TX 76196",
+        "phone": "(817) 884-1111",
+        "local_rules": {
+          "ex_parte_notice_time": "Reasonable Notice",
+          "ex_parte_rule": "Rule 680 - Notice required unless immediate harm",
+          "filing_hours": "8:00 AM - 5:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Affidavit of Inability to Pay"],
+          "self_help_center": "2nd Floor",
+          "url": "https://www.tarrantcounty.com/"
+        }
+      },
+      {
+        "rank": 16,
+        "county": "Bexar County",
+        "state": "Texas",
+        "courthouse": "Justice Center",
+        "address": "300 Dolorosa St, San Antonio, TX 78205",
+        "phone": "(210) 335-2011",
+        "local_rules": {
+          "ex_parte_notice_time": "Reasonable Notice",
+          "ex_parte_rule": "Rule 680 - Notice required unless immediate harm",
+          "filing_hours": "8:00 AM - 5:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Affidavit of Inability to Pay Court Costs"],
+          "self_help_center": "Basement Level",
+          "url": "https://www.bexar.org/"
+        }
+      },
+      {
+        "rank": 17,
+        "county": "Broward County",
+        "state": "Florida",
+        "courthouse": "Broward County Courthouse",
+        "address": "201 SE 6th St, Fort Lauderdale, FL 33301",
+        "phone": "(954) 831-6565",
+        "local_rules": {
+          "ex_parte_notice_time": "48 hours",
+          "ex_parte_rule": "Notice required 48 hours before hearing",
+          "filing_hours": "8:00 AM - 4:30 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Application for Indigent Status"],
+          "self_help_center": "17th Floor, Pro Se Self-Help Center",
+          "url": "https://www.browardclerk.org/"
+        }
+      },
+      {
+        "rank": 18,
+        "county": "Santa Clara County",
+        "state": "California",
+        "courthouse": "Superior Court",
+        "address": "191 N. 1st St, San Jose, CA 95113",
+        "phone": "(408) 882-2700",
+        "local_rules": {
+          "ex_parte_notice_time": "10:00 AM",
+          "ex_parte_rule": "CRC 3.1203 - Notice due by 10:00 AM court day before",
+          "filing_hours": "8:00 AM - 4:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["FW-001", "FW-003"],
+          "self_help_center": "1st Floor, Self-Help Center",
+          "url": "https://www.scscourt.org/"
+        }
+      },
+      {
+        "rank": 19,
+        "county": "Wayne County",
+        "state": "Michigan",
+        "courthouse": "Coleman A. Young Municipal Center",
+        "address": "2 Woodward Ave, Detroit, MI 48226",
+        "phone": "(313) 224-5425",
+        "local_rules": {
+          "ex_parte_notice_time": "24 hours",
+          "ex_parte_rule": "Notice required 24 hours before hearing",
+          "filing_hours": "8:00 AM - 4:30 PM",
+          "electronic_filing": "Optional",
+          "fee_waiver_forms": ["MC 20"],
+          "self_help_center": "3rd Floor, Self-Help Center",
+          "url": "https://www.36thdistrictcourt.org/"
+        }
+      },
+      {
+        "rank": 20,
+        "county": "Alameda County",
+        "state": "California",
+        "courthouse": "René C. Davidson Courthouse",
+        "address": "1225 Fallon St, Oakland, CA 94612",
+        "phone": "(510) 891-6000",
+        "local_rules": {
+          "ex_parte_notice_time": "10:00 AM",
+          "ex_parte_rule": "CRC 3.1203 - Notice due by 10:00 AM court day before",
+          "filing_hours": "8:30 AM - 4:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["FW-001", "FW-003"],
+          "self_help_center": "2nd Floor, Self-Help Center",
+          "url": "https://www.alameda.courts.ca.gov/"
+        }
+      },
+      {
+        "rank": 21,
+        "county": "Middlesex County",
+        "state": "Massachusetts",
+        "courthouse": "Middlesex Probate and Family Court",
+        "address": "208 Cambridge St, Cambridge, MA 02141",
+        "phone": "(617) 768-5800",
+        "local_rules": {
+          "ex_parte_notice_time": "48 hours",
+          "ex_parte_rule": "Notice required 48 hours before hearing",
+          "filing_hours": "8:30 AM - 4:30 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Affidavit of Indigency"],
+          "self_help_center": "Ground Floor",
+          "url": "https://www.mass.gov/orgs/middlesex-county-probate-and-family-court"
+        }
+      },
+      {
+        "rank": 22,
+        "county": "Philadelphia County",
+        "state": "Pennsylvania",
+        "courthouse": "Philadelphia City Hall",
+        "address": "1401 John F. Kennedy Blvd, Philadelphia, PA 19107",
+        "phone": "(215) 686-7000",
+        "local_rules": {
+          "ex_parte_notice_time": "Emergency only",
+          "ex_parte_rule": "Rule 206.1 - Emergency applications only",
+          "filing_hours": "8:30 AM - 4:30 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Petition to Proceed In Forma Pauperis"],
+          "self_help_center": "1st Floor, Self-Help Center",
+          "url": "https://www.courts.phila.gov/"
+        }
+      },
+      {
+        "rank": 23,
+        "county": "Sacramento County",
+        "state": "California",
+        "courthouse": "Sacramento County Courthouse",
+        "address": "720 9th St, Sacramento, CA 95814",
+        "phone": "(916) 874-5522",
+        "local_rules": {
+          "ex_parte_notice_time": "10:00 AM",
+          "ex_parte_rule": "CRC 3.1203 - Notice due by 10:00 AM court day before",
+          "filing_hours": "8:30 AM - 4:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["FW-001", "FW-003"],
+          "self_help_center": "Room 101",
+          "url": "https://www.saccourt.ca.gov/"
+        }
+      },
+      {
+        "rank": 24,
+        "county": "Palm Beach County",
+        "state": "Florida",
+        "courthouse": "Palm Beach County Courthouse",
+        "address": "205 N. Dixie Hwy, West Palm Beach, FL 33401",
+        "phone": "(561) 355-2996",
+        "local_rules": {
+          "ex_parte_notice_time": "48 hours",
+          "ex_parte_rule": "Notice required 48 hours before hearing",
+          "filing_hours": "8:00 AM - 5:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Application for Indigent Status"],
+          "self_help_center": "1st Floor, Self-Help Center",
+          "url": "https://www.mypalmbeachclerk.com/"
+        }
+      },
+      {
+        "rank": 25,
+        "county": "Suffolk County",
+        "state": "New York",
+        "courthouse": "John P. Cohalan Jr. Courthouse",
+        "address": "400 Carleton Ave, Central Islip, NY 11722",
+        "phone": "(631) 740-3900",
+        "local_rules": {
+          "ex_parte_notice_time": "Order to Show Cause required",
+          "ex_parte_rule": "CPLR 2214 - OSC usually required",
+          "filing_hours": "9:00 AM - 5:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Application for Poor Person Relief"],
+          "self_help_center": "Ground Floor",
+          "url": "https://www.nycourts.gov/courts/10jd/suffolk/"
+        }
+      },
+      {
+        "rank": 26,
+        "county": "Hillsborough County",
+        "state": "Florida",
+        "courthouse": "Hillsborough County Courthouse",
+        "address": "800 E. Twiggs St, Tampa, FL 33602",
+        "phone": "(813) 272-5894",
+        "local_rules": {
+          "ex_parte_notice_time": "48 hours",
+          "ex_parte_rule": "Notice required 48 hours before hearing",
+          "filing_hours": "8:00 AM - 5:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Application for Indigent Status"],
+          "self_help_center": "1st Floor, Self-Help Center",
+          "url": "https://www.hillsclerk.com/"
+        }
+      },
+      {
+        "rank": 27,
+        "county": "Bronx County",
+        "state": "New York",
+        "courthouse": "Bronx County Hall of Justice",
+        "address": "265 E. 161st St, Bronx, NY 10451",
+        "phone": "(718) 618-3100",
+        "local_rules": {
+          "ex_parte_notice_time": "Order to Show Cause required",
+          "ex_parte_rule": "CPLR 2214 - OSC usually required",
+          "filing_hours": "9:00 AM - 5:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Application for Poor Person Relief"],
+          "self_help_center": "Ground Floor",
+          "url": "https://www.nycourts.gov/courts/12jd/bronx/"
+        }
+      },
+      {
+        "rank": 28,
+        "county": "Nassau County",
+        "state": "New York",
+        "courthouse": "Nassau County Supreme Court",
+        "address": "100 Supreme Court Dr, Mineola, NY 11501",
+        "phone": "(516) 493-3000",
+        "local_rules": {
+          "ex_parte_notice_time": "Order to Show Cause required",
+          "ex_parte_rule": "CPLR 2214 - OSC usually required",
+          "filing_hours": "9:00 AM - 5:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Application for Poor Person Relief"],
+          "self_help_center": "1st Floor",
+          "url": "https://www.nycourts.gov/courts/10jd/nassau/"
+        }
+      },
+      {
+        "rank": 29,
+        "county": "Franklin County",
+        "state": "Ohio",
+        "courthouse": "Franklin County Courthouse",
+        "address": "369 S. High St, Columbus, OH 43215",
+        "phone": "(614) 525-3453",
+        "local_rules": {
+          "ex_parte_notice_time": "24 hours",
+          "ex_parte_rule": "Notice required 24 hours before hearing",
+          "filing_hours": "8:00 AM - 5:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Affidavit of Indigency"],
+          "self_help_center": "Basement Level, Self-Help Center",
+          "url": "https://www.fccourts.org/"
+        }
+      },
+      {
+        "rank": 30,
+        "county": "Cuyahoga County",
+        "state": "Ohio",
+        "courthouse": "Cuyahoga County Courthouse",
+        "address": "1200 Ontario St, Cleveland, OH 44113",
+        "phone": "(216) 443-7950",
+        "local_rules": {
+          "ex_parte_notice_time": "24 hours",
+          "ex_parte_rule": "Notice required 24 hours before hearing",
+          "filing_hours": "8:00 AM - 4:30 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Affidavit of Indigency"],
+          "self_help_center": "2nd Floor, Self-Help Center",
+          "url": "https://cpdocket.cp.cuyahogacounty.us/"
+        }
+      },
+      {
+        "rank": 31,
+        "county": "Oakland County",
+        "state": "Michigan",
+        "courthouse": "Oakland County Circuit Court",
+        "address": "1200 N. Telegraph Rd, Pontiac, MI 48341",
+        "phone": "(248) 975-9530",
+        "local_rules": {
+          "ex_parte_notice_time": "24 hours",
+          "ex_parte_rule": "Notice required 24 hours before hearing",
+          "filing_hours": "8:00 AM - 4:30 PM",
+          "electronic_filing": "Optional",
+          "fee_waiver_forms": ["MC 20"],
+          "self_help_center": "3rd Floor, Self-Help Center",
+          "url": "https://www.oakgov.com/courts/"
+        }
+      },
+      {
+        "rank": 32,
+        "county": "Allegheny County",
+        "state": "Pennsylvania",
+        "courthouse": "Allegheny County Courthouse",
+        "address": "436 Grant St, Pittsburgh, PA 15219",
+        "phone": "(412) 350-5324",
+        "local_rules": {
+          "ex_parte_notice_time": "Emergency only",
+          "ex_parte_rule": "Rule 206.1 - Emergency applications only",
+          "filing_hours": "8:30 AM - 4:30 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Petition to Proceed In Forma Pauperis"],
+          "self_help_center": "Basement Level",
+          "url": "https://www.alleghenycourts.us/"
+        }
+      },
+      {
+        "rank": 33,
+        "county": "Salt Lake County",
+        "state": "Utah",
+        "courthouse": "Matheson Courthouse",
+        "address": "450 S. State St, Salt Lake City, UT 84111",
+        "phone": "(801) 578-3800",
+        "local_rules": {
+          "ex_parte_notice_time": "24 hours",
+          "ex_parte_rule": "URCP 65A - Notice required 24 hours before",
+          "filing_hours": "8:00 AM - 5:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Fee Waiver Application"],
+          "self_help_center": "1st Floor, Self-Help Center",
+          "url": "https://www.utcourts.gov/"
+        }
+      },
+      {
+        "rank": 34,
+        "county": "Hennepin County",
+        "state": "Minnesota",
+        "courthouse": "Hennepin County Government Center",
+        "address": "300 S. 6th St, Minneapolis, MN 55487",
+        "phone": "(612) 348-2043",
+        "local_rules": {
+          "ex_parte_notice_time": "24 hours",
+          "ex_parte_rule": "Notice required 24 hours before hearing",
+          "filing_hours": "8:00 AM - 4:30 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["IFP Affidavit"],
+          "self_help_center": "1st Floor, Self-Help Center",
+          "url": "https://www.mncourts.gov/"
+        }
+      },
+      {
+        "rank": 35,
+        "county": "Contra Costa County",
+        "state": "California",
+        "courthouse": "Wakefield Taylor Courthouse",
+        "address": "725 Court St, Martinez, CA 94553",
+        "phone": "(925) 608-1000",
+        "local_rules": {
+          "ex_parte_notice_time": "10:00 AM",
+          "ex_parte_rule": "CRC 3.1203 - Notice due by 10:00 AM court day before",
+          "filing_hours": "8:00 AM - 4:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["FW-001", "FW-003"],
+          "self_help_center": "Ground Floor, Self-Help Center",
+          "url": "https://www.cc-courts.org/"
+        }
+      },
+      {
+        "rank": 36,
+        "county": "Fulton County",
+        "state": "Georgia",
+        "courthouse": "Lewis R. Slaton Courthouse",
+        "address": "136 Pryor St SW, Atlanta, GA 30303",
+        "phone": "(404) 612-4700",
+        "local_rules": {
+          "ex_parte_notice_time": "24 hours",
+          "ex_parte_rule": "Notice required 24 hours before hearing",
+          "filing_hours": "8:30 AM - 5:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Pauper's Affidavit"],
+          "self_help_center": "1st Floor, Self-Help Center",
+          "url": "https://www.fultoncountyga.gov/"
+        }
+      },
+      {
+        "rank": 37,
+        "county": "Wake County",
+        "state": "North Carolina",
+        "courthouse": "Wake County Justice Center",
+        "address": "300 S. Salisbury St, Raleigh, NC 27601",
+        "phone": "(919) 792-4000",
+        "local_rules": {
+          "ex_parte_notice_time": "24 hours",
+          "ex_parte_rule": "Notice required 24 hours before hearing",
+          "filing_hours": "8:00 AM - 5:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Fee Waiver Petition"],
+          "self_help_center": "Room 162",
+          "url": "https://www.wake.gov/"
+        }
+      },
+      {
+        "rank": 38,
+        "county": "Mecklenburg County",
+        "state": "North Carolina",
+        "courthouse": "Mecklenburg County Courthouse",
+        "address": "832 E. 4th St, Charlotte, NC 28202",
+        "phone": "(704) 686-0400",
+        "local_rules": {
+          "ex_parte_notice_time": "24 hours",
+          "ex_parte_rule": "Notice required 24 hours before hearing",
+          "filing_hours": "8:00 AM - 5:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Fee Waiver Petition"],
+          "self_help_center": "Ground Floor",
+          "url": "https://www.mecknc.gov/"
+        }
+      },
+      {
+        "rank": 39,
+        "county": "Montgomery County",
+        "state": "Maryland",
+        "courthouse": "Montgomery County Circuit Court",
+        "address": "50 Maryland Ave, Rockville, MD 20850",
+        "phone": "(240) 777-9466",
+        "local_rules": {
+          "ex_parte_notice_time": "24 hours",
+          "ex_parte_rule": "Notice required 24 hours before hearing",
+          "filing_hours": "8:30 AM - 4:30 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Request for Waiver of Prepaid Costs"],
+          "self_help_center": "Ground Floor, Self-Help Center",
+          "url": "https://www.montgomerycountymd.gov/courts/"
+        }
+      },
+      {
+        "rank": 40,
+        "county": "Collin County",
+        "state": "Texas",
+        "courthouse": "Collin County Courthouse",
+        "address": "2100 Bloomdale Rd, McKinney, TX 75071",
+        "phone": "(972) 548-4185",
+        "local_rules": {
+          "ex_parte_notice_time": "Reasonable Notice",
+          "ex_parte_rule": "Rule 680 - Notice required unless immediate harm",
+          "filing_hours": "8:00 AM - 5:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Affidavit of Inability to Pay"],
+          "self_help_center": "1st Floor",
+          "url": "https://www.collincountytx.gov/"
+        }
+      },
+      {
+        "rank": 41,
+        "county": "St. Louis County",
+        "state": "Missouri",
+        "courthouse": "St. Louis County Courts Building",
+        "address": "105 S. Central Ave, Clayton, MO 63105",
+        "phone": "(314) 615-2600",
+        "local_rules": {
+          "ex_parte_notice_time": "24 hours",
+          "ex_parte_rule": "Notice required 24 hours before hearing",
+          "filing_hours": "8:00 AM - 5:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Application to Proceed as a Poor Person"],
+          "self_help_center": "Ground Floor",
+          "url": "https://www.stlouiscountymo.gov/"
+        }
+      },
+      {
+        "rank": 42,
+        "county": "New York County",
+        "state": "New York",
+        "courthouse": "New York County Supreme Court",
+        "address": "60 Centre St, New York, NY 10007",
+        "phone": "(646) 386-3600",
+        "local_rules": {
+          "ex_parte_notice_time": "Order to Show Cause required",
+          "ex_parte_rule": "CPLR 2214 - OSC usually required for ex parte relief",
+          "filing_hours": "9:00 AM - 5:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Application for Poor Person Relief"],
+          "self_help_center": "Room 122",
+          "url": "https://www.nycourts.gov/courts/1jd/newyork/"
+        }
+      },
+      {
+        "rank": 43,
+        "county": "Baltimore County",
+        "state": "Maryland",
+        "courthouse": "Baltimore County Courts Building",
+        "address": "401 Bosley Ave, Towson, MD 21204",
+        "phone": "(410) 887-2601",
+        "local_rules": {
+          "ex_parte_notice_time": "24 hours",
+          "ex_parte_rule": "Notice required 24 hours before hearing",
+          "filing_hours": "8:30 AM - 4:30 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Request for Waiver of Prepaid Costs"],
+          "self_help_center": "Ground Floor",
+          "url": "https://www.baltimorecountymd.gov/"
+        }
+      },
+      {
+        "rank": 44,
+        "county": "Marion County",
+        "state": "Indiana",
+        "courthouse": "Marion County City-County Building",
+        "address": "200 E. Washington St, Indianapolis, IN 46204",
+        "phone": "(317) 327-4742",
+        "local_rules": {
+          "ex_parte_notice_time": "24 hours",
+          "ex_parte_rule": "Notice required 24 hours before hearing",
+          "filing_hours": "8:00 AM - 4:30 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Fee Waiver Affidavit"],
+          "self_help_center": "Ground Floor, Self-Help Center",
+          "url": "https://www.indy.gov/"
+        }
+      },
+      {
+        "rank": 45,
+        "county": "Denver County",
+        "state": "Colorado",
+        "courthouse": "City and County Building",
+        "address": "1437 Bannock St, Denver, CO 80202",
+        "phone": "(720) 865-8300",
+        "local_rules": {
+          "ex_parte_notice_time": "24 hours",
+          "ex_parte_rule": "C.R.C.P. 65 - Notice required 24 hours before hearing",
+          "filing_hours": "7:30 AM - 4:30 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["JDF 205"],
+          "self_help_center": "2nd Floor, Self-Help Center",
+          "url": "https://www.denvergov.org/"
+        }
+      },
+      {
+        "rank": 46,
+        "county": "Milwaukee County",
+        "state": "Wisconsin",
+        "courthouse": "Milwaukee County Courthouse",
+        "address": "901 N. 9th St, Milwaukee, WI 53233",
+        "phone": "(414) 278-4067",
+        "local_rules": {
+          "ex_parte_notice_time": "24 hours",
+          "ex_parte_rule": "Notice required 24 hours before hearing",
+          "filing_hours": "8:00 AM - 4:30 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Affidavit of Indigency"],
+          "self_help_center": "1st Floor, Self-Help Center",
+          "url": "https://county.milwaukee.gov/"
+        }
+      },
+      {
+        "rank": 47,
+        "county": "Pinellas County",
+        "state": "Florida",
+        "courthouse": "Pinellas County Justice Center",
+        "address": "14250 49th St N, Clearwater, FL 33762",
+        "phone": "(727) 464-3000",
+        "local_rules": {
+          "ex_parte_notice_time": "48 hours",
+          "ex_parte_rule": "Notice required 48 hours before hearing",
+          "filing_hours": "8:00 AM - 5:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Application for Indigent Status"],
+          "self_help_center": "1st Floor, Self-Help Center",
+          "url": "https://www.pinellascounty.org/"
+        }
+      },
+      {
+        "rank": 48,
+        "county": "Duval County",
+        "state": "Florida",
+        "courthouse": "Duval County Courthouse",
+        "address": "501 W. Adams St, Jacksonville, FL 32202",
+        "phone": "(904) 255-2000",
+        "local_rules": {
+          "ex_parte_notice_time": "48 hours",
+          "ex_parte_rule": "Notice required 48 hours before hearing",
+          "filing_hours": "8:00 AM - 5:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Application for Indigent Status"],
+          "self_help_center": "1st Floor, Self-Help Center",
+          "url": "https://duvalclerk.com/"
+        }
+      },
+      {
+        "rank": 49,
+        "county": "San Francisco County",
+        "state": "California",
+        "courthouse": "San Francisco Superior Court",
+        "address": "400 McAllister St, San Francisco, CA 94102",
+        "phone": "(415) 551-4000",
+        "local_rules": {
+          "ex_parte_notice_time": "10:00 AM",
+          "ex_parte_rule": "Local Rule 9.1 - Notice must be given by 10:00 AM the court day before",
+          "filing_hours": "8:30 AM - 4:00 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["FW-001", "FW-003"],
+          "self_help_center": "Room 008, Ground Floor",
+          "url": "https://www.sfsuperiorcourt.org/"
+        }
+      },
+      {
+        "rank": 50,
+        "county": "Shelby County",
+        "state": "Tennessee",
+        "courthouse": "Shelby County Courthouse",
+        "address": "140 Adams Ave, Memphis, TN 38103",
+        "phone": "(901) 222-3000",
+        "local_rules": {
+          "ex_parte_notice_time": "24 hours",
+          "ex_parte_rule": "Notice required 24 hours before hearing",
+          "filing_hours": "8:00 AM - 4:30 PM",
+          "electronic_filing": "Mandatory for attorneys",
+          "fee_waiver_forms": ["Petition to Sue as a Poor Person"],
+          "self_help_center": "1st Floor, Self-Help Center",
+          "url": "https://www.shelbycountytn.gov/"
+        }
+      }
+    ]
+  }
+}
