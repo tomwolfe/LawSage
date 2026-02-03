@@ -2,11 +2,11 @@
 
 **Democratizing Legal Access for Everyone**
 
-LawSage is a groundbreaking, open-source, AI-powered platform designed to empower individuals representing themselves in court (Pro Se litigants). By leveraging advanced AI models and real-time legal grounding, LawSage analyzes your unique legal situation and generates a personalized, court-admissible roadmap and legal filings—all within your browser.
+LawSage is an open-source, AI-powered platform designed to empower individuals representing themselves in court (Pro Se litigants). By leveraging advanced AI models and real-time legal grounding, LawSage analyzes your unique legal situation and generates a personalized, court-admissible roadmap and legal filings.
 
 > **Legal Disclaimer:** I am an AI, not an attorney. This tool provides legal information, not legal advice. Use of this tool does not create an attorney-client relationship.
 
-## Key Advancements (v4.0): A Zero-Infrastructure Revolution
+## Key Advancements (v4.0)
 
 LawSage has undergone a transformative evolution! The latest version is now a **resilient, high-performance 'zero-infrastructure' platform** with enhanced capabilities. This means:
 
@@ -14,7 +14,7 @@ LawSage has undergone a transformative evolution! The latest version is now a **
 *   **API Request Consolidation:** Unified 'Structural Hardening' suite combining Adversarial Strategy, Procedural Roadmap, and Local Logistics into a single batch request to minimize Gemini API latency and token usage.
 *   **Optimized Document Processing:** Client-side image downscaling and grayscaling before transmission to OCR endpoints, preventing Vercel Hobby tier timeouts and improving performance.
 *   **High-Reliability Static Grounding:** Static `legal_lookup.json` containing the top 100 pro se procedural rules for instant, zero-latency research of common queries without API calls.
-*   **Virtual Case Folder Architecture:** Leverages Gemini 2.5 Flash Preview (09-2025)'s long context to analyze multiple documents simultaneously, enabling cross-document reasoning without external vector databases.
+*   **Virtual Case Folder Architecture:** Leverages Gemini 2.5 Flash's long context to analyze multiple documents simultaneously, enabling cross-document reasoning without external vector databases.
 *   **Adversarial Strategy Component:** Automatically generates opposition arguments and 'red-teams' your case to identify potential weaknesses and counterarguments.
 *   **Procedural Grounding Enhancement:** Retrieves and validates Local Rules of Court (county/district level) in addition to general statutes for comprehensive procedural compliance.
 *   **Pro Se Survival Guide UI:** Displays hyper-local logistical data (courthouse addresses, filing fees, and dress codes) fetched via real-time search in a dedicated tab.
@@ -57,8 +57,9 @@ LawSage has undergone a transformative evolution! The latest version is now a **
 ## Technology Stack
 
 LawSage is built on a modern, performant full-stack architecture:
+
 *   **Frontend & Backend:** Next.js 16 (React 19) with Tailwind CSS and Lucide Icons. The entire backend logic now runs on Vercel Edge Functions.
-*   **AI Engine:** Google Gemini 2.5 Flash Preview (09-2025) (via the Google AI Python SDK) with web search grounding for real-time legal research.
+*   **AI Engine:** Google Gemini 2.5 Flash (via the Google AI Python SDK) with web search grounding for real-time legal research.
 *   **AI Safety & Structure:** A multi-layered Reliability Layer ensures consistent, safe output with mandatory disclaimers, citation validation, and structural hardening.
 *   **State Management:** URL-based state persistence using lz-string compression for zero-DB architecture.
 *   **Static Grounding Layer:** Embedded procedural rules database for instant legal research without API calls.
@@ -69,28 +70,34 @@ LawSage is built on a modern, performant full-stack architecture:
 ## Getting Started
 
 ### Prerequisites
+
 *   Node.js (v18+ recommended)
 *   A Google Gemini API Key (Get one from the [Google AI Studio](https://aistudio.google.com/))
 
 ### Installation
+
 1.  **Clone the Repository**
-```bash
-git clone https://github.com/tomwolfe/lawsage.git
-cd lawsage
-```
+    ```bash
+    git clone https://github.com/tomwolfe/lawsage.git
+    cd lawsage
+    ```
+
 2.  **Install Frontend Dependencies**
-```bash
-npm install
-```
+    ```bash
+    npm install
+    ```
 
 ### Running the Application Locally
+
 Start the Next.js development server:
 ```bash
 npm run dev
 ```
+
 Open your browser and navigate to [http://localhost:3000](http://localhost:3000) to begin.
 
 ### Setting Your API Key
+
 1.  Open the application in your browser (`http://localhost:3000`).
 2.  Click the "Settings" button in the top right corner.
 3.  Enter your Google Gemini API Key and click "Save Settings".
@@ -145,26 +152,28 @@ All API routes are configured to run on Vercel's Edge Runtime for optimal perfor
 LawSage employs a multi-layered Reliability Layer to ensure that AI-generated content is safe, accurate, and structurally complete:
 *   **Red-Team Auditing:** Every user request is audited for safety violations and jurisdictional clarity before being processed.
 *   **Static Grounding Layer:** Checks the embedded procedural rules database for common queries before making API calls, providing instant zero-latency research.
-*   **Grounded Generation:** Gemini 2.5 Flash Preview (09-2025) is utilized with real-time Google Search grounding to ensure information is based on current statutes and Local Rules of Court.
+*   **Grounded Generation:** Gemini 2.5 Flash is utilized with real-time Google Search grounding to ensure information is based on current statutes and Local Rules of Court.
 *   **Reliability Validation:**
     *   **Citations Validation:** Ensures every response contains at least three verifiable legal citations (e.g., U.S.C., State Codes).
     *   **Procedural Completeness:** Verifies the presence of a 'Procedural Roadmap' section to guide the pro se litigant.
     *   **Adversarial Strategy Validation:** Ensures the presence of opposition arguments and 'red-team' analysis of the user's case.
     *   **Procedural Checks Validation:** Verifies inclusion of local court rule compliance checks.
     *   **Logistics Data Validation:** Ensures hyper-local courthouse information is included in responses.
-*   **Mandatory Disclaimers:** Every response is prepended with a legal disclaimer to clearly distinguish legal information from legal advice.
-*   **Structural Hardening:** A custom validator enforces a strict delimiter system ('---') to separate legal strategy from filing templates.
-*   **Retry Mechanism:** Built-in exponential backoff for AI service rate limits ensures high availability.
-*   **Structured Output:** The AI is prompted to return a JSON schema, which is validated server-side for completeness and safety before being presented to the user.
+    *   **Mandatory Disclaimers:** Every response is prepended with a legal disclaimer to clearly distinguish legal information from legal advice.
+    *   **Structural Hardening:** A custom validator enforces a strict delimiter system ('---') to separate legal strategy from filing templates.
+    *   **Retry Mechanism:** Built-in exponential backoff for AI service rate limits ensures high availability.
+    *   **Structured Output:** The AI is prompted to return a JSON schema, which is validated server-side for completeness and safety before being presented to the user.
 
 ## Contributing
 
 LawSage is an open-source project dedicated to legal democratization. Contributions are welcome!
+
 1.  Fork the repository.
 2.  Create a feature branch (`git checkout -b feature/your-feature-name`).
 3.  Commit your changes (`git commit -m 'Add some feature'`).
 4.  Push to the branch (`git push origin feature/your-feature-name`).
 5.  Open a pull request.
+
 Please ensure your code adheres to the existing style and includes tests for new features.
 
 ## License
@@ -172,6 +181,7 @@ Please ensure your code adheres to the existing style and includes tests for new
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
+
 *   [Next.js](https://nextjs.org/)
 *   [Google AI Studio](https://aistudio.google.com/)
 *   [Tailwind CSS](https://tailwindcss.com/)
