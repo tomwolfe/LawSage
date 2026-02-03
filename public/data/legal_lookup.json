@@ -879,6 +879,22 @@
       "description": "Small claims limit is $6,000.",
       "jurisdiction": "Wyoming",
       "category": "Small Claims"
+    },
+    {
+      "id": 112,
+      "rule_number": "LASC Local Rule 3.20",
+      "title": "Ex Parte Cover Sheet",
+      "description": "LASC Form CIV 015 is a mandatory cover sheet for all ex parte applications in Los Angeles Superior Court.",
+      "jurisdiction": "California",
+      "category": "Filing"
+    },
+    {
+      "id": 113,
+      "rule_number": "CA CCP 85",
+      "title": "Limited vs Unlimited Civil",
+      "description": "Actions where the amount in controversy is $35,000 or less are 'Limited Civil' cases, which have simplified procedures. CC § 789.3 lockout cases are often filed as Limited Civil to reduce complexity for pro se litigants.",
+      "jurisdiction": "California",
+      "category": "Jurisdiction"
     }
   ],
   "ex_parte_notice_rules": [

@@ -1259,9 +1259,9 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
           </h3>
 
           {/* Render validation results */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 text-xs">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 text-xs">
             {(() => {
-              const validationResults = validateLegalStructure(result.text);
+              const validationResults = validateLegalStructure(result.text, jurisdiction);
 
               return (
                 <>
@@ -1288,6 +1288,11 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                   <div className={`p-2 rounded text-center ${validationResults.hasFilingTemplate ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                     <div className="font-semibold">Template</div>
                     <div>{validationResults.hasFilingTemplate ? '✓' : '✗'}</div>
+                  </div>
+
+                  <div className={`p-2 rounded text-center ${validationResults.hasLocalRules ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    <div className="font-semibold">Local Rules</div>
+                    <div>{validationResults.hasLocalRules ? '✓' : '✗'}</div>
                   </div>
 
                   <div className={`p-2 rounded text-center ${validationResults.isValid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>

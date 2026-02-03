@@ -182,6 +182,11 @@ Jurisdiction: {request.jurisdiction}
 Act as a Universal Public Defender.
 Generate a comprehensive legal response in VALID JSON format.
 
+CALIFORNIA-SPECIFIC PROCEDURAL REQUIREMENTS:
+- If the user is in Los Angeles (LASC), the 'Generated Filings' section MUST explicitly list 'LASC Form CIV 015 (Ex Parte Cover Sheet)' as a mandatory document.
+- For California jurisdictions, the 'Procedural Roadmap' MUST distinguish between Limited Civil (under $35,000) and Unlimited Civil. For lockout cases involving statutory damages under CC § 789.3, recommend starting with Limited Civil to reduce filing fees and procedural complexity.
+- In the 'filing_template', the MC-030 Declaration MUST include a specific section with a 'Possession Status' header. This header must explicitly state whether the user still has personal property in the unit to defeat any 'Abandonment' defense.
+
 Your response MUST include:
 1. 'strategy': Overall legal strategy and analysis.
 2. 'adversarial_strategy': Red-team analysis of weaknesses. MANDATORY: Do not use placeholders.
@@ -271,7 +276,7 @@ Return ONLY a valid JSON object.
 
         return text_output, sources, original_json_str
 
-    def step_3_finalize(self, text: str, sources: List[Source], original_json_str: str = None) -> str:
+    def step_3_finalize(self, text: str, sources: List[Source], jurisdiction: str, original_json_str: str = None) -> str:
         """
         Step 3: Validation & Formatting.
         Enforces grounding and standard structure.
@@ -285,7 +290,7 @@ Return ONLY a valid JSON object.
         # Reliability Check (Citations and Roadmap)
         # When using tools (like Google Search), Gemini cannot return structured JSON
         # So we need to rely on text validation for citations and roadmap
-        is_valid = ResponseValidator.validate_legal_output(text)
+        is_valid = ResponseValidator.validate_legal_output(text, jurisdiction)
 
         if not is_valid:
             # Log the issue but continue - this allows responses to be returned even if they don't meet all validation criteria
@@ -301,6 +306,6 @@ Return ONLY a valid JSON object.
         """
         self.step_1_audit(request)
         text, sources, original_json_str = self.step_2_generate(request)
-        final_text = self.step_3_finalize(text, sources, original_json_str)
+        final_text = self.step_3_finalize(text, sources, request.jurisdiction, original_json_str)
 
         return LegalResult(text=final_text, sources=sources)

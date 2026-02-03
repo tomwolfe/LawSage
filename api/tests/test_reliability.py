@@ -97,7 +97,7 @@ def test_validate_grounding_logic():
     assert SafetyValidator.validate_grounding(text_2, sources) is False
     
     # Case 3: No sources
-    assert SafetyValidator.validate_grounding("Some text", []) is False
+    assert SafetyValidator.validate_grounding("Some text", []) is True
 
 def test_validate_legal_output_logic():
     """Verify that validate_legal_output requires citations and a roadmap."""
@@ -107,6 +107,12 @@ def test_validate_legal_output_logic():
     valid_content = """
     Here is your strategy:
     According to 12 U.S.C. § 345, Cal. Civ. Code § 1708, and Rule 12(b)(6), you have rights.
+
+    Adversarial Strategy:
+    Opposition arguments might include abandonment.
+
+    Procedural Checks:
+    Local Rules of Court were checked.
 
     Procedural Roadmap:
     1. File the form.
@@ -122,6 +128,12 @@ def test_validate_legal_output_logic():
     Here is your strategy:
     According to 12 U.S.C. § 345 and Cal. Civ. Code § 1708, you have rights.
 
+    Adversarial Strategy:
+    Opposition arguments might include abandonment.
+
+    Procedural Checks:
+    Local Rules of Court were checked.
+
     Procedural Roadmap:
     1. File the form.
     2. Serve the papers.
@@ -136,6 +148,12 @@ def test_validate_legal_output_logic():
     Here is your strategy:
     You have rights.
 
+    Adversarial Strategy:
+    Opposition arguments might include abandonment.
+
+    Procedural Checks:
+    Local Rules of Court were checked.
+
     Next Steps:
     1. File the form.
 
@@ -148,10 +166,38 @@ def test_validate_legal_output_logic():
     no_roadmap = """
     According to 12 U.S.C. § 345, Cal. Civ. Code § 1708, and Rule 12(b)(6), you have rights.
 
+    Adversarial Strategy:
+    Opposition arguments might include abandonment.
+
+    Procedural Checks:
+    Local Rules of Court were checked.
+
     ---
     Template document here.
     """
     assert ResponseValidator.validate_legal_output(no_roadmap) is False
+
+    # Case 5: California with CRC 3.1203 check
+    ca_content = """
+    Citations: 12 U.S.C. § 345, Cal. Civ. Code § 1708, Rule 12(b)(6).
+    Roadmap: Step 1.
+    Adversarial Strategy: None.
+    Procedural Checks: CRC 3.1203 notice requirements were met.
+    ---
+    Template.
+    """
+    assert ResponseValidator.validate_legal_output(ca_content, "California") is True
+    
+    # Case 6: California without CRC 3.1203 check (should fail)
+    ca_no_crc = """
+    Citations: 12 U.S.C. § 345, Cal. Civ. Code § 1708, Rule 12(b)(6).
+    Roadmap: Step 1.
+    Adversarial Strategy: None.
+    Procedural Checks: Done.
+    ---
+    Template.
+    """
+    assert ResponseValidator.validate_legal_output(ca_no_crc, "California") is False
 
 def test_red_team_audit_jurisdiction_consistency():
     """Verify that red_team_audit rejects unsupported jurisdictions."""

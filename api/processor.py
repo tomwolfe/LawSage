@@ -230,7 +230,7 @@ class ResponseValidator:
         return f"{final_strategy}\n\n---\n\n{filings_part}"
 
     @classmethod
-    def validate_legal_output(cls, content: Union[str, dict]) -> bool:
+    def validate_legal_output(cls, content: Union[str, dict], jurisdiction: str = None) -> bool:
         """
         Validates AI-generated legal content for structural and procedural completeness.
         Returns True if content meets reliability standards, False otherwise.
@@ -259,35 +259,51 @@ class ResponseValidator:
 
                     # Check that we have procedural checks
                     has_procedural_checks = len(parsed_data.procedural_checks) > 0
+                    
+                    # Check for CRC 3.1203 if California
+                    has_ca_notice = True
+                    if jurisdiction and ("california" in jurisdiction.lower() or jurisdiction.lower() == "ca"):
+                        content_lower = content.lower()
+                        has_ca_notice = "crc 3.1203" in content_lower
 
-                    return has_citations and has_roadmap and has_adversarial and has_procedural_checks
+                    return has_citations and has_roadmap and has_adversarial and has_procedural_checks and has_ca_notice
                 except json.JSONDecodeError:
                     # If it's not valid JSON, try to parse it as the old format
-                    return cls._validate_legal_output_legacy(content)
+                    return cls._validate_legal_output_legacy(content, jurisdiction)
             else:
                 # If it doesn't look like JSON, treat as legacy format
-                return cls._validate_legal_output_legacy(content)
+                return cls._validate_legal_output_legacy(content, jurisdiction)
         elif isinstance(content, dict):
-            parsed_data = LegalOutput.model_validate(content)
+            try:
+                parsed_data = LegalOutput.model_validate(content)
 
-            # Check that we have at least 3 citations
-            has_citations = len(parsed_data.citations) >= 3
+                # Check that we have at least 3 citations
+                has_citations = len(parsed_data.citations) >= 3
 
-            # Check that we have a roadmap with at least one item
-            has_roadmap = len(parsed_data.roadmap) > 0
+                # Check that we have a roadmap with at least one item
+                has_roadmap = len(parsed_data.roadmap) > 0
 
-            # Check that we have an adversarial strategy
-            has_adversarial = bool(parsed_data.adversarial_strategy and parsed_data.adversarial_strategy.strip())
+                # Check that we have an adversarial strategy
+                has_adversarial = bool(parsed_data.adversarial_strategy and parsed_data.adversarial_strategy.strip())
 
-            # Check that we have procedural checks
-            has_procedural_checks = len(parsed_data.procedural_checks) > 0
+                # Check that we have procedural checks
+                has_procedural_checks = len(parsed_data.procedural_checks) > 0
+                
+                # Check for CRC 3.1203 if California
+                has_ca_notice = True
+                if jurisdiction and ("california" in jurisdiction.lower() or jurisdiction.lower() == "ca"):
+                    # Check in strategy, adversarial_strategy, and filing_template
+                    content_str = f"{parsed_data.strategy} {parsed_data.adversarial_strategy} {parsed_data.filing_template}"
+                    has_ca_notice = "crc 3.1203" in content_str.lower()
 
-            return has_citations and has_roadmap and has_adversarial and has_procedural_checks
+                return has_citations and has_roadmap and has_adversarial and has_procedural_checks and has_ca_notice
+            except Exception:
+                return False
         else:
             raise ValueError("Content must be a string or dictionary")
 
     @classmethod
-    def _validate_legal_output_legacy(cls, content: str) -> bool:
+    def _validate_legal_output_legacy(cls, content: str, jurisdiction: str = None) -> bool:
         """
         Legacy validation method for backward compatibility.
         """
@@ -338,8 +354,13 @@ class ResponseValidator:
         # Check for Procedural Checks
         procedural_keywords = ["Procedural Checks", "Local Rules of Court", "Procedural technicality"]
         has_procedural = any(kw.lower() in content.lower() for kw in procedural_keywords)
+        
+        # Check for CRC 3.1203 if California
+        has_ca_notice = True
+        if jurisdiction and ("california" in jurisdiction.lower() or jurisdiction.lower() == "ca"):
+            has_ca_notice = "crc 3.1203" in content.lower()
 
-        return has_citations and has_roadmap and has_adversarial and has_procedural
+        return has_citations and has_roadmap and has_adversarial and has_procedural and has_ca_notice
 
     @classmethod
     def parse_to_dict(cls, text: str) -> Dict[str, str]:

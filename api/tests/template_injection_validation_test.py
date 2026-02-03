@@ -17,24 +17,30 @@ def sample_request():
 
 @pytest.fixture
 def mock_api_key():
-    return "AIza-valid-test-key"
+    return "AIza-valid-test-key-long-enough"
 
 def test_server_side_validation_includes_injected_template_structure(sample_request, mock_api_key):
     """Test that the generated LegalOutput contains the injected template structure."""
+    from api.models import LegalResult, Source
     with patch('api.workflow.LawSageWorkflow.invoke') as mock_invoke:
         # Mock the workflow response to include template content
-        mock_result = MagicMock()
-        mock_result.text = """
+        mock_text = """
 LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se.
 This is legal information, not legal advice. Always consult with a qualified attorney.
 
-STRATEGY:
-Based on your situation, you should consider filing a motion to dismiss.
-
-ROADMAP:
-1. Draft the motion to dismiss
-2. File the motion with the court
-3. Serve the opposing party
+    STRATEGY:
+    Based on your situation, you should consider filing a motion to dismiss.
+    
+    OPPOSITION VIEW (RED-TEAM ANALYSIS):
+    The opposition may argue that the motion is premature.
+    
+    PROCEDURAL CHECKS:
+    Checked local rules of court, specifically CRC 3.1203 for notice.
+    
+    ROADMAP:
+    1. Draft the motion to dismiss
+    2. File the motion with the court
+    3. Serve the opposing party
 
 CITATIONS:
 - 12 U.S.C. § 345
@@ -49,7 +55,10 @@ FILING TEMPLATE:
 
 Plaintiff respectfully moves this Court to dismiss the complaint...
 """
-        mock_result.sources = [{"title": "Sample Legal Resource", "uri": "https://example.com"}]
+        mock_result = LegalResult(
+            text=mock_text,
+            sources=[Source(title="Sample Legal Resource", uri="https://example.com")]
+        )
         mock_invoke.return_value = mock_result
         
         response = client.post(
@@ -214,7 +223,7 @@ def test_cosine_similarity_calculation():
     from api.workflow import cosine_similarity
     
     # Test identical strings
-    assert cosine_similarity("hello world", "hello world") == 1.0
+    assert cosine_similarity("hello world", "hello world") == pytest.approx(1.0)
     
     # Test completely different strings
     assert cosine_similarity("hello", "goodbye") == 0.0

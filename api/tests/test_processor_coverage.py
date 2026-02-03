@@ -23,6 +23,8 @@ def test_response_validator_with_dict_input():
     input_dict = {
         "disclaimer": "LEGAL DISCLAIMER: This is legal information...",
         "strategy": "Strategy content...",
+        "adversarial_strategy": "Adversarial content...",
+        "procedural_checks": ["Check 1"],
         "roadmap": roadmap_items,
         "filing_template": "Filing template content...",
         "citations": citations,
@@ -53,6 +55,8 @@ def test_response_validator_with_insufficient_citations():
     input_dict = {
         "disclaimer": "LEGAL DISCLAIMER: This is legal information...",
         "strategy": "Strategy content...",
+        "adversarial_strategy": "Adversarial content...",
+        "procedural_checks": ["Check 1"],
         "roadmap": [{"step": 1, "title": "Step 1", "description": "Description 1"}],
         "filing_template": "Filing template content...",
         "citations": [{"text": "12 U.S.C. § 345", "source": "USC", "url": "https://example.com/1"}],  # Only 1 citation
@@ -101,6 +105,8 @@ def test_validate_legal_output_with_dict_input():
     input_dict = {
         "disclaimer": "LEGAL DISCLAIMER: This is legal information...",
         "strategy": "Strategy content...",
+        "adversarial_strategy": "Adversarial content...",
+        "procedural_checks": ["Check 1"],
         "roadmap": [StrategyItem(step=1, title="Step 1", description="Description 1")],
         "filing_template": "Filing template content...",
         "citations": [
@@ -120,6 +126,8 @@ def test_validate_legal_output_with_insufficient_citations_dict():
     input_dict = {
         "disclaimer": "LEGAL DISCLAIMER: This is legal information...",
         "strategy": "Strategy content...",
+        "adversarial_strategy": "Adversarial content...",
+        "procedural_checks": ["Check 1"],
         "roadmap": [StrategyItem(step=1, title="Step 1", description="Description 1")],
         "filing_template": "Filing template content...",
         "citations": [Citation(text="12 U.S.C. § 345", source="USC", url="https://example.com/1")],  # Only 1 citation
@@ -135,6 +143,8 @@ def test_validate_legal_output_with_no_roadmap():
     input_dict = {
         "disclaimer": "LEGAL DISCLAIMER: This is legal information...",
         "strategy": "Strategy content...",
+        "adversarial_strategy": "Adversarial content...",
+        "procedural_checks": ["Check 1"],
         "roadmap": [],  # No roadmap items
         "filing_template": "Filing template content...",
         "citations": [
@@ -154,6 +164,8 @@ def test_validate_and_fix_with_estimated_time_and_documents():
     input_dict = {
         "disclaimer": "LEGAL DISCLAIMER: This is legal information...",
         "strategy": "Strategy content...",
+        "adversarial_strategy": "Adversarial content...",
+        "procedural_checks": ["Check 1"],
         "roadmap": [{
             "step": 1,
             "title": "Step 1",
@@ -199,6 +211,8 @@ def test_validate_and_fix_with_existing_disclaimer():
     input_dict = {
         "disclaimer": "LEGAL DISCLAIMER: This is legal information...",
         "strategy": text_with_disclaimer,
+        "adversarial_strategy": "Adversarial content...",
+        "procedural_checks": ["Check 1"],
         "roadmap": [{"step": 1, "title": "Step 1", "description": "Description 1"}],
         "filing_template": "Filing template content...",
         "citations": [

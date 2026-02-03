@@ -76,14 +76,16 @@ export function validateCitations(text: string): boolean {
 /**
  * Validates the overall structure of the legal response
  * @param text The response text to validate
+ * @param jurisdiction The jurisdiction for context-specific validation
  * @returns Object with validation results for different sections
  */
-export function validateLegalStructure(text: string): {
+export function validateLegalStructure(text: string, jurisdiction?: string): {
   hasDisclaimer: boolean;
   hasCitations: boolean;
   hasRoadmap: boolean;
   hasStrategy: boolean;
   hasFilingTemplate: boolean;
+  hasLocalRules?: boolean;
   isValid: boolean;
 } {
   if (!text || typeof text !== 'string') {
@@ -105,7 +107,12 @@ export function validateLegalStructure(text: string): {
   const hasStrategy = lowerText.includes('strategy') || lowerText.includes('analysis');
   const hasFilingTemplate = lowerText.includes('filing template') || lowerText.includes('template') || lowerText.includes('form');
 
-  const isValid = hasDisclaimer && hasCitations && hasRoadmap;
+  let hasLocalRules = true;
+  if (jurisdiction?.toLowerCase().includes('california') || jurisdiction?.toLowerCase().includes('ca')) {
+    hasLocalRules = lowerText.includes('crc 3.1203');
+  }
+
+  const isValid = hasDisclaimer && hasCitations && hasRoadmap && hasLocalRules;
 
   return {
     hasDisclaimer,
@@ -113,6 +120,7 @@ export function validateLegalStructure(text: string): {
     hasRoadmap,
     hasStrategy,
     hasFilingTemplate,
+    hasLocalRules,
     isValid
   };
 }
