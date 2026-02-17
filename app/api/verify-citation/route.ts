@@ -16,6 +16,20 @@ interface CitationVerificationResponse {
   verification_source: string;
   status_message: string;
   details?: string;
+  cached?: boolean; // Indicates if result was from cache
+}
+
+// Cache key generator
+function generateCacheKey(citation: string, jurisdiction: string, subject_matter?: string): string {
+  return `citation_verify:${jurisdiction}:${subject_matter || 'general'}:${citation}`;
+}
+
+// Session cache with TTL (1 hour)
+const CITATION_CACHE_TTL = 60 * 60 * 1000; // 1 hour in milliseconds
+
+interface CacheEntry {
+  result: CitationVerificationResponse;
+  timestamp: number;
 }
 
 export async function POST(req: NextRequest) {
@@ -40,10 +54,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Check session storage cache first (client-side will handle localStorage)
+    // For edge runtime, we'll rely on client-side caching primarily
+    // But we can still check if the client sent a cache header
+    
+    const cacheKey = generateCacheKey(citation, jurisdiction, subject_matter);
+    const ifNoneMatch = req.headers.get('If-None-Match');
+    
+    // If client sends ETag/cache key, check if we have a cached response
+    if (ifNoneMatch === cacheKey) {
+      const cacheControl = req.headers.get('Cache-Control');
+      if (cacheControl && cacheControl.includes('no-cache')) {
+        // Client explicitly requested fresh data
+        console.log('Cache bypass requested by client');
+      } else {
+        // In a real implementation, we'd check a distributed cache here
+        // For now, we'll let the client handle localStorage caching
+        console.log('Cache key provided, but relying on client-side cache');
+      }
+    }
+
     // Get API key from headers or environment variables
     const xGeminiApiKey = req.headers.get('X-Gemini-API-Key');
     const apiKey = xGeminiApiKey || process.env.GEMINI_API_KEY;
-    
+
     if (!apiKey) {
       return new Response(
         JSON.stringify({ error: 'Server configuration error: API key missing' }),
@@ -138,10 +172,16 @@ export async function POST(req: NextRequest) {
       };
     }
 
-    // Return the verification result
-    return new Response(JSON.stringify(verificationResult), {
+    // Return the verification result with cache headers
+    const responseBody = JSON.stringify(verificationResult);
+    
+    return new Response(responseBody, {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=3600', // Cache for 1 hour
+        'ETag': `"${cacheKey}"`, // Use cache key as ETag
+      },
     });
   } catch (error: unknown) {
     console.error('Error verifying citation:', error);

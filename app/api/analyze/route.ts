@@ -72,6 +72,170 @@ function cosineSimilarity(text1: string, text2: string): number {
   return dotProduct / (magnitude1 * magnitude2);
 }
 
+/**
+ * Calculate keyword overlap score between user input and template keywords.
+ * Prioritizes exact legal term matches over semantic similarity.
+ */
+function keywordOverlapScore(userInput: string, templateKeywords: string[]): number {
+  if (!templateKeywords || templateKeywords.length === 0) return 0;
+  
+  const userInputLower = userInput.toLowerCase();
+  const userTokens = new Set(userInputLower.split(/\W+/));
+  
+  let matchedKeywords = 0;
+  
+  for (const keyword of templateKeywords) {
+    const keywordLower = keyword.toLowerCase();
+    if (userTokens.has(keywordLower) || userInputLower.includes(keywordLower)) {
+      matchedKeywords++;
+    }
+  }
+  
+  return matchedKeywords / templateKeywords.length;
+}
+
+/**
+ * Check if user input contains emergency legal keywords.
+ * Emergency keywords force high-priority template matching.
+ */
+function hasEmergencyKeywords(userInput: string): boolean {
+  const emergencyKeywords = [
+    "eviction", "lockout", "changed locks", "locked out",
+    "emergency", "immediate", "urgent", "right now", "today",
+    "shut off", "utilities", "no water", "no electricity",
+    "domestic violence", "restraining order", "protective order"
+  ];
+  
+  const userInputLower = userInput.toLowerCase();
+  return emergencyKeywords.some(keyword => userInputLower.includes(keyword));
+}
+
+/**
+ * Find the best matching template using enhanced keyword overlap prioritization.
+ * Emergency keywords (eviction, lockout) force high-priority template matching.
+ */
+function findBestTemplate(userInput: string, templates: any[]): { template: any | null, isEmergency: boolean } {
+  // Check for emergency keywords - force lockout template if detected
+  if (hasEmergencyKeywords(userInput)) {
+    for (const template of templates) {
+      const templateTitle = template.title?.toLowerCase() || '';
+      const templatePath = template.templatePath?.toLowerCase() || '';
+      
+      if (templateTitle.includes('lockout') || templatePath.includes('lockout') || templateTitle.includes('emergency')) {
+        console.log(`Emergency keywords detected, forcing template: ${template.title}`);
+        return { template, isEmergency: true };
+      }
+    }
+  }
+  
+  let bestMatch = null;
+  let highestSimilarity = 0;
+  
+  // Legal keyword boost list
+  const legalBoostKeywords = [
+    'motion', 'complaint', 'answer', 'discovery', 'subpoena',
+    'eviction', 'unlawful detainer', 'foreclosure', 'bankruptcy',
+    'custody', 'divorce', 'restraining order', 'guardianship',
+    'contract', 'breach', 'damages', 'injunction'
+  ];
+
+  for (const template of templates) {
+    // Calculate keyword overlap score (prioritized)
+    const templateKeywords = template.keywords || [];
+    const keywordScore = keywordOverlapScore(userInput, templateKeywords);
+    
+    // Calculate similarity with title
+    const titleSimilarity = cosineSimilarity(userInput.toLowerCase(), template.title?.toLowerCase() || '');
+    
+    // Calculate similarity with description
+    const descSimilarity = cosineSimilarity(userInput.toLowerCase(), template.description?.toLowerCase() || '');
+    
+    // Boost score if template title contains legal keywords that match user input
+    let titleBoost = 0;
+    const templateTitle = template.title?.toLowerCase() || '';
+    for (const legalKeyword of legalBoostKeywords) {
+      if (userInput.toLowerCase().includes(legalKeyword) && templateTitle.includes(legalKeyword)) {
+        titleBoost = 0.2; // 20% boost for legal keyword match
+        break;
+      }
+    }
+    
+    // Weighted combination: keyword overlap (50%), title (30%), description (20%)
+    const combinedSimilarity = (keywordScore * 0.5) + (titleSimilarity * 0.3) + (descSimilarity * 0.2) + titleBoost;
+    
+    if (combinedSimilarity > highestSimilarity) {
+      highestSimilarity = combinedSimilarity;
+      bestMatch = template;
+    }
+  }
+  
+  return { 
+    template: (bestMatch && highestSimilarity > 0.1) ? bestMatch : null,
+    isEmergency: false
+  };
+}
+
+/**
+ * Generic fallback template when no specific match is found.
+ */
+const GENERIC_MOTION_TEMPLATE = `# GENERIC MOTION TEMPLATE
+
+## CAPTION
+[Your Name], Plaintiff/Petitioner,
+v.
+[Opposing Party Name], Defendant/Respondent.
+
+Case No.: [CASE NUMBER]
+Court: [COURT NAME]
+County: [COUNTY]
+State: [STATE]
+
+## MOTION TO [RELIEF REQUESTED]
+
+TO THE HONORABLE COURT AND THE OPPOSING PARTY:
+
+COMES NOW the Plaintiff/Petitioner, [Your Name], pro se, and moves this Honorable Court for an Order [DESCRIBE RELIEF]. In support of this Motion, the Plaintiff states as follows:
+
+### I. INTRODUCTION
+1. This is a [TYPE OF CASE] action brought by the Plaintiff against the Defendant.
+2. The Plaintiff seeks [SPECIFIC RELIEF] based on the following facts and legal authorities.
+
+### II. FACTUAL BACKGROUND
+[Provide a clear, concise statement of the relevant facts. Include dates, locations, and key events.]
+
+### III. LEGAL ARGUMENT
+#### A. [First Legal Point]
+[State your first legal argument with supporting citations]
+
+#### B. [Second Legal Point]
+[State your second legal argument with supporting citations]
+
+### IV. CONCLUSION
+For the foregoing reasons, the Plaintiff respectfully requests that this Court grant this Motion and provide the relief requested.
+
+Respectfully submitted,
+
+[Your Name]
+[Your Address]
+[Your Phone Number]
+[Your Email]
+
+## CERTIFICATE OF SERVICE
+I hereby certify that on [DATE], I served a copy of this Motion on [OPPOSING PARTY] by [METHOD OF SERVICE].
+
+_______________________
+[Your Signature]
+
+## REQUIRED FORMS
+- [ ] Civil Case Cover Sheet (Form CM-010)
+- [ ] Notice of Motion (Form MC-030)
+- [ ] Memorandum of Points and Authorities
+- [ ] Declaration in Support (Form MC-031)
+- [ ] Proposed Order
+
+**Note:** This is a generic template. Please consult your local court rules and consider seeking legal advice for your specific situation.
+`;
+
 // System instruction for the model
 const SYSTEM_INSTRUCTION = `
 You are a Universal Public Defender helping pro se litigants (people representing themselves).
@@ -165,8 +329,8 @@ export async function POST(req: NextRequest) {
 
     // Template injection: Find the best matching template for the user's input
     let templateContent = '';
-    const isEmergency = user_input.toLowerCase().includes('lockout') || user_input.toLowerCase().includes('changed locks');
-    
+    const isEmergency = hasEmergencyKeywords(user_input);
+
     // Fetch Ex Parte rules if it's an emergency
     let exParteRulesText = "";
     if (isEmergency) {
@@ -181,60 +345,32 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (isEmergency) {
-      const { searchExParteRules } = await import('../../../src/utils/legal-lookup');
-      const exParteRules = await searchExParteRules(jurisdiction);
-      if (exParteRules.length > 0) {
-        exParteRulesText = "EX PARTE NOTICE RULES FOR THIS JURISDICTION:\n";
-        exParteRules.forEach(rule => {
-          exParteRulesText += `- ${rule.courthouse}: Notice due by ${rule.notice_time}. Rule: ${rule.rule}\n`;
-        });
-        exParteRulesText += "\n";
-      }
-      
-      // Force high-priority template for lockouts
-      try {
-        const templateResponse = await fetch(`${req.nextUrl.origin}/templates/lockout-emergency-pack.md`);
-        if (templateResponse.ok) {
-          templateContent = await templateResponse.text();
-        }
-      } catch (e) { console.error("Emergency template fetch failed", e); }
-    }
-
-    if (!templateContent) {
-      try {
-        const manifestResponse = await fetch(`${req.nextUrl.origin}/templates/manifest.json`);
-        if (manifestResponse.ok) {
-          const manifest = await manifestResponse.json();
-          const templates = manifest.templates || [];
-
-          let bestMatch = null;
-          let highestSimilarity = -1;
-
-          for (const template of templates) {
-            const titleSimilarity = cosineSimilarity(user_input.toLowerCase(), template.title.toLowerCase());
-            const descSimilarity = cosineSimilarity(user_input.toLowerCase(), template.description.toLowerCase());
-            const keywordsText = template.keywords.join(' ');
-            const keywordsSimilarity = cosineSimilarity(user_input.toLowerCase(), keywordsText.toLowerCase());
-            const combinedSimilarity = (titleSimilarity * 0.4) + (descSimilarity * 0.3) + (keywordsSimilarity * 0.3);
-
-            if (combinedSimilarity > highestSimilarity) {
-              highestSimilarity = combinedSimilarity;
-              bestMatch = template;
-            }
+    // Use enhanced template matching
+    try {
+      const manifestResponse = await fetch(`${req.nextUrl.origin}/templates/manifest.json`);
+      if (manifestResponse.ok) {
+        const manifest = await manifestResponse.json();
+        const templates = manifest.templates || [];
+        
+        const { template: bestMatch, isEmergency: emergencyMatch } = findBestTemplate(user_input, templates);
+        
+        if (bestMatch) {
+          const templatePath = bestMatch.templatePath;
+          const templateResponse = await fetch(`${req.nextUrl.origin}${templatePath}`);
+          if (templateResponse.ok) {
+            templateContent = await templateResponse.text();
+            console.log(`Using template: ${bestMatch.title}`);
           }
-
-          if (bestMatch && highestSimilarity > 0.1) {
-            const templatePath = bestMatch.templatePath;
-            const templateResponse = await fetch(`${req.nextUrl.origin}${templatePath}`);
-            if (templateResponse.ok) {
-              templateContent = await templateResponse.text();
-            }
-          }
+        } else {
+          // Fallback to generic template
+          templateContent = GENERIC_MOTION_TEMPLATE;
+          console.log('No template match found, using generic motion template');
         }
-      } catch (error) {
-        console.warn('Template matching failed:', error);
       }
+    } catch (error) {
+      console.warn('Template matching failed:', error);
+      // Fallback to generic template on error
+      templateContent = GENERIC_MOTION_TEMPLATE;
     }
 
     if (!xGeminiApiKey) {

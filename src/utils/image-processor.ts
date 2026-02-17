@@ -4,15 +4,15 @@
 /**
  * Resizes and compresses an image using the Canvas API with optional grayscaling
  * @param file The image file to process
- * @param maxWidth Maximum width for the resized image (default: 1200)
- * @param quality Quality factor for JPEG compression (default: 0.7)
+ * @param maxWidth Maximum width for the resized image (default: 800)
+ * @param quality Quality factor for JPEG compression (default: 0.6)
  * @param grayscale Whether to apply grayscale filter (default: true)
  * @returns Promise resolving to a base64-encoded string of the processed image
  */
 export async function resizeAndCompressImage(
   file: File,
-  maxWidth: number = 1200,  // Reduced from 1600 to 1200 as per requirements
-  quality: number = 0.7,
+  maxWidth: number = 800,  // Reduced from 1200 to 800px for OCR optimization
+  quality: number = 0.6,   // Starting quality for OCR
   grayscale: boolean = true  // Added grayscale option
 ): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -122,29 +122,31 @@ export function isImageTooLarge(base64String: string, maxSize: number = 4.5 * 10
 
 /**
  * Processes an image file by resizing and compressing it to fit within size limits
+ * Implements progressive quality drop to prevent Vercel timeout issues
  * @param file The image file to process
  * @param maxSize Maximum allowed size in bytes (default: 4.5MB)
- * @param maxWidth Maximum width for the resized image (default: 1200)
+ * @param maxWidth Maximum width for the resized image (default: 800)
  * @returns Promise resolving to a base64-encoded string of the processed image
  */
 export async function processImageForOCR(
   file: File,
   maxSize: number = 4.5 * 1024 * 1024,
-  maxWidth: number = 1200  // Updated to 1200px as per requirements
+  maxWidth: number = 800  // Updated to 800px for OCR optimization
 ): Promise<string> {
-  // First, try with default quality and grayscale enabled
-  let processedImage = await resizeAndCompressImage(file, maxWidth, 0.7, true);
+  // Progressive quality drop strategy to prevent timeouts
+  // Start at 0.6 quality, drop to 0.4 if > 2MB, drop to 0.2 if > 1MB
+  let quality = 0.6;
+  let processedImage = await resizeAndCompressImage(file, maxWidth, quality, true);
 
-  // Check if it's still too large
-  if (isImageTooLarge(processedImage, maxSize)) {
-    // Try with lower quality and grayscale
-    processedImage = await resizeAndCompressImage(file, maxWidth, 0.5, true);
+  // Check if image is too large and apply progressive quality drop
+  if (getImageSize(processedImage) > 2 * 1024 * 1024) {
+    quality = 0.4;
+    processedImage = await resizeAndCompressImage(file, maxWidth, quality, true);
   }
 
-  // Check again
-  if (isImageTooLarge(processedImage, maxSize)) {
-    // Try with even lower quality and grayscale
-    processedImage = await resizeAndCompressImage(file, maxWidth, 0.3, true);
+  if (getImageSize(processedImage) > 1 * 1024 * 1024) {
+    quality = 0.2;
+    processedImage = await resizeAndCompressImage(file, maxWidth, quality, true);
   }
 
   // Final check - if still too large, throw an error
@@ -153,6 +155,34 @@ export async function processImageForOCR(
   }
 
   return processedImage;
+}
+
+/**
+ * Checks if an image file is too large before processing
+ * Provides early warning to users about large images
+ * @param file The image file to check
+ * @param maxSize Maximum allowed size in bytes (default: 4.5MB)
+ * @returns Boolean indicating if the image exceeds the size limit
+ */
+export function isFileTooLarge(file: File, maxSize: number = 4.5 * 1024 * 1024): boolean {
+  return file.size > maxSize;
+}
+
+/**
+ * Gets a user-friendly warning message for large images
+ * @param file The image file to check
+ * @returns Warning message if image is large, empty string otherwise
+ */
+export function getLargeImageWarning(file: File): string {
+  const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+  
+  if (file.size > 4.5 * 1024 * 1024) {
+    return `Warning: This image is ${sizeMB} MB. Images over 4.5 MB may fail to process. Consider using a smaller image.`;
+  } else if (file.size > 2 * 1024 * 1024) {
+    return `Note: This image is ${sizeMB} MB. Processing may take a few seconds.`;
+  }
+  
+  return '';
 }
 
 /**

@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Union
+from typing import Dict, Union, Tuple
 from api.schemas import LegalOutput
 
 class ResponseValidator:
@@ -11,6 +11,97 @@ class ResponseValidator:
     )
 
     NO_FILINGS_MSG = "No filings generated. Please try a more specific request or check the strategy tab."
+
+    @classmethod
+    def get_validation_errors(cls, content: Union[str, dict]) -> Tuple[bool, list]:
+        """
+        Returns a tuple of (is_valid, list_of_errors).
+        Checks for all validation requirements and returns specific error messages.
+        """
+        errors = []
+        
+        # Parse the content if it's a string
+        if isinstance(content, str):
+            content_stripped = content.strip()
+            if content_stripped.startswith('{') or content_stripped.startswith('['):
+                try:
+                    parsed_data = LegalOutput.model_validate_json(content)
+                except json.JSONDecodeError:
+                    errors.append("Invalid JSON format")
+                    return False, errors
+            else:
+                # Legacy format - use text-based validation
+                return cls._get_validation_errors_legacy(content)
+        elif isinstance(content, dict):
+            parsed_data = LegalOutput.model_validate(content)
+        else:
+            errors.append("Content must be a string or dictionary")
+            return False, errors
+        
+        # Check citations
+        if len(parsed_data.citations) < 3:
+            errors.append(f"Missing citations: Found {len(parsed_data.citations)}, need at least 3")
+        
+        # Check roadmap
+        if not parsed_data.roadmap or len(parsed_data.roadmap) == 0:
+            errors.append("Missing roadmap/next steps section")
+        
+        # Check adversarial strategy
+        if not parsed_data.adversarial_strategy or not parsed_data.adversarial_strategy.strip():
+            errors.append("Missing adversarial strategy (red-team analysis)")
+        elif len(parsed_data.adversarial_strategy.strip()) < 50:
+            errors.append("Adversarial strategy is too brief (must be substantial)")
+        
+        # Check procedural checks
+        if not parsed_data.procedural_checks or len(parsed_data.procedural_checks) == 0:
+            errors.append("Missing procedural checks against Local Rules of Court")
+        
+        # Check local logistics
+        if not parsed_data.local_logistics:
+            errors.append("Missing local logistics (courthouse info)")
+        
+        return len(errors) == 0, errors
+
+    @classmethod
+    def _get_validation_errors_legacy(cls, content: str) -> Tuple[bool, list]:
+        """
+        Legacy validation for text-based output.
+        """
+        errors = []
+        
+        # Check for citations
+        import re
+        citation_patterns = [
+            r"\d+\s+[A-Z]\.[A-Z]\.[A-Z]\.?\s+§?\s*\d+",
+            r"[A-Z][a-z]+\.?\s+[Cc]ode\s+§?\s*\d+",
+            r"[Rr]ule\s+\d+\(?[a-z]?\)?",
+            r"Section\s+\d+",
+        ]
+        
+        all_matches = set()
+        for pattern in citation_patterns:
+            matches = re.findall(pattern, content)
+            all_matches.update(matches)
+        
+        if len(all_matches) < 3:
+            errors.append(f"Missing citations: Found {len(all_matches)}, need at least 3")
+        
+        # Check for roadmap
+        roadmap_keywords = ["Next Steps", "Roadmap", "Procedural Roadmap", "What to do next"]
+        if not any(kw.lower() in content.lower() for kw in roadmap_keywords):
+            errors.append("Missing roadmap/next steps section")
+        
+        # Check for adversarial strategy
+        adversarial_keywords = ["Adversarial Strategy", "Opposition View", "Red-Team Analysis"]
+        if not any(kw.lower() in content.lower() for kw in adversarial_keywords):
+            errors.append("Missing adversarial strategy (red-team analysis)")
+        
+        # Check for procedural checks
+        procedural_keywords = ["Procedural Checks", "Local Rules of Court"]
+        if not any(kw.lower() in content.lower() for kw in procedural_keywords):
+            errors.append("Missing procedural checks")
+        
+        return len(errors) == 0, errors
 
     @classmethod
     def validate_and_fix(cls, content: Union[str, dict]) -> str:
