@@ -23,7 +23,7 @@ function getTimeBasedSalt(): string {
  */
 async function getKVClient() {
   try {
-    // @ts-ignore - optional dependency
+    // @ts-expect-error - optional dependency
     const kvModule = await import('@vercel/kv').catch(() => null);
     if (kvModule && kvModule.kv) {
       return kvModule.kv as any;

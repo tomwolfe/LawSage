@@ -11,7 +11,7 @@ import ResultDisplay from './ResultDisplay';
 import HistoryActions from './HistoryActions';
 import ApiKeyModal from './ApiKeyModal';
 import { checkClientSideRateLimit, generateClientFingerprint } from '../lib/rate-limiter-client';
-import { safeError } from '../lib/pii-redactor';
+import { safeError, safeWarn } from '../lib/pii-redactor';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
