@@ -3,7 +3,6 @@ import { GoogleGenAI } from '@google/genai';
 import { SafetyValidator, ResponseValidator } from '../../../lib/validation';
 import { safeLog, safeError, safeWarn, redactPII } from '../../../lib/pii-redactor';
 import { withRateLimit } from '../../../lib/rate-limiter';
-import { orchestrateLegalResearch } from '../../../lib/search-orchestration';
 import { getLegalLookupResponse, searchExParteRules } from '../../../src/utils/legal-lookup';
 
 // Define types
@@ -11,6 +10,7 @@ interface LegalRequest {
   user_input: string;
   jurisdiction: string;
   documents?: string[];
+  images?: string[]; // Base64 encoded images for unified multimodal analysis
 }
 
 interface StandardErrorResponse {
@@ -348,7 +348,15 @@ _______________________
 // System instruction for the model
 const SYSTEM_INSTRUCTION = `
 You are a Universal Public Defender helping pro se litigants (people representing themselves).
-You MUST perform a comprehensive analysis that batches three critical areas into a SINGLE response:
+You MUST perform a comprehensive analysis that batches three critical areas into a SINGLE response.
+
+CRITICAL: You have the ability to see and analyze images directly. When images are provided:
+- Analyze the visual content of each image to extract facts, case numbers, court names, and jurisdiction data.
+- Look for document layouts, seals, signatures, and formatting that indicate document type.
+- Cross-reference information across multiple images to build a complete case picture.
+- Extract text AND interpret visual context (e.g., a stamped "FILED" date, handwritten notes, highlighted sections).
+
+You MUST:
 1. ADVERSARIAL STRATEGY: A 'red-team' analysis of the user's claims. You MUST identify at least three specific weaknesses or potential opposition arguments. DO NOT provide placeholders like "No strategy provided" or "To be determined." If you cannot find a weakness, analyze the most likely procedural hurdles the opposition will raise.
 2. PROCEDURAL ROADMAP: A step-by-step guide on what to do next, with estimated times and required documents.
 3. LOCAL LOGISTICS: Courthouse locations, filing fees, dress codes, and hours of operation.
@@ -394,6 +402,7 @@ CRITICAL INSTRUCTIONS:
 4. Include at least 3 proper legal citations.
 5. Provide a detailed roadmap with at least 3 steps.
 6. MANDATORY: The 'adversarial_strategy' must NOT be empty or use generic placeholders. It must be a critical analysis of the specific facts provided by the user.
+7. When images are provided, analyze them directly to extract information - do NOT rely solely on extracted text.
 `;
 
 export const runtime = 'edge'; // Enable edge runtime
@@ -402,7 +411,7 @@ export async function POST(req: NextRequest) {
   // Wrap handler with rate limiting
   return withRateLimit(async () => {
     try {
-      const { user_input, jurisdiction, documents }: LegalRequest = await req.json();
+      const { user_input, jurisdiction, documents, images }: LegalRequest = await req.json();
 
       // Validate inputs
       if (!user_input?.trim()) {
@@ -498,6 +507,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      // Prepare documents text for prompt
       let documentsText = "";
       if (documents && documents.length > 0) {
         documentsText = "RELEVANT DOCUMENTS FROM VIRTUAL CASE FOLDER:\n\n";
@@ -506,67 +516,66 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // DETERMINISTIC GROUNDING: Perform multi-step legal research
-      safeLog('Starting deterministic legal research...');
-      
       // Send initial status chunk to keep connection alive
       const encoder = new TextEncoder();
-      
+
       const stream = new ReadableStream({
         async start(controller) {
           try {
-            // Send initial research status update
+            // Send initial status
             controller.enqueue(encoder.encode(JSON.stringify({
               type: 'status',
-              message: 'Conducting legal research...'
+              message: 'Analyzing documents and conducting legal research...'
             }) + '\n'));
 
-            // Heartbeat to keep connection alive during long research phase
+            // Heartbeat to keep connection alive during long processing
             const heartbeatInterval = setInterval(() => {
               controller.enqueue(encoder.encode(JSON.stringify({
                 type: 'status',
-                message: 'Searching for relevant statutes and local rules...'
+                message: 'Processing... This may take a moment.'
               }) + '\n'));
             }, 2000);
 
-            // Step 1-3: Generate queries, execute searches, format context
-            let researchContext = "";
-            try {
-              researchContext = await orchestrateLegalResearch(user_input, jurisdiction, apiKey);
-            } finally {
-              clearInterval(heartbeatInterval);
+            const client = new GoogleGenAI({ apiKey });
+
+            // Build the user prompt
+            const userPrompt = `
+${exParteRulesText}
+
+${documentsText || ''}
+
+User Situation: ${user_input}
+Jurisdiction: ${jurisdiction}
+
+${templateContent ? "Use this template as a reference for formatting: " + templateContent.substring(0, 1000) + "..." : ""}
+
+Return a SINGLE JSON response with all required sections as specified in the system instructions.
+`;
+
+            // Prepare content array - starts with text prompt
+            const contents: any[] = [userPrompt];
+
+            // Add images for unified multimodal analysis
+            if (images && images.length > 0) {
+              safeLog(`Processing ${images.length} images with unified multimodal analysis`);
+              
+              for (const base64Image of images) {
+                // Remove data URL prefix if present
+                let base64Data = base64Image;
+                if (base64Image.startsWith('data:')) {
+                  const parts = base64Image.split(',');
+                  base64Data = parts[1] || base64Image;
+                }
+
+                // Add image to contents array
+                contents.push({
+                  inlineData: {
+                    data: base64Data,
+                    mimeType: 'image/jpeg'
+                  }
+                });
+              }
             }
-            
-            // Send research complete status
-            controller.enqueue(encoder.encode(JSON.stringify({
-              type: 'status',
-              message: 'Research complete. Generating legal analysis...'
-            }) + '\n'));
-
-            const prompt = `
- ${documentsText}
- ${exParteRulesText}
-
- ${researchContext}
-
- User Situation: ${user_input}
- Jurisdiction: ${jurisdiction}
-
- You must return a SINGLE JSON object containing:
- 1. 'strategy': Overall legal strategy.
- 2. 'adversarial_strategy': Red-team analysis of weaknesses. MANDATORY: Do not use placeholders. Identify specific counter-arguments the opposition will use. CRITICAL: Must identify at least TWO fact-specific defenses based on the user's input (e.g., if user mentions a "notice," the red-team should suggest the opposition will claim it was a valid "Notice of Belief of Abandonment").
- 3. 'roadmap': Step-by-step next steps for ${jurisdiction}. If this is an emergency (e.g., lockout), include specific Ex Parte notice times from the provided rules.
- 4. 'local_logistics': Specific courthouse info for ${jurisdiction}. For LASC, prioritize Stanley Mosk Courthouse (111 N. Hill St) for housing TROs.
- 5. 'filing_template': Generate TWO distinct templates:
-    (A) The Civil Complaint (grounded in CC § 789.3 and CCP § 1160.2 if applicable). MANDATORY: When citing CC § 789.3, explicitly mention the statutory penalty structure: $250 per violation PLUS $100 per day from the date of violation (as permitted by Civil Code § 789.3(c)(3)).
-    (B) The Ex Parte Application for TRO/OSC.
-    Include explicit placeholders for required Judicial Council forms like CM-010 and MC-030.
-    ${templateContent ? "Base these on this content: " + templateContent : ""}
- 6. 'citations': At least 3 verified citations relevant to the subject matter and jurisdiction (e.g., Cal. Civ. Code § 789.3). Cite research sources as [Source X].
- 7. 'procedural_checks': Results of procedural technicality checks against Local Rules of Court. For Los Angeles County: MUST include check for mandatory e-filing requirement for civil complaints and the Ex Parte filing window (typically 8:30 AM - 10:00 AM).
-
- Return only valid JSON.
- `;
 
             // Convert Zod schema to Google's responseSchema format
             const responseSchema = {
@@ -629,21 +638,18 @@ export async function POST(req: NextRequest) {
               ]
             };
 
-            const client = new GoogleGenAI({ apiKey });
-
             // Auto-retry logic for validation failures
-            const MAX_RETRIES = 2; // Increased to 2 retries for better hardening
+            const MAX_RETRIES = 2;
             let retryCount = 0;
             let accumulatedText = '';
             let parsedOutput: LegalOutput | null = null;
-            let currentPrompt = prompt;
+            let currentContents: any[] = contents;
 
             while (retryCount <= MAX_RETRIES) {
               accumulatedText = '';
               let firstTokenReceived = false;
 
               try {
-                // Send specific status update for retries
                 if (retryCount > 0) {
                   controller.enqueue(encoder.encode(JSON.stringify({
                     type: 'status',
@@ -651,13 +657,18 @@ export async function POST(req: NextRequest) {
                   }) + '\n'));
                 }
 
+                // UNIFIED MULTIMODAL CALL with native Google Search tool
                 const result = await client.models.generateContentStream({
                   model: "gemini-2.5-flash-preview-09-2025",
-                  contents: currentPrompt,
+                  contents: currentContents,
                   config: {
                     systemInstruction: SYSTEM_INSTRUCTION,
                     responseMimeType: 'application/json',
-                    responseSchema: responseSchema
+                    responseSchema: responseSchema,
+                    // Enable native Google Search grounding
+                    tools: [{ googleSearch: {} }],
+                    temperature: 0.1,
+                    maxOutputTokens: 8192
                   }
                 });
 
@@ -666,17 +677,17 @@ export async function POST(req: NextRequest) {
                   if (chunkText) {
                     accumulatedText += chunkText;
 
-                    // Stream each chunk immediately to keep connection alive
                     if (!firstTokenReceived) {
                       firstTokenReceived = true;
                       if (retryCount === 0) {
                         controller.enqueue(encoder.encode(JSON.stringify({
                           type: 'status',
-                          message: 'Analyzing your case...'
+                          message: 'Generating legal analysis...'
                         }) + '\n'));
                       }
                     }
 
+                    // Stream each chunk immediately
                     controller.enqueue(encoder.encode(JSON.stringify({
                       type: 'chunk',
                       content: chunkText
@@ -695,9 +706,10 @@ export async function POST(req: NextRequest) {
                     safeError(`Validation failed (attempt ${retryCount + 1}/${MAX_RETRIES + 1}):`, validation.errors);
 
                     if (retryCount < MAX_RETRIES) {
-                      // Retry with focused prompt
+                      // Retry with focused prompt - rebuild contents with enhanced user prompt
                       retryCount++;
-                      currentPrompt = generateRetryPrompt(prompt, validation, accumulatedText);
+                      const retryPrompt = generateRetryPrompt(userPrompt, validation, accumulatedText);
+                      currentContents = [retryPrompt, ...contents.slice(1)]; // Keep images, replace text prompt
                       safeWarn(`Retrying generation to fix: ${validation.missingFields?.join(', ')}`);
                       continue; // Retry the loop
                     } else {
@@ -734,7 +746,8 @@ export async function POST(req: NextRequest) {
 
                   if (retryCount < MAX_RETRIES) {
                     retryCount++;
-                    currentPrompt = `${prompt}\n\nERROR: Your previous response was not valid JSON. Please respond with ONLY valid JSON matching the requested schema. Ensure all fields are present.`;
+                    const enhancedPrompt = `${userPrompt}\n\nERROR: Your previous response was not valid JSON. Please respond with ONLY valid JSON matching the requested schema. Ensure all fields are present.`;
+                    currentContents = [enhancedPrompt, ...contents.slice(1)]; // Keep images
                     continue;
                   } else {
                     // Return error response
@@ -756,7 +769,7 @@ export async function POST(req: NextRequest) {
 
                 if (retryCount < MAX_RETRIES) {
                   retryCount++;
-                  currentPrompt = prompt;
+                  currentContents = contents; // Retry with original contents
                   continue;
                 } else {
                   throw streamError; // Re-throw to be caught by outer catch

@@ -72,6 +72,41 @@ interface ResultDisplayProps {
   caseLedger: CaseLedgerEntry[];
 }
 
+// Helper function to calculate deadline from roadmap
+function calculateDeadlineFromRoadmap(roadmap: StrategyItem[] | undefined): { answerDue?: Date; daysRemaining?: number } | null {
+  if (!roadmap || roadmap.length === 0) return null;
+
+  // Look for steps that mention "answer" or "deadline"
+  const answerStep = roadmap.find(step => 
+    step.title.toLowerCase().includes('answer') || 
+    step.description.toLowerCase().includes('answer') ||
+    step.title.toLowerCase().includes('deadline')
+  );
+
+  if (!answerStep || !answerStep.estimated_time) return null;
+
+  // Parse estimated time (e.g., "30 days", "2 weeks", "within 5 days")
+  const timeMatch = answerStep.estimated_time.match(/(\d+)\s*(day|week|month)s?/i);
+  if (!timeMatch) return null;
+
+  const value = parseInt(timeMatch[1], 10);
+  const unit = timeMatch[2].toLowerCase();
+
+  const now = new Date();
+  let daysToAdd = value;
+
+  if (unit === 'week') {
+    daysToAdd = value * 7;
+  } else if (unit === 'month') {
+    daysToAdd = value * 30; // Approximate
+  }
+
+  const dueDate = new Date(now.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+  const daysRemaining = daysToAdd;
+
+  return { answerDue: dueDate, daysRemaining };
+}
+
 // Enhanced parsing function to handle both legacy and structured formats
 function parseLegalOutput(text: string): { strategy: string; filings: string; structured?: StructuredLegalOutput } {
   if (!text || typeof text !== 'string') {
@@ -590,6 +625,60 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
         ]
       }))
     );
+
+    // For California filings, add line numbers using a table structure (pleading paper format)
+    if (isCalifornia && filingsText && filingsText !== 'No filings generated.') {
+      const lines = filingsText.split('\n').slice(0, 100); // Limit to first 100 lines for performance
+      
+      // Add a table with line numbers
+      children.push(
+        new Paragraph({
+          text: "",
+          spacing: { before: 400 },
+        }),
+        new Paragraph({
+          text: "PROFESSIONAL PLEADING PAPER FORMAT (with line numbers):",
+          heading: HeadingLevel.HEADING_3,
+        }),
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          borders: {
+            top: { style: BorderStyle.NONE },
+            bottom: { style: BorderStyle.NONE },
+            left: { style: BorderStyle.NONE },
+            right: { style: BorderStyle.NONE },
+            insideHorizontal: { style: BorderStyle.NONE },
+            insideVertical: { style: BorderStyle.SINGLE, size: 1, color: "CCCCCC" },
+          },
+          rows: lines.map((line, index) => 
+            new TableRow({
+              children: [
+                new TableCell({
+                  width: { size: 8, type: WidthType.PERCENTAGE },
+                  children: [
+                    new Paragraph({
+                      text: `${index + 1}`,
+                      alignment: AlignmentType.RIGHT,
+                    }),
+                  ],
+                  borders: {
+                    right: { style: BorderStyle.SINGLE, size: 1, color: "000000" },
+                  },
+                }),
+                new TableCell({
+                  width: { size: 92, type: WidthType.PERCENTAGE },
+                  children: [
+                    new Paragraph({
+                      text: line || ' ',
+                    }),
+                  ],
+                }),
+              ],
+            })
+          ),
+        })
+      );
+    }
 
     return new Document({
       sections: [{
@@ -1125,10 +1214,74 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
 
           if (activeTab === 'survival-guide') {
             const logistics = structured?.local_logistics || {};
+            const deadlineInfo = calculateDeadlineFromRoadmap(structured?.roadmap);
 
             return (
               <div className="space-y-6">
                 <h2 className="text-2xl font-bold text-slate-800">Pro Se Survival Guide</h2>
+
+                {/* Pro Se Deadline Calculator */}
+                {deadlineInfo && deadlineInfo.daysRemaining !== undefined && (
+                  <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-xl p-6">
+                    <h3 className="font-bold text-lg text-red-800 mb-4 flex items-center gap-2">
+                      <AlertCircle size={20} />
+                      Pro Se Deadline Calculator
+                    </h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="bg-white rounded-lg p-4 border border-red-100">
+                        <div className="text-sm text-slate-500 font-medium">Days Remaining</div>
+                        <div className={`text-3xl font-bold ${deadlineInfo.daysRemaining <= 7 ? 'text-red-600 animate-pulse' : 'text-slate-800'}`}>
+                          {deadlineInfo.daysRemaining}
+                        </div>
+                        <div className="text-xs text-slate-400 mt-1">
+                          {deadlineInfo.daysRemaining <= 3 ? 'URGENT: Act now!' : deadlineInfo.daysRemaining <= 7 ? 'Time is critical' : 'Still time to prepare'}
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-lg p-4 border border-red-100">
+                        <div className="text-sm text-slate-500 font-medium">Estimated Due Date</div>
+                        <div className="text-lg font-bold text-slate-800">
+                          {deadlineInfo.answerDue?.toLocaleDateString('en-US', { 
+                            weekday: 'long',
+                            month: 'long', 
+                            day: 'numeric', 
+                            year: 'numeric' 
+                          })}
+                        </div>
+                        <div className="text-xs text-slate-400 mt-1">
+                          Based on roadmap analysis
+                        </div>
+                      </div>
+
+                      <div className="bg-white rounded-lg p-4 border border-red-100">
+                        <div className="text-sm text-slate-500 font-medium">Action Required</div>
+                        <div className="text-sm font-semibold text-slate-700">
+                          File your Answer before the deadline
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (deadlineInfo.answerDue) {
+                              addToCaseLedger('answer_due', `Answer due by ${deadlineInfo.answerDue?.toLocaleDateString()}`, deadlineInfo.answerDue);
+                            }
+                          }}
+                          className="mt-2 text-xs bg-red-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-red-700 transition-colors"
+                        >
+                          Add to Case Ledger
+                        </button>
+                      </div>
+                    </div>
+
+                    {deadlineInfo.daysRemaining <= 7 && (
+                      <div className="mt-4 bg-red-100 border border-red-300 rounded-lg p-3">
+                        <p className="text-sm text-red-800 font-semibold flex items-center gap-2">
+                          <AlertTriangle size={16} />
+                          WARNING: You have less than a week! Consider filing an Ex Parte application if the deadline is within 3 days.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">

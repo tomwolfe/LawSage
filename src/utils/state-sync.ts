@@ -338,7 +338,9 @@ export function watchStateAndSyncToUrl(getState: () => unknown, debounceMs: numb
         globalLastStateHash = currentStateHash;
       }
     } catch (error) {
-      safeError('Error in state watcher:', error);
+      // Handle errors properly - convert to Error object if needed
+      const err = error instanceof Error ? error : new Error(String(error));
+      safeError('Error in state watcher:', err);
     }
   };
 

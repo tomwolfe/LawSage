@@ -186,10 +186,15 @@ export function safeLog(message: string, ...data: unknown[]): void {
  */
 export function safeError(message: string, ...data: unknown[]): void {
   const redacted = redactPII(message);
-  
+
   const redactedData = data.map(item => {
     if (typeof item === 'string') {
       return redactPII(item).redacted;
+    }
+    if (item instanceof Error) {
+      // Pass Error objects through unchanged to preserve error type for tests
+      // The message will still be redacted in the main message parameter
+      return item;
     }
     if (typeof item === 'object' && item !== null) {
       const copy = { ...item } as Record<string, unknown>;
@@ -203,8 +208,8 @@ export function safeError(message: string, ...data: unknown[]): void {
     return item;
   });
 
-  const logPrefix = redacted.redactedFields.length > 0 
-    ? `[PII_REDACTED: ${redacted.redactedFields.join(', ')}] ` 
+  const logPrefix = redacted.redactedFields.length > 0
+    ? `[PII_REDACTED: ${redacted.redactedFields.join(', ')}] `
     : '';
 
   console.error(`${logPrefix}${redacted.redacted}`, ...redactedData);

@@ -442,84 +442,32 @@ export default function LegalInterface() {
     try {
       let isUsingFallbackKeyHeader = false;
 
-      // Task 1: Process all selected files with OCR in parallel
-      const documents: string[] = [];
+      // UNIFIED MULTIMODAL: Process images directly in the analyze call
+      const images: string[] = [];
       if (selectedFiles.length > 0) {
-        setStreamingStatus(`Step 1/3: Extracting text from ${selectedFiles.length} document(s)...`);
-        
-        const ocrPromises = selectedFiles.map(async (file) => {
+        setStreamingStatus(`Step 1/2: Processing ${selectedFiles.length} document(s) for unified analysis...`);
+
+        // Convert all selected files to base64
+        const base64Promises = selectedFiles.map(async (file) => {
           try {
+            // Use the existing image processor to resize/compress
             const processedImage = await processImageForOCR(file);
-            const response = await fetch('/api/ocr', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-Gemini-API-Key': apiKey,
-                'X-Client-Fingerprint': generateClientFingerprint(),
-              },
-              body: JSON.stringify({
-                image: processedImage,
-                jurisdiction
-              }),
-            });
-
-            if (response.headers.get('x-using-fallback-key') === 'true') {
-              isUsingFallbackKeyHeader = true;
-            }
-
-            if (!response.ok) {
-              if (response.status === 429) {
-                throw new Error('Demo limit reached for OCR. Please add your own API key.');
-              }
-              const errorData = await response.json();
-              throw new Error(errorData.detail || `Failed to process ${file.name}`);
-            }
-
-            const contentType = response.headers.get('content-type');
-            if (contentType && contentType.includes('application/x-ndjson')) {
-              const reader = response.body?.getReader();
-              if (!reader) throw new Error('ReadableStream not supported');
-
-              const decoder = new TextDecoder();
-              let ocrResult: OCRResult | null = null;
-
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                const chunk = decoder.decode(value, { stream: true });
-                const lines = chunk.split('\n').filter(line => line.trim());
-
-                for (const line of lines) {
-                  const message = JSON.parse(line);
-                  if (message.type === 'complete') {
-                    ocrResult = message.result;
-                    if (message.result?.isUsingFallbackKey) isUsingFallbackKeyHeader = true;
-                  } else if (message.type === 'error') {
-                    throw new Error(message.error);
-                  }
-                }
-              }
-
-              return ocrResult?.extracted_text || null;
-            }
-            return null;
+            // Remove data URL prefix for API
+            const base64Data = processedImage.includes(',') ? processedImage.split(',')[1] : processedImage;
+            return base64Data;
           } catch (fileErr) {
             safeError(`Failed to process file ${file.name}:`, fileErr);
             throw fileErr;
           }
         });
 
-        const results = await Promise.all(ocrPromises);
-        results.forEach(text => {
-          if (text) documents.push(text);
-        });
+        images.push(...await Promise.all(base64Promises));
       }
 
-      // Process complete analysis with (optionally) all extracted documents
-      setStreamingStatus('Step 2/3: Conducting legal research and grounding...');
-      
-      const analysisInput = userInput.trim() || `Analyze the ${documents.length} document(s) in the Virtual Case Folder and provide a comprehensive legal strategy.`;
+      // Unified multimodal analysis - NO separate OCR step
+      setStreamingStatus(selectedFiles.length > 0 ? 'Step 2/2: Analyzing documents and conducting legal research...' : 'Step 1/1: Conducting legal research and analysis...');
+
+      const analysisInput = userInput.trim() || `Analyze the ${images.length} document(s) in the Virtual Case Folder and provide a comprehensive legal strategy.`;
 
       const response = await fetch('/api/analyze', {
         method: 'POST',
@@ -528,10 +476,10 @@ export default function LegalInterface() {
           'X-Gemini-API-Key': apiKey,
           'X-Client-Fingerprint': generateClientFingerprint(),
         },
-        body: JSON.stringify({ 
-          user_input: analysisInput, 
+        body: JSON.stringify({
+          user_input: analysisInput,
           jurisdiction,
-          documents // Multi-file documents array
+          images // Send base64 images directly for unified multimodal analysis
         }),
         signal: controller.signal,
       });
@@ -582,10 +530,10 @@ export default function LegalInterface() {
                 const message = JSON.parse(line);
                 if (message.type === 'status') {
                   // Map server statuses to our steps
-                  if (message.message.includes('research')) {
-                    setStreamingStatus('Step 2/3: Conducting legal research and grounding...');
-                  } else if (message.message.includes('Generating') || message.message.includes('Analyzing')) {
-                    setStreamingStatus('Step 3/3: Synthesizing strategy and filings...');
+                  if (message.message.includes('research') || message.message.includes('Analyzing')) {
+                    setStreamingStatus(selectedFiles.length > 0 ? 'Step 2/2: Analyzing documents and conducting legal research...' : 'Conducting legal research...');
+                  } else if (message.message.includes('Regenerating')) {
+                    setStreamingStatus(message.message);
                   } else {
                     setStreamingStatus(message.message);
                   }
