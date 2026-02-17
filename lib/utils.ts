@@ -1,5 +1,6 @@
 // lib/utils.ts
 // Utility functions for the LawSage application
+import { safeError } from './pii-redactor';
 
 /**
  * RateLimiter utility to track and throttle requests to stay within Vercel Hobby Tier limits.
@@ -61,7 +62,7 @@ export class RateLimiter {
       // Rate limit exceeded
       return false;
     } catch (error) {
-      console.error('Error checking rate limit:', error);
+      safeError('Error checking rate limit:', error);
       // If there's an error, allow the request to prevent blocking the user
       return true;
     }
@@ -90,7 +91,7 @@ export class RateLimiter {
       // Save back to localStorage
       localStorage.setItem(this.storageKey, JSON.stringify({ requests }));
     } catch (error) {
-      console.error('Error recording request:', error);
+      safeError('Error recording request:', error);
     }
   }
 
@@ -114,7 +115,7 @@ export class RateLimiter {
 
       return Math.max(0, this.maxRequests - recentRequests.length);
     } catch (error) {
-      console.error('Error getting remaining requests:', error);
+      safeError('Error getting remaining requests:', error);
       return this.maxRequests;
     }
   }
@@ -147,7 +148,7 @@ export class RateLimiter {
       
       return Math.max(0, timeUntilOldestExpires);
     } catch (error) {
-      console.error('Error getting time until allowed:', error);
+      safeError('Error getting time until allowed:', error);
       return 0;
     }
   }

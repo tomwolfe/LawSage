@@ -4,6 +4,7 @@ import { SafetyValidator, ResponseValidator } from '../../../lib/validation';
 import { safeLog, safeError, safeWarn, redactPII } from '../../../lib/pii-redactor';
 import { withRateLimit } from '../../../lib/rate-limiter';
 import { orchestrateLegalResearch } from '../../../lib/search-orchestration';
+import { getLegalLookupResponse, searchExParteRules } from '../../../src/utils/legal-lookup';
 
 // Define types
 interface LegalRequest {
@@ -410,6 +411,7 @@ export async function POST(req: NextRequest) {
 
       // Get API key from request header (user-provided) or fall back to environment variable
       const xGeminiApiKey = req.headers.get('X-Gemini-API-Key');
+      const isUsingFallbackKey = !xGeminiApiKey;
       const apiKey = xGeminiApiKey || process.env.GEMINI_API_KEY;
 
       if (!apiKey) {
@@ -428,12 +430,15 @@ export async function POST(req: NextRequest) {
       }
 
       // Static grounding layer - check common procedural questions first (saves API calls)
-      const { getLegalLookupResponse } = await import('../../../src/utils/legal-lookup');
       const staticResponse = await getLegalLookupResponse(`${user_input} ${jurisdiction}`);
 
       if (staticResponse) {
         safeLog('Static grounding match found, returning cached response');
-        return NextResponse.json(staticResponse);
+        const response = NextResponse.json(staticResponse);
+        if (isUsingFallbackKey) {
+          response.headers.set('x-using-fallback-key', 'true');
+        }
+        return response;
       }
 
       // Template injection
@@ -442,7 +447,6 @@ export async function POST(req: NextRequest) {
 
       let exParteRulesText = "";
       if (isEmergency) {
-        const { searchExParteRules } = await import('../../../src/utils/legal-lookup');
         const exParteRules = await searchExParteRules(jurisdiction);
         if (exParteRules.length > 0) {
           exParteRulesText = "EX PARTE NOTICE RULES FOR THIS JURISDICTION:\n";
@@ -605,7 +609,7 @@ export async function POST(req: NextRequest) {
             const client = new GoogleGenAI({ apiKey });
 
             // Auto-retry logic for validation failures
-            const MAX_RETRIES = 1; // Only retry once to avoid infinite loops
+            const MAX_RETRIES = 2; // Increased to 2 retries for better hardening
             let retryCount = 0;
             let accumulatedText = '';
             let parsedOutput: LegalOutput | null = null;
@@ -616,6 +620,14 @@ export async function POST(req: NextRequest) {
               let firstTokenReceived = false;
 
               try {
+                // Send specific status update for retries
+                if (retryCount > 0) {
+                  controller.enqueue(encoder.encode(JSON.stringify({
+                    type: 'status',
+                    message: `Regenerating incomplete sections (Attempt ${retryCount}/${MAX_RETRIES})...`
+                  }) + '\n'));
+                }
+
                 const result = await client.models.generateContentStream({
                   model: "gemini-2.5-flash-preview-09-2025",
                   contents: currentPrompt,
@@ -634,13 +646,12 @@ export async function POST(req: NextRequest) {
                     // Stream each chunk immediately to keep connection alive
                     if (!firstTokenReceived) {
                       firstTokenReceived = true;
-                      const statusMessage = retryCount === 0 
-                        ? 'Analyzing your case...' 
-                        : 'Regenerating incomplete sections...';
-                      controller.enqueue(encoder.encode(JSON.stringify({
-                        type: 'status',
-                        message: statusMessage
-                      }) + '\n'));
+                      if (retryCount === 0) {
+                        controller.enqueue(encoder.encode(JSON.stringify({
+                          type: 'status',
+                          message: 'Analyzing your case...'
+                        }) + '\n'));
+                      }
                     }
 
                     controller.enqueue(encoder.encode(JSON.stringify({
@@ -667,16 +678,16 @@ export async function POST(req: NextRequest) {
                       safeWarn(`Retrying generation to fix: ${validation.missingFields?.join(', ')}`);
                       continue; // Retry the loop
                     } else {
-                      // Final attempt failed, use fallback
-                      safeError('All retry attempts failed, using fallback response');
+                      // Final attempt failed, use fallback for missing fields
+                      safeError('All retry attempts failed, applying structural hardening fallback');
                       parsedOutput = {
-                        disclaimer: ResponseValidator.STANDARD_DISCLAIMER,
-                        strategy: parsedOutput.strategy || "Analysis incomplete. Please try again with more details about your legal situation.",
-                        adversarial_strategy: parsedOutput.adversarial_strategy || "Red-team analysis unavailable due to incomplete input.",
-                        roadmap: parsedOutput.roadmap || [{ step: 1, title: "Consult an attorney", description: "Seek professional legal advice for your specific situation." }],
-                        filing_template: parsedOutput.filing_template || "Template generation failed. Please provide more specific details about your case.",
+                        disclaimer: parsedOutput.disclaimer || ResponseValidator.STANDARD_DISCLAIMER,
+                        strategy: parsedOutput.strategy || "Analysis incomplete. Please try again with more details.",
+                        adversarial_strategy: parsedOutput.adversarial_strategy || "Red-team analysis unavailable due to incomplete output structure.",
+                        roadmap: parsedOutput.roadmap && parsedOutput.roadmap.length > 0 ? parsedOutput.roadmap : [{ step: 1, title: "Consult an attorney", description: "Seek professional legal advice for your specific situation." }],
+                        filing_template: parsedOutput.filing_template || "Template generation failed. Please provide more specific details.",
                         citations: parsedOutput.citations || [],
-                        local_logistics: parsedOutput.local_logistics || {},
+                        local_logistics: parsedOutput.local_logistics || { courthouse_address: "Consult local court directory" },
                         procedural_checks: parsedOutput.procedural_checks || []
                       };
                     }
@@ -688,7 +699,6 @@ export async function POST(req: NextRequest) {
                     const zodResult = zodValidation.validateLegalOutput(parsedOutput);
                     if (!zodResult.valid) {
                       safeWarn('Zod validation warnings:', zodResult.errors);
-                      // Don't fail on Zod warnings if structural validation passed
                     }
                   } catch (zodError) {
                     safeWarn('Zod validation error (non-blocking):', zodError);
@@ -701,7 +711,7 @@ export async function POST(req: NextRequest) {
 
                   if (retryCount < MAX_RETRIES) {
                     retryCount++;
-                    currentPrompt = `${prompt}\n\nERROR: Your previous response was not valid JSON. Please respond with ONLY valid JSON.`;
+                    currentPrompt = `${prompt}\n\nERROR: Your previous response was not valid JSON. Please respond with ONLY valid JSON matching the requested schema. Ensure all fields are present.`;
                     continue;
                   } else {
                     // Return error response
@@ -712,7 +722,7 @@ export async function POST(req: NextRequest) {
                       roadmap: [{ step: 1, title: "Try again", description: "Please resubmit your request." }],
                       filing_template: "Template unavailable.",
                       citations: [],
-                      local_logistics: {},
+                      local_logistics: { courthouse_address: "Unknown" },
                       procedural_checks: []
                     };
                     break;
@@ -740,7 +750,7 @@ export async function POST(req: NextRequest) {
                 roadmap: [{ step: 1, title: "Contact support", description: "An error occurred during analysis." }],
                 filing_template: "Template unavailable.",
                 citations: [],
-                local_logistics: {},
+                local_logistics: { courthouse_address: "Unknown" },
                 procedural_checks: []
               };
             }
@@ -749,10 +759,14 @@ export async function POST(req: NextRequest) {
               ({ title: c.text, uri: c.url })
             ) || [];
 
-            // Send final complete response
+            // Send final complete response with metadata
             controller.enqueue(encoder.encode(JSON.stringify({
               type: 'complete',
-              result: { text: JSON.stringify(parsedOutput), sources }
+              result: { 
+                text: JSON.stringify(parsedOutput), 
+                sources,
+                isUsingFallbackKey
+              }
             }) + '\n'));
           } catch (e) {
             safeError("AI processing error:", e);
@@ -773,6 +787,7 @@ export async function POST(req: NextRequest) {
           'Connection': 'keep-alive',
           'X-RateLimit-Limit': '5',
           'X-RateLimit-Window': '3600',
+          ...(isUsingFallbackKey ? { 'x-using-fallback-key': 'true' } : {})
         }
       });
     } catch (error: unknown) {

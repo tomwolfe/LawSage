@@ -1,5 +1,4 @@
-// lib/validation.ts
-// Validation utilities that can be shared between API routes and tests
+import { safeLog } from './pii-redactor';
 
 // Supported jurisdictions
 export const SUPPORTED_JURISDICTIONS = new Set([
@@ -30,7 +29,7 @@ export class SafetyValidator {
 
     // If we have fewer than 3 sources, we still proceed but log the issue
     if (groundingData.length < 3) {
-      console.log(`INFO: Found ${groundingData.length} sources (less than 3), proceeding anyway.`);
+      safeLog(`INFO: Found ${groundingData.length} sources (less than 3), proceeding anyway.`);
       return true;
     }
 
@@ -61,7 +60,7 @@ export class SafetyValidator {
 
     // Check if the jurisdiction is supported
     if (!SUPPORTED_JURISDICTIONS.has(jurisdiction)) {
-      console.log(`RED TEAM AUDIT: Attempt to generate content for unsupported jurisdiction: '${jurisdiction}'`);
+      safeLog(`RED TEAM AUDIT: Attempt to generate content for unsupported jurisdiction: '${jurisdiction}'`);
       return false;
     }
 
@@ -91,7 +90,7 @@ export class SafetyValidator {
     ).length;
 
     if (factSpecificCount < 2) {
-      console.log(`RED TEAM AUDIT: Limited fact-specific defense triggers detected (found ${factSpecificCount} keywords). Consider prompting for more details.`);
+      safeLog(`RED TEAM AUDIT: Limited fact-specific defense triggers detected (found ${factSpecificCount} keywords). Consider prompting for more details.`);
     }
 
     return true;

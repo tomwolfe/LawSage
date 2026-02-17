@@ -4,6 +4,7 @@
  */
 
 import * as LZString from 'lz-string';
+import { safeError } from '../../lib/pii-redactor';
 import type { CaseLedgerEntry, LegalResult } from '../../components/LegalInterface';
 
 export interface CaseHistoryItem {
@@ -159,7 +160,7 @@ export function saveCaseToLocalStorage(
     
     localStorage.setItem(storageKey, JSON.stringify(dataToSave));
   } catch (error) {
-    console.error('Failed to save case to localStorage:', error);
+    safeError('Failed to save case to localStorage:', error);
   }
 }
 
@@ -213,7 +214,7 @@ export function loadCaseFromLocalStorage(jurisdiction: string): {
       ledger: convertDatesInObject(typedData.ledger) as CaseLedgerEntry[]
     };
   } catch (error) {
-    console.error('Failed to load case from localStorage:', error);
+    safeError('Failed to load case from localStorage:', error);
     return null;
   }
 }

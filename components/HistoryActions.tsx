@@ -2,6 +2,7 @@
 
 import React, { useRef } from 'react';
 import { Download, Upload } from 'lucide-react';
+import { safeError } from '../lib/pii-redactor';
 
 interface Source {
   title: string | null;
@@ -97,7 +98,7 @@ export default function HistoryActions({ onImport }: Omit<HistoryActionsProps, '
               timestamp: new Date(item.timestamp)
             }));
           } catch (err) {
-            console.error('Failed to parse existing history during merge', err);
+            safeError('Failed to parse existing history during merge', err);
           }
         }
 

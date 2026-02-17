@@ -3,6 +3,7 @@
 // HYBRID PERSISTENCE: Uses URL for small states, localStorage for large states
 
 import * as LZString from 'lz-string';
+import { safeLog, safeError } from '../../lib/pii-redactor';
 
 // URL length limit (conservative estimate to avoid browser limits)
 const URL_LENGTH_LIMIT = 1500;
@@ -33,7 +34,7 @@ export function compressStateToUrlFragment(state: unknown): string {
 
     return compressed;
   } catch (error) {
-    console.error('Error compressing state to URL fragment:', error);
+    safeError('Error compressing state to URL fragment:', error);
     return '';
   }
 }
@@ -71,7 +72,7 @@ export function decompressStateFromUrlFragment(fragment: string): unknown {
     // Parse the JSON string
     return JSON.parse(decompressed);
   } catch (error) {
-    console.error('Error decompressing state from URL fragment:', error);
+    safeError('Error decompressing state from URL fragment:', error);
     return null;
   }
 }
@@ -91,10 +92,10 @@ export function saveStateToLocalStorage(state: unknown): string {
     // Store session ID reference
     localStorage.setItem(CURRENT_SESSION_KEY, sessionId);
     
-    console.log(`State saved to localStorage with session ID: ${sessionId}`);
+    safeLog(`State saved to localStorage with session ID: ${sessionId}`);
     return sessionId;
   } catch (error) {
-    console.error('Error saving state to localStorage:', error);
+    safeError('Error saving state to localStorage:', error);
     return '';
   }
 }
@@ -118,7 +119,7 @@ export function getStateFromLocalStorage(sessionId?: string): unknown {
     
     return decompressStateFromUrlFragment(compressed);
   } catch (error) {
-    console.error('Error getting state from localStorage:', error);
+    safeError('Error getting state from localStorage:', error);
     return null;
   }
 }
@@ -153,7 +154,7 @@ export function cleanupLocalStorage(): void {
       }
     }
   } catch (error) {
-    console.error('Error cleaning up localStorage:', error);
+    safeError('Error cleaning up localStorage:', error);
   }
 }
 
@@ -171,7 +172,7 @@ export function updateUrlWithState(state: unknown): void {
       const sessionId = saveStateToLocalStorage(state);
       const newUrl = `${window.location.pathname}${window.location.search}#${sessionId}`;
       window.history.replaceState({}, '', newUrl);
-      console.log('State too large for URL, saved to localStorage');
+      safeLog('State too large for URL, saved to localStorage');
     } else {
       // Use URL hash directly
       const compressedState = compressStateToUrlFragment(state);
@@ -179,7 +180,7 @@ export function updateUrlWithState(state: unknown): void {
       window.history.replaceState({}, '', newUrl);
     }
   } catch (error) {
-    console.error('Error updating URL with state:', error);
+    safeError('Error updating URL with state:', error);
   }
 }
 
@@ -198,14 +199,14 @@ export function getStateFromUrl(): unknown {
 
     // Check if this looks like a session ID (starts with "session_")
     if (hash.startsWith('session_')) {
-      console.log('Detected session ID in URL, retrieving from localStorage');
+      safeLog('Detected session ID in URL, retrieving from localStorage');
       return getStateFromLocalStorage(hash);
     }
 
     // Otherwise, treat as compressed state in URL
     return decompressStateFromUrlFragment(hash);
   } catch (error) {
-    console.error('Error getting state from URL:', error);
+    safeError('Error getting state from URL:', error);
     return null;
   }
 }
@@ -303,7 +304,7 @@ export function restoreVirtualCaseFolderState(urlHash: string): Record<string, u
 
     return result;
   } catch (error) {
-    console.error('Error restoring Virtual Case Folder state from URL:', error);
+    safeError('Error restoring Virtual Case Folder state from URL:', error);
     return null;
   }
 }
@@ -337,7 +338,7 @@ export function watchStateAndSyncToUrl(getState: () => unknown, debounceMs: numb
         globalLastStateHash = currentStateHash;
       }
     } catch (error) {
-      console.error('Error in state watcher:', error);
+      safeError('Error in state watcher:', error);
     }
   };
 

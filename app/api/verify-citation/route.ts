@@ -98,7 +98,7 @@ Be conservative - only mark as verified if you find strong evidence.`;
       },
     });
 
-    const responseText = result.text;
+    const responseText = result.text || '{}';
     const verification: VerifyCitationResponse = JSON.parse(responseText);
 
     safeLog(`Citation verification result for "${citation}": ${verification.is_verified ? 'VERIFIED' : 'NOT VERIFIED'}`);

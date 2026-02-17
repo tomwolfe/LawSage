@@ -9,6 +9,7 @@ import remarkGfm from 'remark-gfm';
 import { validateLegalStructure } from '../src/utils/reliability';
 import { LegalMotion, MotionToDismiss, MotionForDiscovery, validateLegalMotion } from '../lib/schemas/motions';
 import { verifyCitationWithCache } from '../src/utils/citation-cache';
+import { safeError } from '../lib/pii-redactor';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -198,7 +199,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
         setCopyStatus(prev => ({ ...prev, [section]: false }));
       }, 2000);
     } catch (err) {
-      console.error('Failed to copy text: ', err);
+      safeError('Failed to copy text: ', err);
     }
   };
 
@@ -331,7 +332,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
       const currentApiKey = apiKey || localStorage.getItem('lawsage_gemini_api_key') || '';
       return await verifyCitationWithCache(citationText, jurisdiction, undefined, currentApiKey);
     } catch (error: unknown) {
-      console.error('Error verifying citation:', error);
+      safeError('Error verifying citation:', error);
       const errorMessage = typeof error === 'object' && error !== null && 'message' in error
         ? String((error as Record<string, unknown>).message)
         : 'Verification failed';
@@ -820,7 +821,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
         setCopyStatus(prev => ({ ...prev, all: false }));
       }, 2000);
     } catch (err) {
-      console.error('Failed to copy all content: ', err);
+      safeError('Failed to copy all content: ', err);
     }
   };
 
@@ -894,7 +895,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                   throw new Error("Failed to shorten URL");
                 }
               } catch (err) {
-                console.error(err);
+                safeError('Failed to shorten URL: ', err);
                 // Fallback to copying long URL
                 await navigator.clipboard.writeText(currentUrl);
                 setCopyStatus(prev => ({ ...prev, share: true }));

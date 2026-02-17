@@ -1,6 +1,8 @@
 // Client-side citation verification cache using localStorage
 // Prevents re-verifying the same citation multiple times during a session
 
+import { safeLog, safeWarn } from '../../lib/pii-redactor';
+
 const CACHE_PREFIX = 'lawsage_citation_cache:';
 const CACHE_TIMESTAMP_PREFIX = 'lawsage_citation_timestamp:';
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour in milliseconds
@@ -41,7 +43,7 @@ function isCacheValid(timestampKey: string): boolean {
     return (now - timestamp) < CACHE_TTL;
   } catch (error) {
     // localStorage might be unavailable or full
-    console.warn('Cache timestamp check failed:', error);
+    safeWarn('Cache timestamp check failed:', error);
     return false;
   }
 }
@@ -72,7 +74,7 @@ export function getCachedCitation(
     
     return JSON.parse(cachedStr) as CachedCitation;
   } catch (error) {
-    console.warn('Failed to retrieve cached citation:', error);
+    safeWarn('Failed to retrieve cached citation:', error);
     return null;
   }
 }
@@ -93,7 +95,7 @@ export function cacheCitation(
     localStorage.setItem(cacheKey, JSON.stringify(result));
     localStorage.setItem(timestampKey, Date.now().toString());
   } catch (error) {
-    console.warn('Failed to cache citation verification:', error);
+    safeWarn('Failed to cache citation verification:', error);
     // localStorage might be full - could implement LRU eviction here if needed
   }
 }
@@ -116,7 +118,7 @@ export function clearCitationCache(): void {
     // Remove all cache entries
     keysToRemove.forEach(key => localStorage.removeItem(key));
   } catch (error) {
-    console.warn('Failed to clear citation cache:', error);
+    safeWarn('Failed to clear citation cache:', error);
   }
 }
 
@@ -144,7 +146,7 @@ export function getCitationCacheStats(): { count: number; size: number } {
       size: totalSize // Approximate size in characters
     };
   } catch (error) {
-    console.warn('Failed to get cache stats:', error);
+    safeWarn('Failed to get cache stats:', error);
     return { count: 0, size: 0 };
   }
 }
@@ -162,11 +164,11 @@ export async function verifyCitationWithCache(
   // Check cache first
   const cached = getCachedCitation(citation, jurisdiction, subject_matter);
   if (cached) {
-    console.log(`Citation cache hit: ${citation}`);
+    safeLog(`Citation cache hit: ${citation}`);
     return cached;
   }
 
-  console.log(`Citation cache miss, fetching: ${citation}`);
+  safeLog(`Citation cache miss, fetching: ${citation}`);
 
   // Make API call
   const headers: HeadersInit = {

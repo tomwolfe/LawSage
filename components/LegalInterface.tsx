@@ -10,7 +10,8 @@ import { twMerge } from 'tailwind-merge';
 import ResultDisplay from './ResultDisplay';
 import HistoryActions from './HistoryActions';
 import ApiKeyModal from './ApiKeyModal';
-import { checkClientSideRateLimit, getClientSideRateLimitStatus, RATE_LIMIT_CONFIG, generateClientFingerprint } from '../lib/rate-limiter';
+import { checkClientSideRateLimit, getClientSideRateLimitStatus, RATE_LIMIT_CONFIG, generateClientFingerprint } from '../lib/rate-limiter-client';
+import { safeLog, safeError, safeWarn } from '../lib/pii-redactor';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -269,13 +270,15 @@ export default function LegalInterface() {
           setHistory(historyWithDates);
         }
       } catch (error) {
-        console.error('Failed to parse history from localStorage:', error);
+        safeError('Failed to parse history from localStorage:', error);
       }
     }
   }, []);
 
-  const handleApiKeySave = (key: string) => {
-    setApiKey(key);
+  const handleApiKeySave = (key?: string) => {
+    if (key) {
+      setApiKey(key);
+    }
     setShowApiKeyModal(false);
     
     // Resume analysis if it was interrupted for key entry
@@ -359,7 +362,7 @@ export default function LegalInterface() {
         });
       }
     } catch (error) {
-      console.error('Failed to fetch rate limit info:', error);
+      safeError('Failed to fetch rate limit info:', error);
     }
   };
 
@@ -427,97 +430,213 @@ export default function LegalInterface() {
             }),
           });
 
-          // Handle rate limit headers
-          handleRateLimitInfo();
+                    // Handle rate limit headers
 
-          if (!response.ok) {
-            if (response.status === 429) {
-              const retryAfter = response.headers.get('Retry-After') || '60';
-              setError(`Rate limit exceeded. You have used all 5 free requests in the last hour. Please wait ${Math.ceil(parseInt(retryAfter, 10) / 60)} minutes and try again.`);
-              return;
-            } else if (response.status === 401) {
-              setError('API key is missing or invalid. Please enter your Gemini API key.');
-              // Reset the key and show modal
-              localStorage.removeItem('lawsage_gemini_api_key');
-              setApiKey('');
-              setShowApiKeyModal(true);
-              return;
-            } else {
-              const errorData = await response.json();
-              throw new Error(errorData.detail || 'Failed to process image');
-            }
-          }
+                    handleRateLimitInfo();
 
-          // Handle streaming response
-          const contentType = response.headers.get('content-type');
           
-          if (contentType && contentType.includes('application/x-ndjson')) {
-            const reader = response.body?.getReader();
-            if (!reader) {
-              throw new Error('ReadableStream not supported');
-            }
 
-            const decoder = new TextDecoder();
-            let finalResult: LegalResult | null = null;
+                    const isUsingFallbackKeyHeader = response.headers.get('x-using-fallback-key') === 'true';
 
-            try {
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
+          
 
-                const chunk = decoder.decode(value, { stream: true });
-                const lines = chunk.split('\n').filter(line => line.trim());
+                    if (!response.ok) {
 
-                for (const line of lines) {
-                  try {
-                    const message = JSON.parse(line);
+                      if (response.status === 429) {
 
-                    if (message.type === 'status') {
-                      setStreamingStatus(message.message);
-                    } else if (message.type === 'complete') {
-                      finalResult = message.result;
-                    } else if (message.type === 'error') {
-                      throw new Error(message.error);
+                        setError('Demo limit reached. Please enter your own free Gemini API key in Settings to continue instantly.');
+
+                        setShowApiKeyModal(true);
+
+                        return;
+
+                      } else if (response.status === 401) {
+
+                        setError('API key is missing or invalid. Please enter your Gemini API key.');
+
+                        // Reset the key and show modal
+
+                        localStorage.removeItem('lawsage_gemini_api_key');
+
+                        setApiKey('');
+
+                        setShowApiKeyModal(true);
+
+                        return;
+
+                      } else {
+
+                        const errorData = await response.json();
+
+                        throw new Error(errorData.detail || 'Failed to process image');
+
+                      }
+
                     }
-                    // chunk messages are streamed for progress but not accumulated here
-                  } catch (parseError) {
-                    console.warn('Failed to parse stream chunk:', parseError);
-                  }
-                }
-              }
 
-              if (finalResult) {
-                // Convert OCR result to LegalResult format
-                const ocrResult = finalResult as unknown as OCRResult;
-                const legalResult: LegalResult = {
-                  text: ocrResult.extracted_text,
-                  sources: []
-                };
-                
-                setResult(legalResult);
-                setActiveTab('strategy');
+          
 
-                const newHistoryItem: CaseHistoryItem = {
-                  id: Date.now().toString(),
-                  timestamp: new Date(),
-                  jurisdiction,
-                  userInput: `OCR Analysis of: ${selectedFile.name}`,
-                  result: legalResult
-                };
+                    // Handle streaming response
 
-                const updatedHistory = [newHistoryItem, ...history];
-                setHistory(updatedHistory);
-                localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
-              } else {
-                throw new Error('No complete response received from server');
-              }
-            } catch (streamError) {
-              if (streamError instanceof Error && streamError.name === 'AbortError') {
-                throw new Error('Request timed out. Please try again.');
-              }
-              throw streamError;
-            }
-          } else {
+                    const contentType = response.headers.get('content-type');
+
+                    
+
+                    if (contentType && contentType.includes('application/x-ndjson')) {
+
+                      const reader = response.body?.getReader();
+
+                      if (!reader) {
+
+                        throw new Error('ReadableStream not supported');
+
+                      }
+
+          
+
+                      const decoder = new TextDecoder();
+
+                      let finalResult: LegalResult | null = null;
+
+                      let resultIncludesFallbackKey = false;
+
+          
+
+                      try {
+
+                        while (true) {
+
+                          const { done, value } = await reader.read();
+
+                          if (done) break;
+
+          
+
+                          const chunk = decoder.decode(value, { stream: true });
+
+                          const lines = chunk.split('\n').filter(line => line.trim());
+
+          
+
+                          for (const line of lines) {
+
+                            try {
+
+                              const message = JSON.parse(line);
+
+          
+
+                              if (message.type === 'status') {
+
+                                setStreamingStatus(message.message);
+
+                              } else if (message.type === 'complete') {
+
+                                finalResult = message.result;
+
+                                if (message.result && message.result.isUsingFallbackKey) {
+
+                                  resultIncludesFallbackKey = true;
+
+                                }
+
+                              } else if (message.type === 'error') {
+
+                                throw new Error(message.error);
+
+                              }
+
+                              // chunk messages are streamed for progress but not accumulated here
+
+                            } catch (parseError) {
+
+                              safeWarn('Failed to parse stream chunk:', parseError);
+
+                            }
+
+                          }
+
+                        }
+
+          
+
+                        if (finalResult) {
+
+                          // Convert OCR result to LegalResult format
+
+                          const ocrResult = finalResult as unknown as OCRResult & { isUsingFallbackKey?: boolean };
+
+                          const legalResult: LegalResult = {
+
+                            text: ocrResult.extracted_text,
+
+                            sources: []
+
+                          };
+
+                          
+
+                          setResult(legalResult);
+
+                          setActiveTab('strategy');
+
+          
+
+                          // Proactive BYOK enforcement
+
+                          if (isUsingFallbackKeyHeader || resultIncludesFallbackKey || ocrResult.isUsingFallbackKey) {
+
+                            setWarning('You are using the limited public demo key. Please add your own free key for unlimited access.');
+
+                            setTimeout(() => setShowApiKeyModal(true), 2000);
+
+                          }
+
+          
+
+                          const newHistoryItem: CaseHistoryItem = {
+
+                            id: Date.now().toString(),
+
+                            timestamp: new Date(),
+
+                            jurisdiction,
+
+                            userInput: `OCR Analysis of: ${selectedFile.name}`,
+
+                            result: legalResult
+
+                          };
+
+          
+
+                          const updatedHistory = [newHistoryItem, ...history];
+
+                          setHistory(updatedHistory);
+
+                          localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
+
+                        } else {
+
+                          throw new Error('No complete response received from server');
+
+                        }
+
+                      } catch (streamError) {
+
+                        if (streamError instanceof Error && streamError.name === 'AbortError') {
+
+                          throw new Error('Request timed out. Please try again.');
+
+                        }
+
+                        throw streamError;
+
+                      }
+
+                    }
+
+           else {
             // Fallback for non-streaming responses
             const data: LegalResult = await response.json();
             setResult(data);
@@ -551,93 +670,205 @@ export default function LegalInterface() {
           signal: controller.signal,
         });
 
-        // Handle rate limit headers
-        handleRateLimitInfo();
+                // Handle rate limit headers
 
-        clearTimeout(timeoutId);
+                handleRateLimitInfo();
 
-        if (!response.ok) {
-          if (response.status === 429) {
-            const retryAfter = response.headers.get('Retry-After') || '60';
-            setError(`Rate limit exceeded. You have used all 5 free requests in the last hour. Please wait ${Math.ceil(parseInt(retryAfter, 10) / 60)} minutes and try again.`);
-            return;
-          } else if (response.status === 401) {
-            setError('API key is missing or invalid. Please enter your Gemini API key.');
-            // Reset the key and show modal
-            localStorage.removeItem('lawsage_gemini_api_key');
-            setApiKey('');
-            setShowApiKeyModal(true);
-            return;
-          } else {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Failed to generate response');
-          }
-        }
+        
 
-        const contentType = response.headers.get('content-type');
+                const isUsingFallbackKeyHeader = response.headers.get('x-using-fallback-key') === 'true';
 
-        // Handle streaming NDJSON response
-        if (contentType && contentType.includes('application/x-ndjson')) {
-          const reader = response.body?.getReader();
-          if (!reader) {
-            throw new Error('ReadableStream not supported');
-          }
+        
 
-          const decoder = new TextDecoder();
-          let finalResult: LegalResult | null = null;
+                clearTimeout(timeoutId);
 
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
+        
 
-              const chunk = decoder.decode(value, { stream: true });
-              const lines = chunk.split('\n').filter(line => line.trim());
+                if (!response.ok) {
 
-              for (const line of lines) {
-                try {
-                  const message = JSON.parse(line);
+                  if (response.status === 429) {
 
-                  if (message.type === 'status') {
-                    setStreamingStatus(message.message);
-                  } else if (message.type === 'complete') {
-                    finalResult = message.result;
-                  } else if (message.type === 'error') {
-                    throw new Error(message.error);
+                    setError('Demo limit reached. Please enter your own free Gemini API key in Settings to continue instantly.');
+
+                    setShowApiKeyModal(true);
+
+                    return;
+
+                  } else if (response.status === 401) {
+
+                    setError('API key is missing or invalid. Please enter your Gemini API key.');
+
+                    // Reset the key and show modal
+
+                    localStorage.removeItem('lawsage_gemini_api_key');
+
+                    setApiKey('');
+
+                    setShowApiKeyModal(true);
+
+                    return;
+
+                  } else {
+
+                    const errorData = await response.json();
+
+                    throw new Error(errorData.detail || 'Failed to generate response');
+
                   }
-                  // chunk messages are streamed for progress but not accumulated here
-                } catch (parseError) {
-                  console.warn('Failed to parse stream chunk:', parseError);
+
                 }
-              }
-            }
 
-            if (finalResult) {
-              setResult(finalResult);
-              setActiveTab('strategy');
+        
 
-              const newHistoryItem: CaseHistoryItem = {
-                id: Date.now().toString(),
-                timestamp: new Date(),
-                jurisdiction,
-                userInput,
-                result: finalResult
-              };
+                const contentType = response.headers.get('content-type');
 
-              const updatedHistory = [newHistoryItem, ...history];
-              setHistory(updatedHistory);
-              localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
-              addToCaseLedger('complaint_filed', `Initial analysis submitted for: ${userInput.substring(0, 50)}${userInput.length > 50 ? '...' : ''}`);
-            } else {
-              throw new Error('No complete response received from server');
-            }
-          } catch (streamError) {
-            if (streamError instanceof Error && streamError.name === 'AbortError') {
-              throw new Error('Request timed out. Please try again.');
-            }
-            throw streamError;
-          }
-        } else {
+        
+
+                // Handle streaming NDJSON response
+
+                if (contentType && contentType.includes('application/x-ndjson')) {
+
+                  const reader = response.body?.getReader();
+
+                  if (!reader) {
+
+                    throw new Error('ReadableStream not supported');
+
+                  }
+
+        
+
+                  const decoder = new TextDecoder();
+
+                  let finalResult: LegalResult | null = null;
+
+                  let resultIncludesFallbackKey = false;
+
+        
+
+                  try {
+
+                    while (true) {
+
+                      const { done, value } = await reader.read();
+
+                      if (done) break;
+
+        
+
+                      const chunk = decoder.decode(value, { stream: true });
+
+                      const lines = chunk.split('\n').filter(line => line.trim());
+
+        
+
+                      for (const line of lines) {
+
+                        try {
+
+                          const message = JSON.parse(line);
+
+        
+
+                          if (message.type === 'status') {
+
+                            setStreamingStatus(message.message);
+
+                          } else if (message.type === 'complete') {
+
+                            finalResult = message.result;
+
+                            if (message.result && message.result.isUsingFallbackKey) {
+
+                              resultIncludesFallbackKey = true;
+
+                            }
+
+                          } else if (message.type === 'error') {
+
+                            throw new Error(message.error);
+
+                          }
+
+                          // chunk messages are streamed for progress but not accumulated here
+
+                        } catch (parseError) {
+
+                          safeWarn('Failed to parse stream chunk:', parseError);
+
+                        }
+
+                      }
+
+                    }
+
+        
+
+                    if (finalResult) {
+
+                      setResult(finalResult);
+
+                      setActiveTab('strategy');
+
+        
+
+                      // Proactive BYOK enforcement
+
+                      if (isUsingFallbackKeyHeader || resultIncludesFallbackKey) {
+
+                        setWarning('You are using the limited public demo key. Please add your own free key for unlimited access.');
+
+                        setTimeout(() => setShowApiKeyModal(true), 2000);
+
+                      }
+
+        
+
+                      const newHistoryItem: CaseHistoryItem = {
+
+                        id: Date.now().toString(),
+
+                        timestamp: new Date(),
+
+                        jurisdiction,
+
+                        userInput,
+
+                        result: finalResult
+
+                      };
+
+        
+
+                      const updatedHistory = [newHistoryItem, ...history];
+
+                      setHistory(updatedHistory);
+
+                      localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
+
+                      addToCaseLedger('complaint_filed', `Initial analysis submitted for: ${userInput.substring(0, 50)}${userInput.length > 50 ? '...' : ''}`);
+
+                    } else {
+
+                      throw new Error('No complete response received from server');
+
+                    }
+
+                  } catch (streamError) {
+
+                    if (streamError instanceof Error && streamError.name === 'AbortError') {
+
+                      throw new Error('Request timed out. Please try again.');
+
+                    }
+
+                    throw streamError;
+
+                  }
+
+                }
+
+         else {
           // Fallback for non-streaming responses
           if (!contentType || !contentType.includes('application/json')) {
             const textBody = await response.text();

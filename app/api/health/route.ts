@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getRateLimitStatus, RATE_LIMIT_CONFIG } from '../../../lib/rate-limiter';
+import { safeError } from '../../../lib/pii-redactor';
 
 /**
  * Health check endpoint with rate limit status
@@ -26,7 +27,7 @@ export async function GET() {
       }
     });
   } catch (error) {
-    console.error('Health check failed:', error);
+    safeError('Health check failed:', error);
     return NextResponse.json({
       status: 'degraded',
       message: 'LawSage API is running with limited functionality',

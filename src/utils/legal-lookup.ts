@@ -1,17 +1,16 @@
-// utils/legal-lookup.ts
-// Utility for checking legal lookup database before making API calls
+import legalLookupData from '../../public/data/legal_lookup.json';
 
-interface Source {
+export interface Source {
   title: string | null;
   uri: string | null;
 }
 
-interface LegalResult {
+export interface LegalResult {
   text: string;
   sources: Source[];
 }
 
-interface LegalRule {
+export interface LegalRule {
   id: number;
   rule_number: string;
   title: string;
@@ -20,7 +19,7 @@ interface LegalRule {
   category: string;
 }
 
-interface ExParteNoticeRule {
+export interface ExParteNoticeRule {
   id: number;
   courthouse: string;
   jurisdiction: string;
@@ -28,40 +27,19 @@ interface ExParteNoticeRule {
   rule: string;
 }
 
-interface LegalLookupDatabase {
+export interface LegalLookupDatabase {
   pro_se_procedural_rules: LegalRule[];
   ex_parte_notice_rules: ExParteNoticeRule[];
 }
 
-let legalLookupDb: LegalLookupDatabase | null = null;
+const legalLookupDb: LegalLookupDatabase = legalLookupData as LegalLookupDatabase;
 
 /**
  * Loads the legal lookup database from the public data folder
  * @returns Promise resolving to the legal lookup database
  */
 async function loadLegalLookupDb(): Promise<LegalLookupDatabase> {
-  if (legalLookupDb) {
-    return legalLookupDb;
-  }
-
-  try {
-    // In a Next.js environment, we need to fetch from the public directory
-    const response = await fetch('/data/legal_lookup.json');
-    if (!response.ok) {
-      throw new Error(`Failed to load legal lookup database: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    legalLookupDb = data;
-    return data;
-  } catch (error) {
-    console.error('Error loading legal lookup database:', error);
-    // Return an empty database to prevent crashes
-    return { 
-      pro_se_procedural_rules: [],
-      ex_parte_notice_rules: [] 
-    };
-  }
+  return legalLookupDb;
 }
 
 /**

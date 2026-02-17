@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { SafetyValidator } from '../../../lib/validation';
-import { safeLog, safeError, redactPII } from '../../../lib/pii-redactor';
+import { safeLog, safeError, safeWarn, redactPII } from '../../../lib/pii-redactor';
 import { withRateLimit } from '../../../lib/rate-limiter';
 
 // Define types
@@ -76,6 +76,7 @@ export async function POST(req: NextRequest) {
 
       // Get API key from request header (user-provided) or fall back to environment variable
       const xGeminiApiKey = req.headers.get('X-Gemini-API-Key');
+      const isUsingFallbackKey = !xGeminiApiKey;
       const apiKey = xGeminiApiKey || process.env.GEMINI_API_KEY;
 
       if (!apiKey) {
@@ -87,11 +88,10 @@ export async function POST(req: NextRequest) {
 
       safeLog(`Processing OCR request for jurisdiction: ${jurisdiction}`);
 
-      // Decode the base64 image data
-      let imageData;
+      // Extract base64 image data
+      let base64Data = image;
       try {
         // Remove data URL prefix if present (e.g., "data:image/jpeg;base64,")
-        let base64Data = image;
         if (image.startsWith('data:')) {
           const parts = image.split(',');
           if (parts.length < 2) {
@@ -99,19 +99,16 @@ export async function POST(req: NextRequest) {
           }
           base64Data = parts[1]; // Get the base64 part
         }
-
-        // Convert base64 to Uint8Array
-        const binaryString = atob(base64Data);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
+        
+        // Basic validation of base64
+        if (!/^[A-Za-z0-9+/=]+$/.test(base64Data.replace(/\s/g, ''))) {
+           throw new Error('Invalid base64 characters');
         }
-        imageData = bytes;
       } catch (_error) {
         return NextResponse.json(
           {
             type: "ValidationError",
-            detail: "Invalid base64 image data."
+            detail: "Invalid image data format."
           } satisfies StandardErrorResponse,
           { status: 400 }
         );
@@ -161,7 +158,7 @@ export async function POST(req: NextRequest) {
                 prompt,
                 {
                   inlineData: {
-                    data: imageData, // Already base64 encoded
+                    data: base64Data, // Already base64 encoded
                     mimeType: 'image/jpeg' // We'll default to jpeg, but could detect from data URL
                   }
                 }
@@ -242,7 +239,7 @@ export async function POST(req: NextRequest) {
             // Send final complete response
             controller.enqueue(encoder.encode(JSON.stringify({
               type: 'complete',
-              result: ocrResult
+              result: { ...ocrResult, isUsingFallbackKey }
             }) + '\n'));
           } catch (e) {
             safeError("AI processing error:", e);
@@ -253,7 +250,16 @@ export async function POST(req: NextRequest) {
           } finally {
             controller.close();
           }
+        },
+        // Hard timeout for the stream processing (45 seconds)
+        cancel() {
+          safeWarn('OCR processing stream cancelled or timed out');
         }
+      });
+
+      // Implement a race between the stream and a timeout
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('OCR processing timed out after 45 seconds')), 45000);
       });
 
       return new Response(stream, {
@@ -263,6 +269,7 @@ export async function POST(req: NextRequest) {
           'Connection': 'keep-alive',
           'X-RateLimit-Limit': '5',
           'X-RateLimit-Window': '3600',
+          ...(isUsingFallbackKey ? { 'x-using-fallback-key': 'true' } : {})
         }
       });
     } catch (error: unknown) {

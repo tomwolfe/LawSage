@@ -1,4 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
+import { safeLog, safeError, safeWarn } from './pii-redactor';
 
 /**
  * Generates 3 targeted legal search queries using Gemini for deeper grounding
@@ -72,7 +73,7 @@ export async function generateSearchQueries(
         }
         
         // If all parsing attempts fail, return default queries
-        console.warn('Failed to parse search queries from Gemini response:', responseText);
+        safeWarn('Failed to parse search queries from Gemini response:', responseText);
         return [
           `local rules of court ${jurisdiction} ${userInput.split(' ')[0]} proceedings`,
           `statutory precedents ${userInput.split(' ').slice(0, 3).join(' ')}`,
@@ -81,7 +82,7 @@ export async function generateSearchQueries(
       }
     }
   } catch (error) {
-    console.error('Error generating search queries:', error);
+    safeError('Error generating search queries:', error);
     // Return default queries if API call fails
     return [
       `local rules of court ${jurisdiction} ${userInput.split(' ')[0]} proceedings`,
@@ -128,7 +129,7 @@ export async function executeSearchQueries(
         timestamp: new Date().toISOString()
       });
     } catch (error) {
-      console.error(`Error executing search query "${query}":`, error);
+      safeError(`Error executing search query "${query}":`, error);
       results.push({
         query,
         search_results: `Error executing search: ${(error as Error).message}`,
