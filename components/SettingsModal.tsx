@@ -1,10 +1,51 @@
 'use client';
 
-import { useState } from 'react';
-import { Settings, X, Info, CheckCircle, Scale, Shield } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Settings, X, Info, CheckCircle, Scale, Shield, Key, Trash2 } from 'lucide-react';
+import ApiKeyModal from './ApiKeyModal';
 
 export default function SettingsModal() {
   const [isOpen, setIsOpen] = useState(false);
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [apiKey, setApiKey] = useState<string>('');
+  const [rateLimitStatus, setRateLimitStatus] = useState<{ remaining: number; resetAt: Date } | null>(null);
+
+  // Load API key from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedKey = localStorage.getItem('lawsage_gemini_api_key');
+      if (storedKey) {
+        // Mask the key for display (show first 4 and last 4 chars)
+        const masked = storedKey.length > 8 
+          ? `${storedKey.substring(0, 4)}...${storedKey.substring(storedKey.length - 4)}`
+          : '****';
+        setApiKey(masked);
+      }
+    }
+  }, [isOpen]);
+
+  // Load rate limit status
+  useEffect(() => {
+    if (typeof window !== 'undefined' && isOpen) {
+      const stored = localStorage.getItem('lawsage_ratelimit_status');
+      if (stored) {
+        try {
+          const data = JSON.parse(stored);
+          setRateLimitStatus({
+            remaining: data.remaining,
+            resetAt: new Date(data.resetAt),
+          });
+        } catch {
+          // Ignore parse errors
+        }
+      }
+    }
+  }, [isOpen]);
+
+  const handleClearApiKey = () => {
+    localStorage.removeItem('lawsage_gemini_api_key');
+    setApiKey('');
+  };
 
   return (
     <>
@@ -30,6 +71,60 @@ export default function SettingsModal() {
             </div>
 
             <div className="p-6 space-y-4">
+              {/* API Key Management */}
+              <div className="bg-slate-50 rounded-lg p-4 space-y-3 border border-slate-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Key className="text-indigo-600" size={20} />
+                    <span className="text-sm font-bold text-slate-900">API Key Settings</span>
+                  </div>
+                  {apiKey && (
+                    <button
+                      onClick={handleClearApiKey}
+                      className="flex items-center gap-1 text-red-600 hover:text-red-800 text-xs font-medium"
+                    >
+                      <Trash2 size={14} />
+                      Clear
+                    </button>
+                  )}
+                </div>
+                {apiKey ? (
+                  <div className="flex items-center gap-2 text-sm text-slate-700">
+                    <CheckCircle className="text-emerald-600" size={16} />
+                    <span className="font-mono">{apiKey}</span>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-600">
+                    No API key configured. Using server-provided key (if available).
+                  </p>
+                )}
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    setShowApiKeyModal(true);
+                  }}
+                  className="w-full px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                >
+                  {apiKey ? 'Update API Key' : 'Add API Key'}
+                </button>
+              </div>
+
+              {/* Rate Limit Status */}
+              {rateLimitStatus && (
+                <div className="bg-amber-50 rounded-lg p-4 space-y-2 border border-amber-100">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="text-amber-600" size={20} />
+                    <span className="text-sm font-bold text-amber-900">Usage Status</span>
+                  </div>
+                  <p className="text-sm text-amber-800">
+                    Remaining requests: <strong>{rateLimitStatus.remaining} / 5</strong>
+                  </p>
+                  <p className="text-xs text-amber-700">
+                    Resets at: {rateLimitStatus.resetAt.toLocaleTimeString()}
+                  </p>
+                </div>
+              )}
+
               {/* Free Access Info */}
               <div className="bg-indigo-50 rounded-lg p-4 space-y-3 border border-indigo-100">
                 <div className="flex items-center gap-2">
@@ -37,8 +132,8 @@ export default function SettingsModal() {
                   <span className="text-sm font-bold text-indigo-900">Completely Free Access</span>
                 </div>
                 <p className="text-sm text-indigo-800">
-                  LawSage provides <strong>5 free requests per hour</strong> to ensure fair access for all users. 
-                  No API key required - just start using the tool!
+                  LawSage provides <strong>5 free requests per hour</strong> to ensure fair access for all users.
+                  Bring your own API key for unlimited personal use (Google's free tier applies).
                 </p>
                 <div className="flex items-center gap-2 text-xs text-indigo-700 mt-2">
                   <Info size={14} />
@@ -98,6 +193,17 @@ export default function SettingsModal() {
           </div>
         </div>
       )}
+
+      {/* API Key Modal */}
+      <ApiKeyModal
+        isOpen={showApiKeyModal}
+        onClose={(key) => {
+          setShowApiKeyModal(false);
+          if (key) {
+            setApiKey(key.substring(0, 4) + '...' + key.substring(key.length - 4));
+          }
+        }}
+      />
     </>
   );
 }

@@ -154,13 +154,14 @@ export async function POST(req: NextRequest) {
             }) + '\n'));
 
             // Generate content using the multimodal model with constrained JSON output
+            // Note: imageData is already base64 encoded from the client-side image processor
             const result = await client.models.generateContentStream({
               model: "gemini-2.5-flash-preview-09-2025", // Using the multimodal capable model
               contents: [
                 prompt,
                 {
                   inlineData: {
-                    data: Buffer.from(imageData).toString('base64'),
+                    data: imageData, // Already base64 encoded
                     mimeType: 'image/jpeg' // We'll default to jpeg, but could detect from data URL
                   }
                 }

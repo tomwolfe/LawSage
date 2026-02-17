@@ -163,20 +163,20 @@ export async function verifyCitationWithCache(
   const cached = getCachedCitation(citation, jurisdiction, subject_matter);
   if (cached) {
     console.log(`Citation cache hit: ${citation}`);
-    return { ...cached, cached: true } as CachedCitation;
+    return cached;
   }
-  
+
   console.log(`Citation cache miss, fetching: ${citation}`);
-  
+
   // Make API call
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
   };
-  
+
   if (apiKey) {
     headers['X-Gemini-API-Key'] = apiKey;
   }
-  
+
   const response = await fetch('/api/verify-citation', {
     method: 'POST',
     headers,
@@ -186,15 +186,15 @@ export async function verifyCitationWithCache(
       subject_matter,
     }),
   });
-  
+
   if (!response.ok) {
     throw new Error(`Citation verification failed: ${response.status}`);
   }
-  
-  const result = await response.json();
-  
+
+  const result = await response.json() as CachedCitation;
+
   // Cache the result
   cacheCitation(citation, jurisdiction, result, subject_matter);
-  
+
   return result;
 }

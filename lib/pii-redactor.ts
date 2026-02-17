@@ -47,6 +47,13 @@ export function redactPII(text: string): RedactionResult {
     redacted = redacted.replace(ssnPattern, '[SSN_REDACTED]');
   }
 
+  // Gemini API keys (AIza...)
+  const geminiKeyPattern = /\bAIza[0-9A-Za-z-_]{35}\b/g;
+  if (redacted.match(geminiKeyPattern)) {
+    redactedFields.push('gemini_api_key');
+    redacted = redacted.replace(geminiKeyPattern, '[GEMINI_API_KEY_REDACTED]');
+  }
+
   // Case numbers (various court formats)
   const caseNumberPatterns = [
     /\b\d{1,2}:\d{2}-cv-\d{5,7}\b/gi,      // Federal: 1:22-cv-12345

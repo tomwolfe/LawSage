@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Upload, Download, Save, FolderOpen, Info } from 'lucide-react';
+import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Upload, Download, Save, FolderOpen, Info, Key } from 'lucide-react';
 import { processImageForOCR } from '../src/utils/image-processor';
 import { updateUrlWithState, watchStateAndSyncToUrl, createVirtualCaseFolderState, restoreVirtualCaseFolderState, cleanupLocalStorage } from '../src/utils/state-sync';
 import { exportCaseFile, importCaseFile, saveCaseToLocalStorage } from '../src/utils/case-file-manager';
@@ -9,6 +9,8 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ResultDisplay from './ResultDisplay';
 import HistoryActions from './HistoryActions';
+import ApiKeyModal from './ApiKeyModal';
+import { checkClientSideRateLimit, getClientSideRateLimitStatus, RATE_LIMIT_CONFIG, generateClientFingerprint } from '../lib/rate-limiter';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -134,6 +136,9 @@ export default function LegalInterface() {
   const [caseLedger, setCaseLedger] = useState<CaseLedgerEntry[]>([]);
   const [streamingStatus, setStreamingStatus] = useState<string>('');
   const [rateLimitInfo, setRateLimitInfo] = useState<{ remaining: number; resetAt: Date | null } | null>(null);
+  const [apiKey, setApiKey] = useState<string>('');
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const resumeAnalysisRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize state from URL fragment on component mount
@@ -236,6 +241,14 @@ export default function LegalInterface() {
     checkHealth();
   }, []);
 
+  // Initialize API key from localStorage
+  useEffect(() => {
+    const storedApiKey = localStorage.getItem('lawsage_gemini_api_key');
+    if (storedApiKey) {
+      setApiKey(storedApiKey);
+    }
+  }, []);
+
   // Load history from localStorage on component mount
   useEffect(() => {
     const savedHistory = localStorage.getItem('lawsage_history');
@@ -260,6 +273,20 @@ export default function LegalInterface() {
       }
     }
   }, []);
+
+  const handleApiKeySave = (key: string) => {
+    setApiKey(key);
+    setShowApiKeyModal(false);
+    
+    // Resume analysis if it was interrupted for key entry
+    if (resumeAnalysisRef.current) {
+      resumeAnalysisRef.current = false;
+      // Use setTimeout to ensure the modal state is fully updated before starting fetch
+      setTimeout(() => {
+        handleSubmit();
+      }, 100);
+    }
+  };
 
   const handleVoice = () => {
     if (!('webkitSpeechRecognition' in window)) {
@@ -337,12 +364,30 @@ export default function LegalInterface() {
   };
 
   const handleSubmit = async () => {
+    if (loading) return; // Prevent multiple submissions
+
     setError('');
     setWarning('');
     setStreamingStatus('');
 
     if (!userInput.trim() && !selectedFile) {
       setError('Please describe your legal situation or upload an image.');
+      return;
+    }
+
+    // Double-check rate limit on client side
+    const clientRateLimit = checkClientSideRateLimit();
+    if (!clientRateLimit.allowed) {
+      const waitMinutes = Math.ceil((clientRateLimit.resetAt - Date.now()) / (1000 * 60));
+      setError(`Rate limit exceeded. You have used all 5 free requests in the last hour. Please wait ${waitMinutes} minutes or enter your own Gemini API key in Settings.`);
+      return;
+    }
+
+    // Check for API key if user is about to make a request
+    if (!apiKey) {
+      // Don't block, but prepare to resume
+      resumeAnalysisRef.current = true;
+      setShowApiKeyModal(true);
       return;
     }
 
@@ -373,6 +418,8 @@ export default function LegalInterface() {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'X-Gemini-API-Key': apiKey, // Explicitly send the key we checked above
+              'X-Client-Fingerprint': generateClientFingerprint(),
             },
             body: JSON.stringify({
               image: processedImage,
@@ -385,10 +432,15 @@ export default function LegalInterface() {
 
           if (!response.ok) {
             if (response.status === 429) {
-              setError('Rate limit exceeded. You have used all 5 free requests in the last hour. Please wait and try again later.');
+              const retryAfter = response.headers.get('Retry-After') || '60';
+              setError(`Rate limit exceeded. You have used all 5 free requests in the last hour. Please wait ${Math.ceil(parseInt(retryAfter, 10) / 60)} minutes and try again.`);
               return;
             } else if (response.status === 401) {
-              setError('Authentication failed. Please contact support.');
+              setError('API key is missing or invalid. Please enter your Gemini API key.');
+              // Reset the key and show modal
+              localStorage.removeItem('lawsage_gemini_api_key');
+              setApiKey('');
+              setShowApiKeyModal(true);
               return;
             } else {
               const errorData = await response.json();
@@ -492,6 +544,8 @@ export default function LegalInterface() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'X-Gemini-API-Key': apiKey, // Explicitly send the key
+            'X-Client-Fingerprint': generateClientFingerprint(),
           },
           body: JSON.stringify({ user_input: userInput, jurisdiction }),
           signal: controller.signal,
@@ -504,10 +558,15 @@ export default function LegalInterface() {
 
         if (!response.ok) {
           if (response.status === 429) {
-            setError('Rate limit exceeded. You have used all 5 free requests in the last hour. Please wait and try again later.');
+            const retryAfter = response.headers.get('Retry-After') || '60';
+            setError(`Rate limit exceeded. You have used all 5 free requests in the last hour. Please wait ${Math.ceil(parseInt(retryAfter, 10) / 60)} minutes and try again.`);
             return;
           } else if (response.status === 401) {
-            setError('Authentication failed. Please contact support.');
+            setError('API key is missing or invalid. Please enter your Gemini API key.');
+            // Reset the key and show modal
+            localStorage.removeItem('lawsage_gemini_api_key');
+            setApiKey('');
+            setShowApiKeyModal(true);
             return;
           } else {
             const errorData = await response.json();
@@ -979,9 +1038,16 @@ export default function LegalInterface() {
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           jurisdiction={jurisdiction}
-          apiKey=""
+          apiKey={apiKey}
         />
       )}
+
+      {/* API Key Modal */}
+      <ApiKeyModal
+        isOpen={showApiKeyModal}
+        onClose={handleApiKeySave}
+        existingKey={apiKey}
+      />
     </div>
   );
 }

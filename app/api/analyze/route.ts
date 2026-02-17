@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
-import { SafetyValidator } from '../../../lib/validation';
+import { SafetyValidator, ResponseValidator } from '../../../lib/validation';
 import { safeLog, safeError, safeWarn, redactPII } from '../../../lib/pii-redactor';
 import { withRateLimit } from '../../../lib/rate-limiter';
 import { orchestrateLegalResearch } from '../../../lib/search-orchestration';
@@ -23,6 +23,104 @@ interface Template {
   description: string;
   templatePath: string;
   keywords: string[];
+}
+
+interface LegalOutput {
+  disclaimer?: string;
+  strategy?: string;
+  adversarial_strategy?: string;
+  roadmap?: Array<{ step: number; title: string; description: string; estimated_time?: string; required_documents?: string[] }>;
+  filing_template?: string;
+  citations?: Array<{ text: string; source?: string; url?: string }>;
+  local_logistics?: Record<string, unknown>;
+  procedural_checks?: string[];
+}
+
+interface ValidationResult {
+  valid: boolean;
+  errors?: string[];
+  missingFields?: string[];
+}
+
+/**
+ * Validate the AI output structure and content
+ * Returns validation result with specific error details
+ */
+function validateLegalOutputStructure(output: LegalOutput): ValidationResult {
+  const errors: string[] = [];
+  const missingFields: string[] = [];
+
+  // Check required fields
+  if (!output.disclaimer) {
+    missingFields.push('disclaimer');
+    errors.push('Missing required disclaimer');
+  }
+
+  if (!output.strategy) {
+    missingFields.push('strategy');
+    errors.push('Missing required strategy section');
+  }
+
+  if (!output.adversarial_strategy) {
+    missingFields.push('adversarial_strategy');
+    errors.push('Missing required adversarial strategy (red-team analysis)');
+  }
+
+  if (!output.roadmap || output.roadmap.length === 0) {
+    missingFields.push('roadmap');
+    errors.push('Missing required roadmap or roadmap is empty');
+  }
+
+  if (!output.filing_template) {
+    missingFields.push('filing_template');
+    errors.push('Missing required filing template');
+  }
+
+  if (!output.citations || output.citations.length < 3) {
+    missingFields.push('citations');
+    errors.push(`Insufficient citations (found ${output.citations?.length || 0}, required 3)`);
+  }
+
+  if (!output.local_logistics) {
+    missingFields.push('local_logistics');
+    errors.push('Missing required local logistics information');
+  }
+
+  if (!output.procedural_checks || output.procedural_checks.length === 0) {
+    missingFields.push('procedural_checks');
+    errors.push('Missing required procedural checks');
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors: errors.length > 0 ? errors : undefined,
+    missingFields: missingFields.length > 0 ? missingFields : undefined,
+  };
+}
+
+/**
+ * Generate a retry prompt that focuses on fixing specific validation errors
+ */
+function generateRetryPrompt(
+  originalPrompt: string,
+  validationResult: ValidationResult,
+  accumulatedText: string
+): string {
+  const missingFieldsStr = validationResult.missingFields?.join(', ') || 'unknown fields';
+  
+  return `Your previous response was incomplete or malformed.
+  
+Validation failed because: ${validationResult.errors?.join('; ')}.
+
+Please regenerate ONLY the missing or incomplete sections (${missingFieldsStr}) and combine them with your previous analysis to provide a COMPLETE and VALID JSON response.
+
+Original context:
+${originalPrompt.substring(0, 1000)}
+
+Previous (partial/invalid) response:
+${accumulatedText.substring(0, 2000)}
+
+Provide a COMPLETE JSON response that includes ALL required fields. Do not use placeholders - provide actual content.`;
 }
 
 /**
@@ -506,62 +604,144 @@ export async function POST(req: NextRequest) {
 
             const client = new GoogleGenAI({ apiKey });
 
+            // Auto-retry logic for validation failures
+            const MAX_RETRIES = 1; // Only retry once to avoid infinite loops
+            let retryCount = 0;
             let accumulatedText = '';
-            let firstTokenReceived = false;
+            let parsedOutput: LegalOutput | null = null;
+            let currentPrompt = prompt;
 
-            const result = await client.models.generateContentStream({
-              model: "gemini-2.5-flash-preview-09-2025",
-              contents: prompt,
-              config: {
-                systemInstruction: SYSTEM_INSTRUCTION,
-                responseMimeType: 'application/json',
-                responseSchema: responseSchema
-              }
-            });
+            while (retryCount <= MAX_RETRIES) {
+              accumulatedText = '';
+              let firstTokenReceived = false;
 
-            for await (const chunk of result) {
-              const chunkText = chunk.text;
-              if (chunkText) {
-                accumulatedText += chunkText;
-                
-                // Stream each chunk immediately to keep connection alive
-                if (!firstTokenReceived) {
-                  firstTokenReceived = true;
-                  controller.enqueue(encoder.encode(JSON.stringify({
-                    type: 'status',
-                    message: 'Analysis complete, formatting response...'
-                  }) + '\n'));
+              try {
+                const result = await client.models.generateContentStream({
+                  model: "gemini-2.5-flash-preview-09-2025",
+                  contents: currentPrompt,
+                  config: {
+                    systemInstruction: SYSTEM_INSTRUCTION,
+                    responseMimeType: 'application/json',
+                    responseSchema: responseSchema
+                  }
+                });
+
+                for await (const chunk of result) {
+                  const chunkText = chunk.text;
+                  if (chunkText) {
+                    accumulatedText += chunkText;
+
+                    // Stream each chunk immediately to keep connection alive
+                    if (!firstTokenReceived) {
+                      firstTokenReceived = true;
+                      const statusMessage = retryCount === 0 
+                        ? 'Analyzing your case...' 
+                        : 'Regenerating incomplete sections...';
+                      controller.enqueue(encoder.encode(JSON.stringify({
+                        type: 'status',
+                        message: statusMessage
+                      }) + '\n'));
+                    }
+
+                    controller.enqueue(encoder.encode(JSON.stringify({
+                      type: 'chunk',
+                      content: chunkText
+                    }) + '\n'));
+                  }
                 }
-                
-                controller.enqueue(encoder.encode(JSON.stringify({
-                  type: 'chunk',
-                  content: chunkText
-                }) + '\n'));
+
+                // Process final accumulated text
+                try {
+                  parsedOutput = JSON.parse(accumulatedText) as LegalOutput;
+
+                  // Validate structure
+                  const validation = validateLegalOutputStructure(parsedOutput);
+
+                  if (!validation.valid) {
+                    safeError(`Validation failed (attempt ${retryCount + 1}/${MAX_RETRIES + 1}):`, validation.errors);
+
+                    if (retryCount < MAX_RETRIES) {
+                      // Retry with focused prompt
+                      retryCount++;
+                      currentPrompt = generateRetryPrompt(prompt, validation, accumulatedText);
+                      safeWarn(`Retrying generation to fix: ${validation.missingFields?.join(', ')}`);
+                      continue; // Retry the loop
+                    } else {
+                      // Final attempt failed, use fallback
+                      safeError('All retry attempts failed, using fallback response');
+                      parsedOutput = {
+                        disclaimer: ResponseValidator.STANDARD_DISCLAIMER,
+                        strategy: parsedOutput.strategy || "Analysis incomplete. Please try again with more details about your legal situation.",
+                        adversarial_strategy: parsedOutput.adversarial_strategy || "Red-team analysis unavailable due to incomplete input.",
+                        roadmap: parsedOutput.roadmap || [{ step: 1, title: "Consult an attorney", description: "Seek professional legal advice for your specific situation." }],
+                        filing_template: parsedOutput.filing_template || "Template generation failed. Please provide more specific details about your case.",
+                        citations: parsedOutput.citations || [],
+                        local_logistics: parsedOutput.local_logistics || {},
+                        procedural_checks: parsedOutput.procedural_checks || []
+                      };
+                    }
+                  }
+
+                  // Additional Zod schema validation for extra safety
+                  try {
+                    const zodValidation = await import('../../../lib/schemas/legal-output');
+                    const zodResult = zodValidation.validateLegalOutput(parsedOutput);
+                    if (!zodResult.valid) {
+                      safeWarn('Zod validation warnings:', zodResult.errors);
+                      // Don't fail on Zod warnings if structural validation passed
+                    }
+                  } catch (zodError) {
+                    safeWarn('Zod validation error (non-blocking):', zodError);
+                  }
+
+                  // Validation passed or fallback applied, exit loop
+                  break;
+                } catch (parseError) {
+                  safeError("Failed to parse JSON:", parseError);
+
+                  if (retryCount < MAX_RETRIES) {
+                    retryCount++;
+                    currentPrompt = `${prompt}\n\nERROR: Your previous response was not valid JSON. Please respond with ONLY valid JSON.`;
+                    continue;
+                  } else {
+                    // Return error response
+                    parsedOutput = {
+                      disclaimer: ResponseValidator.STANDARD_DISCLAIMER,
+                      strategy: "Unable to generate analysis. The AI service returned malformed data.",
+                      adversarial_strategy: "Analysis unavailable.",
+                      roadmap: [{ step: 1, title: "Try again", description: "Please resubmit your request." }],
+                      filing_template: "Template unavailable.",
+                      citations: [],
+                      local_logistics: {},
+                      procedural_checks: []
+                    };
+                    break;
+                  }
+                }
+              } catch (streamError) {
+                safeError("Streaming error:", streamError);
+
+                if (retryCount < MAX_RETRIES) {
+                  retryCount++;
+                  currentPrompt = prompt;
+                  continue;
+                } else {
+                  throw streamError; // Re-throw to be caught by outer catch
+                }
               }
             }
 
-            // Process final accumulated text - should be valid JSON due to responseMimeType
-            let parsedOutput;
-            try {
-              parsedOutput = JSON.parse(accumulatedText);
-
-              // Validate against our Zod schema for extra safety
-              const validation = await import('../../../lib/schemas/legal-output');
-              const validationResult = validation.validateLegalOutput(parsedOutput);
-
-              if (!validationResult.valid) {
-                safeError('Schema validation failed:', validationResult.errors);
-                parsedOutput = {
-                  error: "AI response failed schema validation",
-                  validation_errors: validationResult.errors,
-                  raw: accumulatedText.substring(0, 500)
-                };
-              }
-            } catch (parseError) {
-              safeError("Failed to parse final JSON:", parseError);
+            // Ensure parsedOutput is never null at this point
+            if (!parsedOutput) {
               parsedOutput = {
-                error: "Failed to parse AI response",
-                raw: accumulatedText.substring(0, 500)
+                disclaimer: ResponseValidator.STANDARD_DISCLAIMER,
+                strategy: "Analysis unavailable due to a processing error.",
+                adversarial_strategy: "Analysis unavailable.",
+                roadmap: [{ step: 1, title: "Contact support", description: "An error occurred during analysis." }],
+                filing_template: "Template unavailable.",
+                citations: [],
+                local_logistics: {},
+                procedural_checks: []
               };
             }
 

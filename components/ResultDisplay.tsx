@@ -8,6 +8,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { validateLegalStructure } from '../src/utils/reliability';
 import { LegalMotion, MotionToDismiss, MotionForDiscovery, validateLegalMotion } from '../lib/schemas/motions';
+import { verifyCitationWithCache } from '../src/utils/citation-cache';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -327,34 +328,8 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
   // Function to verify a citation
   const verifyCitation = async (citationText: string) => {
     try {
-      const currentApiKey = apiKey || localStorage.getItem('GEMINI_API_KEY') || '';
-      const response = await fetch('/api/verify-citation', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Gemini-API-Key': currentApiKey,
-        },
-        body: JSON.stringify({
-          citation: citationText,
-          jurisdiction: jurisdiction
-        })
-      });
-
-      if (!response.ok) {
-        let errorMsg = `HTTP error! status: ${response.status}`;
-        try {
-          const errorData = await response.json();
-          errorMsg = errorData.details || errorData.error || errorMsg;
-        } catch (_error) {
-          // Fallback to text if JSON parse fails
-          const text = await response.text();
-          if (text) errorMsg = text.slice(0, 100);
-        }
-        throw new Error(errorMsg);
-      }
-
-      const data = await response.json();
-      return data;
+      const currentApiKey = apiKey || localStorage.getItem('lawsage_gemini_api_key') || '';
+      return await verifyCitationWithCache(citationText, jurisdiction, undefined, currentApiKey);
     } catch (error: unknown) {
       console.error('Error verifying citation:', error);
       const errorMessage = typeof error === 'object' && error !== null && 'message' in error
