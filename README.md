@@ -133,9 +133,10 @@ The easiest and recommended way to deploy LawSage is on **Vercel**. The entire a
 1.  Push your code to a public GitHub repository.
 2.  Go to [https://vercel.com/new](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme).
 3.  Import your repository.
-4.  **Important:** Set the `GEMINI_API_KEY` environment variable in your Vercel project settings.
+4.  **Optional:** Set the `GEMINI_API_KEY` environment variable in your Vercel project settings (this provides a fallback API key).
     *   Go to your Vercel project's **Settings** > **Environment Variables**.
     *   Add a new variable named `GEMINI_API_KEY` and paste your API key as the value.
+    *   **Note:** Users can also provide their own API key directly in the application Settings UI, which takes precedence over the environment variable.
 5.  Click "Deploy". Your application will be live!
 
 ## API Routes

@@ -1,32 +1,14 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Upload, Download, FileUp, Save, FolderOpen } from 'lucide-react';
+import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Upload, Download, Save, FolderOpen, Info } from 'lucide-react';
 import { processImageForOCR } from '../src/utils/image-processor';
-import { updateUrlWithState, watchStateAndSyncToUrl, createVirtualCaseFolderState, restoreVirtualCaseFolderState } from '../src/utils/state-sync';
+import { updateUrlWithState, watchStateAndSyncToUrl, createVirtualCaseFolderState, restoreVirtualCaseFolderState, cleanupLocalStorage } from '../src/utils/state-sync';
 import { exportCaseFile, importCaseFile, saveCaseToLocalStorage } from '../src/utils/case-file-manager';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ResultDisplay from './ResultDisplay';
 import HistoryActions from './HistoryActions';
-
-declare global {
-  interface Window {
-    webkitSpeechRecognition: {
-      new (): SpeechRecognition;
-    };
-  }
-}
-
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  onstart: () => void;
-  onend: () => void;
-  onerror: (event: unknown) => void;
-  onresult: (event: { results: { [key: number]: { [key: number]: { transcript: string } } } }) => void;
-  start: () => void;
-}
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -68,6 +50,16 @@ interface CaseHistoryItem {
   result: LegalResult;
 }
 
+interface OCRResult {
+  extracted_text: string;
+  document_type?: string;
+  case_number?: string;
+  court_name?: string;
+  parties?: string[];
+  important_dates?: string[];
+  legal_references?: string[];
+}
+
 const US_STATES = [
   "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut", "Delaware", "Florida", "Georgia",
   "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland",
@@ -90,13 +82,19 @@ const LEGAL_KEYWORDS = [
   'lawyer', 'attorney', 'legal', 'pro se', 'self-represent'
 ];
 
+// Rate limit info
+const RATE_LIMIT_INFO = {
+  limit: 5,
+  windowHours: 1,
+};
+
 /**
  * Pre-flight validation for user input
  * Checks if input has sufficient detail for accurate legal analysis
  */
 function validateUserInput(input: string): { valid: boolean; warning?: string } {
   const trimmed = input.trim();
-  
+
   // Check minimum length
   if (trimmed.length < 10) {
     return {
@@ -104,18 +102,18 @@ function validateUserInput(input: string): { valid: boolean; warning?: string } 
       warning: 'Please provide more details about your legal situation (at least 10 characters).'
     };
   }
-  
+
   // Check for legal keywords (at least 1 for better analysis)
   const inputLower = trimmed.toLowerCase();
   const keywordMatches = LEGAL_KEYWORDS.filter(keyword => inputLower.includes(keyword));
-  
+
   if (keywordMatches.length === 0) {
     return {
       valid: true,
       warning: 'For more accurate analysis, try to include specific legal terms related to your situation (e.g., eviction, contract, custody, etc.).'
     };
   }
-  
+
   return { valid: true };
 }
 
@@ -134,14 +132,18 @@ export default function LegalInterface() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [caseLedger, setCaseLedger] = useState<CaseLedgerEntry[]>([]);
-  const [apiKey, setApiKey] = useState('');
+  const [streamingStatus, setStreamingStatus] = useState<string>('');
+  const [rateLimitInfo, setRateLimitInfo] = useState<{ remaining: number; resetAt: Date | null } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize state from URL fragment on component mount
   useEffect(() => {
+    // Cleanup old localStorage entries
+    cleanupLocalStorage();
+
     const hash = window.location.hash.substring(1);
     const savedState = restoreVirtualCaseFolderState(hash);
-    
+
     if (savedState && typeof savedState === 'object' && savedState !== null) {
       const savedStateRecord = savedState as Record<string, unknown>;
       const caseFolder = savedStateRecord.caseFolder as CaseFolderState | undefined;
@@ -193,13 +195,6 @@ export default function LegalInterface() {
     }
   }, []);
 
-  useEffect(() => {
-    const savedKey = localStorage.getItem('GEMINI_API_KEY');
-    if (savedKey) {
-      setApiKey(savedKey);
-    }
-  }, []);
-
   // Set up URL state synchronization
   useEffect(() => {
     const getStateToSync = () => createVirtualCaseFolderState({
@@ -241,8 +236,8 @@ export default function LegalInterface() {
     checkHealth();
   }, []);
 
+  // Load history from localStorage on component mount
   useEffect(() => {
-    // Load history from localStorage on component mount
     const savedHistory = localStorage.getItem('lawsage_history');
     if (savedHistory) {
       try {
@@ -272,7 +267,9 @@ export default function LegalInterface() {
       return;
     }
 
-    const recognition = new window.webkitSpeechRecognition();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SpeechRecognition = (window as any).webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = false;
 
@@ -319,16 +316,31 @@ export default function LegalInterface() {
     fileInput?.click();
   };
 
+  const handleRateLimitInfo = async () => {
+    try {
+      const response = await fetch('/api/analyze', {
+        method: 'HEAD',
+      });
+      
+      const remaining = response.headers.get('X-RateLimit-Remaining');
+      const reset = response.headers.get('X-RateLimit-Reset');
+      
+      if (remaining && reset) {
+        setRateLimitInfo({
+          remaining: parseInt(remaining, 10),
+          resetAt: new Date(parseInt(reset, 10)),
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch rate limit info:', error);
+    }
+  };
 
   const handleSubmit = async () => {
     setError('');
     setWarning('');
-    
-    const apiKey = localStorage.getItem('GEMINI_API_KEY');
-    if (!apiKey) {
-      setError('Please set your Gemini API Key in Settings first.');
-      return;
-    }
+    setStreamingStatus('');
+
     if (!userInput.trim() && !selectedFile) {
       setError('Please describe your legal situation or upload an image.');
       return;
@@ -361,7 +373,6 @@ export default function LegalInterface() {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'X-Gemini-API-Key': apiKey,
             },
             body: JSON.stringify({
               image: processedImage,
@@ -369,12 +380,15 @@ export default function LegalInterface() {
             }),
           });
 
+          // Handle rate limit headers
+          handleRateLimitInfo();
+
           if (!response.ok) {
             if (response.status === 429) {
-              setError('Rate limit exceeded. Please enter your own free Gemini API key in Settings to continue.');
+              setError('Rate limit exceeded. You have used all 5 free requests in the last hour. Please wait and try again later.');
               return;
             } else if (response.status === 401) {
-              setError('Invalid API key. Please update your key in Settings.');
+              setError('Authentication failed. Please contact support.');
               return;
             } else {
               const errorData = await response.json();
@@ -382,21 +396,93 @@ export default function LegalInterface() {
             }
           }
 
-          const data: LegalResult = await response.json();
-          setResult(data);
-          setActiveTab('strategy');
+          // Handle streaming response
+          const contentType = response.headers.get('content-type');
+          
+          if (contentType && contentType.includes('application/x-ndjson')) {
+            const reader = response.body?.getReader();
+            if (!reader) {
+              throw new Error('ReadableStream not supported');
+            }
 
-          const newHistoryItem: CaseHistoryItem = {
-            id: Date.now().toString(),
-            timestamp: new Date(),
-            jurisdiction,
-            userInput: `OCR Analysis of: ${selectedFile.name}`,
-            result: data
-          };
+            const decoder = new TextDecoder();
+            let finalResult: LegalResult | null = null;
 
-          const updatedHistory = [newHistoryItem, ...history];
-          setHistory(updatedHistory);
-          localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n').filter(line => line.trim());
+
+                for (const line of lines) {
+                  try {
+                    const message = JSON.parse(line);
+
+                    if (message.type === 'status') {
+                      setStreamingStatus(message.message);
+                    } else if (message.type === 'complete') {
+                      finalResult = message.result;
+                    } else if (message.type === 'error') {
+                      throw new Error(message.error);
+                    }
+                    // chunk messages are streamed for progress but not accumulated here
+                  } catch (parseError) {
+                    console.warn('Failed to parse stream chunk:', parseError);
+                  }
+                }
+              }
+
+              if (finalResult) {
+                // Convert OCR result to LegalResult format
+                const ocrResult = finalResult as unknown as OCRResult;
+                const legalResult: LegalResult = {
+                  text: ocrResult.extracted_text,
+                  sources: []
+                };
+                
+                setResult(legalResult);
+                setActiveTab('strategy');
+
+                const newHistoryItem: CaseHistoryItem = {
+                  id: Date.now().toString(),
+                  timestamp: new Date(),
+                  jurisdiction,
+                  userInput: `OCR Analysis of: ${selectedFile.name}`,
+                  result: legalResult
+                };
+
+                const updatedHistory = [newHistoryItem, ...history];
+                setHistory(updatedHistory);
+                localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
+              } else {
+                throw new Error('No complete response received from server');
+              }
+            } catch (streamError) {
+              if (streamError instanceof Error && streamError.name === 'AbortError') {
+                throw new Error('Request timed out. Please try again.');
+              }
+              throw streamError;
+            }
+          } else {
+            // Fallback for non-streaming responses
+            const data: LegalResult = await response.json();
+            setResult(data);
+            setActiveTab('strategy');
+
+            const newHistoryItem: CaseHistoryItem = {
+              id: Date.now().toString(),
+              timestamp: new Date(),
+              jurisdiction,
+              userInput: `OCR Analysis of: ${selectedFile.name}`,
+              result: data
+            };
+
+            const updatedHistory = [newHistoryItem, ...history];
+            setHistory(updatedHistory);
+            localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
+          }
         } catch (err) {
           setError(err instanceof Error ? err.message : 'An unknown error occurred during OCR processing');
         }
@@ -406,20 +492,22 @@ export default function LegalInterface() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'X-Gemini-API-Key': apiKey,
           },
           body: JSON.stringify({ user_input: userInput, jurisdiction }),
           signal: controller.signal,
         });
 
+        // Handle rate limit headers
+        handleRateLimitInfo();
+
         clearTimeout(timeoutId);
 
         if (!response.ok) {
           if (response.status === 429) {
-            setError('Rate limit exceeded. Please enter your own free Gemini API key in Settings to continue.');
+            setError('Rate limit exceeded. You have used all 5 free requests in the last hour. Please wait and try again later.');
             return;
           } else if (response.status === 401) {
-            setError('Invalid API key. Please update your key in Settings.');
+            setError('Authentication failed. Please contact support.');
             return;
           } else {
             const errorData = await response.json();
@@ -451,12 +539,14 @@ export default function LegalInterface() {
                 try {
                   const message = JSON.parse(line);
 
-                  if (message.type === 'complete') {
+                  if (message.type === 'status') {
+                    setStreamingStatus(message.message);
+                  } else if (message.type === 'complete') {
                     finalResult = message.result;
                   } else if (message.type === 'error') {
                     throw new Error(message.error);
                   }
-                  // Note: chunk messages are streamed for progress but not accumulated here
+                  // chunk messages are streamed for progress but not accumulated here
                 } catch (parseError) {
                   console.warn('Failed to parse stream chunk:', parseError);
                 }
@@ -521,6 +611,7 @@ export default function LegalInterface() {
       }
     } finally {
       setLoading(false);
+      setStreamingStatus('');
     }
   };
 
@@ -585,7 +676,7 @@ export default function LegalInterface() {
 
     try {
       const importedData = await importCaseFile(file);
-      
+
       // Restore state from imported file
       if (importedData.caseFolder) {
         setUserInput(importedData.caseFolder.userInput || '');
@@ -595,15 +686,15 @@ export default function LegalInterface() {
         setSelectedHistoryItem(importedData.caseFolder.selectedHistoryItem);
         setBackendUnreachable(importedData.caseFolder.backendUnreachable || false);
       }
-      
+
       if (importedData.analysisResult) {
         setResult(importedData.analysisResult);
       }
-      
+
       if (importedData.ledger && importedData.ledger.length > 0) {
         setCaseLedger(importedData.ledger);
       }
-      
+
       setError('');
       setWarning(`Successfully imported case file from ${new Date(importedData.exportedAt).toLocaleDateString()}`);
       addToCaseLedger('other', `Case file imported from disk`);
@@ -642,7 +733,23 @@ export default function LegalInterface() {
           </p>
         </div>
       )}
-      
+
+      {/* Rate Limit Info */}
+      {rateLimitInfo && (
+        <div className="bg-indigo-50 border border-indigo-200 p-4 rounded-xl flex items-center gap-3 text-indigo-800 shadow-sm">
+          <Info className="shrink-0" size={20} />
+          <div className="flex-1">
+            <p className="text-sm font-medium">
+              {rateLimitInfo.remaining} requests remaining this hour
+              {rateLimitInfo.resetAt && ` (resets at ${rateLimitInfo.resetAt.toLocaleTimeString()})`}
+            </p>
+            <p className="text-xs text-indigo-600 mt-1">
+              LawSage provides {RATE_LIMIT_INFO.limit} free requests per hour to ensure fair access for all users.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Warning Message */}
       {warning && (
         <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-3 text-amber-800 shadow-sm">
@@ -650,7 +757,7 @@ export default function LegalInterface() {
           <p className="text-sm font-medium">{warning}</p>
         </div>
       )}
-      
+
       {/* Case File Management */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
         <div className="flex justify-between items-center mb-4">
@@ -667,7 +774,7 @@ export default function LegalInterface() {
               <Download size={16} />
               Export Case
             </button>
-            
+
             <label className="flex items-center gap-1 px-3 py-1.5 border border-slate-300 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors cursor-pointer">
               <FolderOpen size={16} />
               Import Case
@@ -679,7 +786,7 @@ export default function LegalInterface() {
                 className="hidden"
               />
             </label>
-            
+
             <button
               onClick={handleSaveToLocalStorage}
               className="flex items-center gap-1 px-3 py-1.5 border border-slate-300 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
@@ -691,11 +798,11 @@ export default function LegalInterface() {
           </div>
         </div>
         <p className="text-sm text-slate-600">
-          <strong>Export/Import:</strong> Save your complete case file to disk (bypasses URL limits). 
+          <strong>Export/Import:</strong> Save your complete case file to disk (bypasses URL limits).
           <strong> Local Storage:</strong> Quick save in your browser for this jurisdiction.
         </p>
       </div>
-      
+
       {/* History Section */}
       {history.length > 0 && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
@@ -836,6 +943,15 @@ export default function LegalInterface() {
             </div>
           </div>
         </div>
+
+        {/* Streaming Status */}
+        {streamingStatus && (
+          <div className="mt-4 bg-indigo-50 border border-indigo-200 p-3 rounded-lg flex items-center gap-2 text-indigo-700">
+            <Loader2 className="animate-spin" size={16} />
+            <span className="text-sm font-medium">{streamingStatus}</span>
+          </div>
+        )}
+
         {error && (
           <div className="space-y-3 mt-2">
             <div className="flex items-center justify-between gap-2 text-red-600 text-sm p-3 bg-red-50 rounded-lg border border-red-100">
@@ -863,7 +979,7 @@ export default function LegalInterface() {
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           jurisdiction={jurisdiction}
-          apiKey={apiKey}
+          apiKey=""
         />
       )}
     </div>

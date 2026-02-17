@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { SafetyValidator } from '../../../lib/validation';
 import { safeLog, safeError, safeWarn, redactPII } from '../../../lib/pii-redactor';
-import { StructuredLegalOutputSchema } from '../../../lib/schemas/legal-output';
+import { withRateLimit } from '../../../lib/rate-limiter';
+import { orchestrateLegalResearch } from '../../../lib/search-orchestration';
 
 // Define types
 interface LegalRequest {
@@ -16,51 +17,12 @@ interface StandardErrorResponse {
   detail: string;
 }
 
-// Simple cosine similarity function for template matching
-function cosineSimilarity(text1: string, text2: string): number {
-  if (!text1 || !text2) return 0;
-
-  // Tokenize and normalize the texts
-  const tokens1 = text1.toLowerCase().split(/\W+/).filter(Boolean);
-  const tokens2 = text2.toLowerCase().split(/\W+/).filter(Boolean);
-
-  // Create term frequency maps
-  const freqMap1 = new Map<string, number>();
-  const freqMap2 = new Map<string, number>();
-
-  for (const token of tokens1) {
-    freqMap1.set(token, (freqMap1.get(token) || 0) + 1);
-  }
-
-  for (const token of tokens2) {
-    freqMap2.set(token, (freqMap2.get(token) || 0) + 1);
-  }
-
-  // Get all unique terms
-  const allTerms = new Set([...tokens1, ...tokens2]);
-
-  // Calculate vectors
-  const vec1: number[] = [];
-  const vec2: number[] = [];
-
-  for (const term of allTerms) {
-    vec1.push(freqMap1.get(term) || 0);
-    vec2.push(freqMap2.get(term) || 0);
-  }
-
-  // Calculate dot product
-  let dotProduct = 0;
-  for (let i = 0; i < vec1.length; i++) {
-    dotProduct += vec1[i] * vec2[i];
-  }
-
-  // Calculate magnitudes
-  const magnitude1 = Math.sqrt(vec1.reduce((sum, val) => sum + val * val, 0));
-  const magnitude2 = Math.sqrt(vec2.reduce((sum, val) => sum + val * val, 0));
-
-  if (magnitude1 === 0 || magnitude2 === 0) return 0;
-
-  return dotProduct / (magnitude1 * magnitude2);
+// Define types for template matching
+interface Template {
+  title: string;
+  description: string;
+  templatePath: string;
+  keywords: string[];
 }
 
 /**
@@ -101,11 +63,51 @@ function hasEmergencyKeywords(userInput: string): boolean {
   return emergencyKeywords.some(keyword => userInputLower.includes(keyword));
 }
 
-interface Template {
-  title: string;
-  description: string;
-  templatePath: string;
-  keywords: string[];
+// Simple cosine similarity function for template matching
+function cosineSimilarity(text1: string, text2: string): number {
+  if (!text1 || !text2) return 0;
+
+  // Tokenize and normalize the texts
+  const tokens1 = text1.toLowerCase().split(/\W+/).filter(Boolean);
+  const tokens2 = text2.toLowerCase().split(/\W+/).filter(Boolean);
+
+  // Create term frequency maps
+  const freqMap1 = new Map<string, number>();
+  const freqMap2 = new Map<string, number>();
+
+  for (const token of tokens1) {
+    freqMap1.set(token, (freqMap1.get(token) || 0) + 1);
+  }
+
+  for (const token of tokens2) {
+    freqMap2.set(token, (freqMap2.get(token) || 0) + 1);
+  }
+
+  // Get all unique terms
+  const allTerms = new Set([...tokens1, ...tokens2]);
+
+  // Create vectors
+  const vec1: number[] = [];
+  const vec2: number[] = [];
+
+  for (const term of allTerms) {
+    vec1.push(freqMap1.get(term) || 0);
+    vec2.push(freqMap2.get(term) || 0);
+  }
+
+  // Calculate dot product
+  let dotProduct = 0;
+  for (let i = 0; i < vec1.length; i++) {
+    dotProduct += vec1[i] * vec2[i];
+  }
+
+  // Calculate magnitudes
+  const magnitude1 = Math.sqrt(vec1.reduce((sum, val) => sum + val * val, 0));
+  const magnitude2 = Math.sqrt(vec2.reduce((sum, val) => sum + val * val, 0));
+
+  if (magnitude1 === 0 || magnitude2 === 0) return 0;
+
+  return dotProduct / (magnitude1 * magnitude2);
 }
 
 /**
@@ -192,7 +194,7 @@ State: [STATE]
 
 TO THE HONORABLE COURT AND THE OPPOSING PARTY:
 
-COMES NOW the Plaintiff/Petitioner, [Your Name], pro se, and moves this Honorable Court for an Order [DESCRIBE RELIEF]. In support of this Motion, the Plaintiff states as follows:
+COMES NOW the Plaintiff/Petitioner, [Your Name], pro se, and moves this Honorable Court for an Order [RELIEF REQUESTED]. In support of this Motion, the Plaintiff states as follows:
 
 ### I. INTRODUCTION
 1. This is a [TYPE OF CASE] action brought by the Plaintiff against the Defendant.
@@ -277,8 +279,8 @@ Your response MUST be in valid JSON format with the following structure:
 }
 
 CRITICAL INSTRUCTIONS:
-1. Use the Google Search tool (if available) to find 'Local Rules of Court' for the user's specific county/district.
-2. Extract courthouse location, filing fees, and procedural requirements from these local rules.
+1. Use the provided RESEARCH CONTEXT to ground your citations and analysis.
+2. Cite sources explicitly using [Source X] notation when referencing the research context.
 3. Return ALL requested information in a single JSON response.
 4. Include at least 3 proper legal citations.
 5. Provide a detailed roadmap with at least 3 steps.
@@ -288,110 +290,139 @@ CRITICAL INSTRUCTIONS:
 export const runtime = 'edge'; // Enable edge runtime
 
 export async function POST(req: NextRequest) {
-  try {
-    const xGeminiApiKey = req.headers.get('X-Gemini-API-Key');
-    const { user_input, jurisdiction, documents }: LegalRequest = await req.json();
-
-    // Validate inputs
-    if (!user_input?.trim()) {
-      return NextResponse.json(
-        { type: "ValidationError", detail: "User input is required." } satisfies StandardErrorResponse,
-        { status: 400 }
-      );
-    }
-
-    if (!jurisdiction?.trim()) {
-      return NextResponse.json(
-        { type: "ValidationError", detail: "Jurisdiction is required." } satisfies StandardErrorResponse,
-        { status: 400 }
-      );
-    }
-
-    // PII Redaction for logging - log redacted version only
-    const redactedInput = redactPII(user_input);
-    if (redactedInput.redactedFields.length > 0) {
-      safeLog(`Processing request with PII redacted: [${redactedInput.redactedFields.join(', ')}]`);
-    } else {
-      safeLog(`Processing request for jurisdiction: ${jurisdiction}`);
-    }
-
-    // Static grounding layer - check common procedural questions first (saves API calls)
-    const { getLegalLookupResponse } = await import('../../../src/utils/legal-lookup');
-    const staticResponse = await getLegalLookupResponse(`${user_input} ${jurisdiction}`);
-
-    if (staticResponse) {
-      safeLog('Static grounding match found, returning cached response');
-      return NextResponse.json(staticResponse);
-    }
-
-    // Template injection
-    let templateContent = '';
-    const isEmergency = hasEmergencyKeywords(user_input);
-
-    let exParteRulesText = "";
-    if (isEmergency) {
-      const { searchExParteRules } = await import('../../../src/utils/legal-lookup');
-      const exParteRules = await searchExParteRules(jurisdiction);
-      if (exParteRules.length > 0) {
-        exParteRulesText = "EX PARTE NOTICE RULES FOR THIS JURISDICTION:\n";
-        exParteRules.forEach(rule => {
-          exParteRulesText += `- ${rule.courthouse}: Notice due by ${rule.notice_time}. Rule: ${rule.rule}\n`;
-        });
-        exParteRulesText += "\n";
-      }
-    }
-
+  // Wrap handler with rate limiting
+  return withRateLimit(async () => {
     try {
-      const manifestResponse = await fetch(`${req.nextUrl.origin}/templates/manifest.json`);
-      if (manifestResponse.ok) {
-        const manifest = await manifestResponse.json();
-        const templates = manifest.templates || [];
-        const { template: bestMatch } = findBestTemplate(user_input, templates);
+      const { user_input, jurisdiction, documents }: LegalRequest = await req.json();
 
-        if (bestMatch) {
-          const templatePath = bestMatch.templatePath;
-          const templateResponse = await fetch(`${req.nextUrl.origin}${templatePath}`);
-          if (templateResponse.ok) {
-            templateContent = await templateResponse.text();
-            safeLog(`Using template: ${bestMatch.title}`);
-          }
-        } else {
-          templateContent = GENERIC_MOTION_TEMPLATE;
-          safeLog('No template match found, using generic motion template');
+      // Validate inputs
+      if (!user_input?.trim()) {
+        return NextResponse.json(
+          { type: "ValidationError", detail: "User input is required." } satisfies StandardErrorResponse,
+          { status: 400 }
+        );
+      }
+
+      if (!jurisdiction?.trim()) {
+        return NextResponse.json(
+          { type: "ValidationError", detail: "Jurisdiction is required." } satisfies StandardErrorResponse,
+          { status: 400 }
+        );
+      }
+
+      // Get API key from request header (user-provided) or fall back to environment variable
+      const xGeminiApiKey = req.headers.get('X-Gemini-API-Key');
+      const apiKey = xGeminiApiKey || process.env.GEMINI_API_KEY;
+
+      if (!apiKey) {
+        return NextResponse.json(
+          { type: "AuthenticationError", detail: "Gemini API Key is missing. Please provide your API key in Settings." } satisfies StandardErrorResponse,
+          { status: 401 }
+        );
+      }
+
+      // PII Redaction for logging - log redacted version only
+      const redactedInput = redactPII(user_input);
+      if (redactedInput.redactedFields.length > 0) {
+        safeLog(`Processing request with PII redacted: [${redactedInput.redactedFields.join(', ')}]`);
+      } else {
+        safeLog(`Processing request for jurisdiction: ${jurisdiction}`);
+      }
+
+      // Static grounding layer - check common procedural questions first (saves API calls)
+      const { getLegalLookupResponse } = await import('../../../src/utils/legal-lookup');
+      const staticResponse = await getLegalLookupResponse(`${user_input} ${jurisdiction}`);
+
+      if (staticResponse) {
+        safeLog('Static grounding match found, returning cached response');
+        return NextResponse.json(staticResponse);
+      }
+
+      // Template injection
+      let templateContent = '';
+      const isEmergency = hasEmergencyKeywords(user_input);
+
+      let exParteRulesText = "";
+      if (isEmergency) {
+        const { searchExParteRules } = await import('../../../src/utils/legal-lookup');
+        const exParteRules = await searchExParteRules(jurisdiction);
+        if (exParteRules.length > 0) {
+          exParteRulesText = "EX PARTE NOTICE RULES FOR THIS JURISDICTION:\n";
+          exParteRules.forEach(rule => {
+            exParteRulesText += `- ${rule.courthouse}: Notice due by ${rule.notice_time}. Rule: ${rule.rule}\n`;
+          });
+          exParteRulesText += "\n";
         }
       }
-    } catch (error) {
-      safeWarn('Template matching failed:', error);
-      templateContent = GENERIC_MOTION_TEMPLATE;
-    }
 
-    if (!xGeminiApiKey) {
-      return NextResponse.json(
-        { type: "AuthenticationError", detail: "Gemini API Key is missing. Static grounding layer did not find a match for this query." } satisfies StandardErrorResponse,
-        { status: 401 }
-      );
-    }
+      try {
+        const manifestResponse = await fetch(`${req.nextUrl.origin}/templates/manifest.json`);
+        if (manifestResponse.ok) {
+          const manifest = await manifestResponse.json();
+          const templates = manifest.templates || [];
+          const { template: bestMatch } = findBestTemplate(user_input, templates);
 
-    if (!SafetyValidator.redTeamAudit(user_input, jurisdiction)) {
-      return NextResponse.json(
-        { type: "SafetyViolation", detail: "Request blocked: Missing jurisdiction or potential safety violation." } satisfies StandardErrorResponse,
-        { status: 400 }
-      );
-    }
+          if (bestMatch) {
+            const templatePath = bestMatch.templatePath;
+            const templateResponse = await fetch(`${req.nextUrl.origin}${templatePath}`);
+            if (templateResponse.ok) {
+              templateContent = await templateResponse.text();
+              safeLog(`Using template: ${bestMatch.title}`);
+            }
+          } else {
+            templateContent = GENERIC_MOTION_TEMPLATE;
+            safeLog('No template match found, using generic motion template');
+          }
+        }
+      } catch (error) {
+        safeWarn('Template matching failed:', error);
+        templateContent = GENERIC_MOTION_TEMPLATE;
+      }
 
-    const client = new GoogleGenAI({ apiKey: xGeminiApiKey });
+      if (!SafetyValidator.redTeamAudit(user_input, jurisdiction)) {
+        return NextResponse.json(
+          { type: "SafetyViolation", detail: "Request blocked: Missing jurisdiction or potential safety violation." } satisfies StandardErrorResponse,
+          { status: 400 }
+        );
+      }
 
-    let documentsText = "";
-    if (documents && documents.length > 0) {
-      documentsText = "RELEVANT DOCUMENTS FROM VIRTUAL CASE FOLDER:\n\n";
-      documents.forEach((doc, index) => {
-        documentsText += `Document ${index + 1}:\n${doc}\n\n`;
-      });
-    }
+      let documentsText = "";
+      if (documents && documents.length > 0) {
+        documentsText = "RELEVANT DOCUMENTS FROM VIRTUAL CASE FOLDER:\n\n";
+        documents.forEach((doc, index) => {
+          documentsText += `Document ${index + 1}:\n${doc}\n\n`;
+        });
+      }
 
-    const prompt = `
+      // DETERMINISTIC GROUNDING: Perform multi-step legal research
+      safeLog('Starting deterministic legal research...');
+      
+      // Send initial status chunk to keep connection alive
+      const encoder = new TextEncoder();
+      
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            // Send research status update
+            controller.enqueue(encoder.encode(JSON.stringify({
+              type: 'status',
+              message: 'Conducting legal research...'
+            }) + '\n'));
+
+            // Step 1-3: Generate queries, execute searches, format context
+            const researchContext = await orchestrateLegalResearch(user_input, jurisdiction, apiKey);
+            
+            // Send research complete status
+            controller.enqueue(encoder.encode(JSON.stringify({
+              type: 'status',
+              message: 'Generating legal analysis...'
+            }) + '\n'));
+
+            const prompt = `
  ${documentsText}
  ${exParteRulesText}
+
+ ${researchContext}
 
  User Situation: ${user_input}
  Jurisdiction: ${jurisdiction}
@@ -406,185 +437,193 @@ export async function POST(req: NextRequest) {
     (B) The Ex Parte Application for TRO/OSC.
     Include explicit placeholders for required Judicial Council forms like CM-010 and MC-030.
     ${templateContent ? "Base these on this content: " + templateContent : ""}
- 6. 'citations': At least 3 verified citations relevant to the subject matter and jurisdiction (e.g., Cal. Civ. Code § 789.3).
+ 6. 'citations': At least 3 verified citations relevant to the subject matter and jurisdiction (e.g., Cal. Civ. Code § 789.3). Cite research sources as [Source X].
  7. 'procedural_checks': Results of procedural technicality checks against Local Rules of Court. For Los Angeles County: MUST include check for mandatory e-filing requirement for civil complaints and the Ex Parte filing window (typically 8:30 AM - 10:00 AM).
 
  Return only valid JSON.
  `;
 
-    // Convert Zod schema to Google's responseSchema format
-    // Google uses a subset of JSON Schema format
-    const responseSchema = {
-      type: 'object',
-      properties: {
-        disclaimer: { type: 'string' },
-        strategy: { type: 'string' },
-        adversarial_strategy: { type: 'string' },
-        roadmap: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              step: { type: 'integer' },
-              title: { type: 'string' },
-              description: { type: 'string' },
-              estimated_time: { type: 'string' },
-              required_documents: { type: 'array', items: { type: 'string' } }
-            },
-            required: ['step', 'title', 'description']
-          }
-        },
-        filing_template: { type: 'string' },
-        citations: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              text: { type: 'string' },
-              source: { type: 'string', enum: ['federal statute', 'state statute', 'court rule', 'case law', 'local rule', 'other'] },
-              url: { type: 'string' }
-            },
-            required: ['text']
-          }
-        },
-        sources: { type: 'array', items: { type: 'string' } },
-        local_logistics: {
-          type: 'object',
-          properties: {
-            courthouse_address: { type: 'string' },
-            filing_fees: { type: 'string' },
-            dress_code: { type: 'string' },
-            parking_info: { type: 'string' },
-            hours_of_operation: { type: 'string' },
-            local_rules_url: { type: 'string' }
-          },
-          required: ['courthouse_address']
-        },
-        procedural_checks: { type: 'array', items: { type: 'string' } }
-      },
-      required: [
-        'disclaimer',
-        'strategy',
-        'adversarial_strategy',
-        'roadmap',
-        'filing_template',
-        'citations',
-        'local_logistics',
-        'procedural_checks'
-      ]
-    };
+            // Convert Zod schema to Google's responseSchema format
+            const responseSchema = {
+              type: 'object',
+              properties: {
+                disclaimer: { type: 'string' },
+                strategy: { type: 'string' },
+                adversarial_strategy: { type: 'string' },
+                roadmap: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      step: { type: 'integer' },
+                      title: { type: 'string' },
+                      description: { type: 'string' },
+                      estimated_time: { type: 'string' },
+                      required_documents: { type: 'array', items: { type: 'string' } }
+                    },
+                    required: ['step', 'title', 'description']
+                  }
+                },
+                filing_template: { type: 'string' },
+                citations: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      text: { type: 'string' },
+                      source: { type: 'string', enum: ['federal statute', 'state statute', 'court rule', 'case law', 'local rule', 'other'] },
+                      url: { type: 'string' }
+                    },
+                    required: ['text']
+                  }
+                },
+                sources: { type: 'array', items: { type: 'string' } },
+                local_logistics: {
+                  type: 'object',
+                  properties: {
+                    courthouse_address: { type: 'string' },
+                    filing_fees: { type: 'string' },
+                    dress_code: { type: 'string' },
+                    parking_info: { type: 'string' },
+                    hours_of_operation: { type: 'string' },
+                    local_rules_url: { type: 'string' }
+                  },
+                  required: ['courthouse_address']
+                },
+                procedural_checks: { type: 'array', items: { type: 'string' } }
+              },
+              required: [
+                'disclaimer',
+                'strategy',
+                'adversarial_strategy',
+                'roadmap',
+                'filing_template',
+                'citations',
+                'local_logistics',
+                'procedural_checks'
+              ]
+            };
 
-    // TRUE STREAMING: Send chunks as they arrive from Gemini to avoid Vercel 10s timeout
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      async start(controller) {
-        try {
-          const result = await client.models.generateContentStream({
-            model: "gemini-2.5-flash-preview-09-2025",
-            contents: prompt,
-            config: { 
-              systemInstruction: SYSTEM_INSTRUCTION,
-              responseMimeType: 'application/json',
-              responseSchema: responseSchema
+            const client = new GoogleGenAI({ apiKey });
+
+            let accumulatedText = '';
+            let firstTokenReceived = false;
+
+            const result = await client.models.generateContentStream({
+              model: "gemini-2.5-flash-preview-09-2025",
+              contents: prompt,
+              config: {
+                systemInstruction: SYSTEM_INSTRUCTION,
+                responseMimeType: 'application/json',
+                responseSchema: responseSchema
+              }
+            });
+
+            for await (const chunk of result) {
+              const chunkText = chunk.text;
+              if (chunkText) {
+                accumulatedText += chunkText;
+                
+                // Stream each chunk immediately to keep connection alive
+                if (!firstTokenReceived) {
+                  firstTokenReceived = true;
+                  controller.enqueue(encoder.encode(JSON.stringify({
+                    type: 'status',
+                    message: 'Analysis complete, formatting response...'
+                  }) + '\n'));
+                }
+                
+                controller.enqueue(encoder.encode(JSON.stringify({
+                  type: 'chunk',
+                  content: chunkText
+                }) + '\n'));
+              }
             }
-          });
 
-          let accumulatedText = '';
+            // Process final accumulated text - should be valid JSON due to responseMimeType
+            let parsedOutput;
+            try {
+              parsedOutput = JSON.parse(accumulatedText);
 
-          for await (const chunk of result) {
-            const chunkText = chunk.text;
-            if (chunkText) {
-              accumulatedText += chunkText;
-              // Stream each chunk immediately to keep connection alive
-              controller.enqueue(encoder.encode(JSON.stringify({
-                type: 'chunk',
-                content: chunkText
-              }) + '\n'));
-            }
-          }
+              // Validate against our Zod schema for extra safety
+              const validation = await import('../../../lib/schemas/legal-output');
+              const validationResult = validation.validateLegalOutput(parsedOutput);
 
-          // Process final accumulated text - should be valid JSON due to responseMimeType
-          let parsedOutput;
-          try {
-            parsedOutput = JSON.parse(accumulatedText);
-            
-            // Validate against our Zod schema for extra safety
-            const validation = await import('../../../lib/schemas/legal-output');
-            const validationResult = validation.validateLegalOutput(parsedOutput);
-            
-            if (!validationResult.valid) {
-              safeError('Schema validation failed:', validationResult.errors);
+              if (!validationResult.valid) {
+                safeError('Schema validation failed:', validationResult.errors);
+                parsedOutput = {
+                  error: "AI response failed schema validation",
+                  validation_errors: validationResult.errors,
+                  raw: accumulatedText.substring(0, 500)
+                };
+              }
+            } catch (parseError) {
+              safeError("Failed to parse final JSON:", parseError);
               parsedOutput = {
-                error: "AI response failed schema validation",
-                validation_errors: validationResult.errors,
+                error: "Failed to parse AI response",
                 raw: accumulatedText.substring(0, 500)
               };
             }
-          } catch (parseError) {
-            safeError("Failed to parse final JSON:", parseError);
-            parsedOutput = {
-              error: "Failed to parse AI response",
-              raw: accumulatedText.substring(0, 500)
-            };
+
+            const sources = parsedOutput.citations?.map((c: { text: string; url?: string }) =>
+              ({ title: c.text, uri: c.url })
+            ) || [];
+
+            // Send final complete response
+            controller.enqueue(encoder.encode(JSON.stringify({
+              type: 'complete',
+              result: { text: JSON.stringify(parsedOutput), sources }
+            }) + '\n'));
+          } catch (e) {
+            safeError("AI processing error:", e);
+            controller.enqueue(encoder.encode(JSON.stringify({
+              type: 'error',
+              error: e instanceof Error ? e.message : 'Unknown error'
+            }) + '\n'));
+          } finally {
+            controller.close();
           }
-
-          const sources = parsedOutput.citations?.map((c: { text: string; url?: string }) =>
-            ({ title: c.text, uri: c.url })
-          ) || [];
-
-          // Send final complete response
-          controller.enqueue(encoder.encode(JSON.stringify({
-            type: 'complete',
-            result: { text: JSON.stringify(parsedOutput), sources }
-          }) + '\n'));
-        } catch (e) {
-          safeError("AI processing error:", e);
-          controller.enqueue(encoder.encode(JSON.stringify({
-            type: 'error',
-            error: e instanceof Error ? e.message : 'Unknown error'
-          }) + '\n'));
-        } finally {
-          controller.close();
         }
+      });
+
+      return new Response(stream, {
+        headers: {
+          'Content-Type': 'application/x-ndjson',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+          'X-RateLimit-Limit': '5',
+          'X-RateLimit-Window': '3600',
+        }
+      });
+    } catch (error: unknown) {
+      safeError("Error in analyze API route:", error);
+
+      const errorMessage = typeof error === 'object' && error !== null && 'message' in error
+        ? String((error as Record<string, unknown>).message)
+        : 'Unknown error occurred';
+
+      if (errorMessage.includes("429") || errorMessage.toLowerCase().includes("quota") || errorMessage.toLowerCase().includes("rate limit")) {
+        return NextResponse.json(
+          {
+            type: "RateLimitError",
+            detail: "Rate limit exceeded. Please enter your own free Gemini API key in Settings to continue immediately.",
+            suggestion: "Visit https://aistudio.google.com/app/apikey to get your free API key"
+          } satisfies StandardErrorResponse & { suggestion: string },
+          { status: 429 }
+        );
+      } else if (errorMessage.includes("400") || errorMessage.toLowerCase().includes("invalid")) {
+        return NextResponse.json(
+          { type: "AIClientError", detail: errorMessage || "Invalid request to AI service" } satisfies StandardErrorResponse,
+          { status: 400 }
+        );
+      } else {
+        return NextResponse.json(
+          { type: "InternalServerError", detail: "An internal server error occurred" } satisfies StandardErrorResponse,
+          { status: 500 }
+        );
       }
-    });
-
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'application/x-ndjson',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive'
-      }
-    });
-  } catch (error: unknown) {
-    safeError("Error in analyze API route:", error);
-
-    const errorMessage = typeof error === 'object' && error !== null && 'message' in error
-      ? String((error as Record<string, unknown>).message)
-      : 'Unknown error occurred';
-
-    // Check for rate limit errors and provide graceful degradation
-    if (errorMessage.includes("429") || errorMessage.toLowerCase().includes("quota") || errorMessage.toLowerCase().includes("rate limit")) {
-      return NextResponse.json(
-        { 
-          type: "RateLimitError", 
-          detail: "Host API key rate limit exceeded. Please enter your own free Gemini API key in Settings to continue immediately.",
-          suggestion: "Visit https://aistudio.google.com/app/apikey to get your free API key"
-        } satisfies StandardErrorResponse & { suggestion: string },
-        { status: 429 }
-      );
-    } else if (errorMessage.includes("400") || errorMessage.toLowerCase().includes("invalid")) {
-      return NextResponse.json(
-        { type: "AIClientError", detail: errorMessage || "Invalid request to AI service" } satisfies StandardErrorResponse,
-        { status: 400 }
-      );
-    } else {
-      return NextResponse.json(
-        { type: "InternalServerError", detail: "An internal server error occurred" } satisfies StandardErrorResponse,
-        { status: 500 }
-      );
     }
-  }
+  });
 }
 
 export async function GET(_req: NextRequest) {

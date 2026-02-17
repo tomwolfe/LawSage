@@ -1,7 +1,22 @@
 // utils/state-sync.ts
 // URL state synchronization utility for compressing and storing case folder state
+// HYBRID PERSISTENCE: Uses URL for small states, localStorage for large states
 
 import * as LZString from 'lz-string';
+
+// URL length limit (conservative estimate to avoid browser limits)
+const URL_LENGTH_LIMIT = 1500;
+// LocalStorage key prefix
+const LS_PREFIX = 'lawsage:case:';
+// Session ID key for current case
+const CURRENT_SESSION_KEY = 'lawsage:current-session';
+
+/**
+ * Generate a unique session ID
+ */
+function generateSessionId(): string {
+  return `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
 
 /**
  * Compresses and encodes the case folder state to a URL fragment
@@ -20,6 +35,18 @@ export function compressStateToUrlFragment(state: unknown): string {
   } catch (error) {
     console.error('Error compressing state to URL fragment:', error);
     return '';
+  }
+}
+
+/**
+ * Check if state is too large for URL and should use localStorage
+ */
+export function shouldUseLocalStorage(state: unknown): boolean {
+  try {
+    const compressed = compressStateToUrlFragment(state);
+    return compressed.length > URL_LENGTH_LIMIT;
+  } catch {
+    return true; // Use localStorage if compression fails
   }
 }
 
@@ -50,16 +77,107 @@ export function decompressStateFromUrlFragment(fragment: string): unknown {
 }
 
 /**
+ * Save state to localStorage with a session ID
+ */
+export function saveStateToLocalStorage(state: unknown): string {
+  try {
+    const sessionId = generateSessionId();
+    const key = `${LS_PREFIX}${sessionId}`;
+    
+    // Compress and store
+    const compressed = compressStateToUrlFragment(state);
+    localStorage.setItem(key, compressed);
+    
+    // Store session ID reference
+    localStorage.setItem(CURRENT_SESSION_KEY, sessionId);
+    
+    console.log(`State saved to localStorage with session ID: ${sessionId}`);
+    return sessionId;
+  } catch (error) {
+    console.error('Error saving state to localStorage:', error);
+    return '';
+  }
+}
+
+/**
+ * Get state from localStorage by session ID
+ */
+export function getStateFromLocalStorage(sessionId?: string): unknown {
+  try {
+    const id = sessionId || localStorage.getItem(CURRENT_SESSION_KEY);
+    if (!id) {
+      return null;
+    }
+    
+    const key = `${LS_PREFIX}${id}`;
+    const compressed = localStorage.getItem(key);
+    
+    if (!compressed) {
+      return null;
+    }
+    
+    return decompressStateFromUrlFragment(compressed);
+  } catch (error) {
+    console.error('Error getting state from localStorage:', error);
+    return null;
+  }
+}
+
+/**
+ * Clear old localStorage entries (cleanup)
+ */
+export function cleanupLocalStorage(): void {
+  try {
+    const now = Date.now();
+    const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
+    
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(LS_PREFIX)) {
+        const compressed = localStorage.getItem(key);
+        if (compressed) {
+          try {
+            const state = decompressStateFromUrlFragment(compressed);
+            const stateRecord = state as Record<string, unknown> | null;
+            if (stateRecord && 'timestamp' in stateRecord) {
+              const timestamp = stateRecord.timestamp as number;
+              if (now - timestamp > maxAge) {
+                localStorage.removeItem(key);
+              }
+            }
+          } catch {
+            // Invalid data, remove
+            localStorage.removeItem(key);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error cleaning up localStorage:', error);
+  }
+}
+
+/**
  * Updates the URL hash with the compressed state
+ * HYBRID MODE: If state is too large, saves to localStorage and uses session ID in URL
  * @param state The state to compress and store in the URL
  */
 export function updateUrlWithState(state: unknown): void {
   try {
-    const compressedState = compressStateToUrlFragment(state);
-
-    // Update the URL hash without triggering a page reload
-    const newUrl = `${window.location.pathname}${window.location.search}#${compressedState}`;
-    window.history.replaceState({}, '', newUrl);
+    const useLocalStorage = shouldUseLocalStorage(state);
+    
+    if (useLocalStorage) {
+      // Save to localStorage and use session ID in URL
+      const sessionId = saveStateToLocalStorage(state);
+      const newUrl = `${window.location.pathname}${window.location.search}#${sessionId}`;
+      window.history.replaceState({}, '', newUrl);
+      console.log('State too large for URL, saved to localStorage');
+    } else {
+      // Use URL hash directly
+      const compressedState = compressStateToUrlFragment(state);
+      const newUrl = `${window.location.pathname}${window.location.search}#${compressedState}`;
+      window.history.replaceState({}, '', newUrl);
+    }
   } catch (error) {
     console.error('Error updating URL with state:', error);
   }
@@ -67,6 +185,7 @@ export function updateUrlWithState(state: unknown): void {
 
 /**
  * Retrieves the state from the URL hash
+ * HYBRID MODE: Checks if URL contains session ID, if so retrieves from localStorage
  * @returns The decompressed state object or null if not found
  */
 export function getStateFromUrl(): unknown {
@@ -77,6 +196,13 @@ export function getStateFromUrl(): unknown {
       return null;
     }
 
+    // Check if this looks like a session ID (starts with "session_")
+    if (hash.startsWith('session_')) {
+      console.log('Detected session ID in URL, retrieving from localStorage');
+      return getStateFromLocalStorage(hash);
+    }
+
+    // Otherwise, treat as compressed state in URL
     return decompressStateFromUrlFragment(hash);
   } catch (error) {
     console.error('Error getting state from URL:', error);
