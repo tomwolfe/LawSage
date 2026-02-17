@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { SafetyValidator } from '../../../lib/validation';
+import { safeLog, safeError, safeWarn, redactPII } from '../../../lib/pii-redactor';
+import { StructuredLegalOutputSchema } from '../../../lib/schemas/legal-output';
 
 // Define types
 interface LegalRequest {
@@ -67,19 +69,19 @@ function cosineSimilarity(text1: string, text2: string): number {
  */
 function keywordOverlapScore(userInput: string, templateKeywords: string[]): number {
   if (!templateKeywords || templateKeywords.length === 0) return 0;
-  
+
   const userInputLower = userInput.toLowerCase();
   const userTokens = new Set(userInputLower.split(/\W+/));
-  
+
   let matchedKeywords = 0;
-  
+
   for (const keyword of templateKeywords) {
     const keywordLower = keyword.toLowerCase();
     if (userTokens.has(keywordLower) || userInputLower.includes(keywordLower)) {
       matchedKeywords++;
     }
   }
-  
+
   return matchedKeywords / templateKeywords.length;
 }
 
@@ -94,7 +96,7 @@ function hasEmergencyKeywords(userInput: string): boolean {
     "shut off", "utilities", "no water", "no electricity",
     "domestic violence", "restraining order", "protective order"
   ];
-  
+
   const userInputLower = userInput.toLowerCase();
   return emergencyKeywords.some(keyword => userInputLower.includes(keyword));
 }
@@ -116,17 +118,17 @@ function findBestTemplate(userInput: string, templates: Template[]): { template:
     for (const template of templates) {
       const templateTitle = template.title?.toLowerCase() || '';
       const templatePath = template.templatePath?.toLowerCase() || '';
-      
+
       if (templateTitle.includes('lockout') || templatePath.includes('lockout') || templateTitle.includes('emergency')) {
-        console.log(`Emergency keywords detected, forcing template: ${template.title}`);
+        safeLog(`Emergency keywords detected, forcing template: ${template.title}`);
         return { template, isEmergency: true };
       }
     }
   }
-  
+
   let bestMatch = null;
   let highestSimilarity = 0;
-  
+
   // Legal keyword boost list
   const legalBoostKeywords = [
     'motion', 'complaint', 'answer', 'discovery', 'subpoena',
@@ -139,13 +141,13 @@ function findBestTemplate(userInput: string, templates: Template[]): { template:
     // Calculate keyword overlap score (prioritized)
     const templateKeywords = template.keywords || [];
     const keywordScore = keywordOverlapScore(userInput, templateKeywords);
-    
+
     // Calculate similarity with title
     const titleSimilarity = cosineSimilarity(userInput.toLowerCase(), template.title?.toLowerCase() || '');
-    
+
     // Calculate similarity with description
     const descSimilarity = cosineSimilarity(userInput.toLowerCase(), template.description?.toLowerCase() || '');
-    
+
     // Boost score if template title contains legal keywords that match user input
     let titleBoost = 0;
     const templateTitle = template.title?.toLowerCase() || '';
@@ -155,17 +157,17 @@ function findBestTemplate(userInput: string, templates: Template[]): { template:
         break;
       }
     }
-    
+
     // Weighted combination: keyword overlap (50%), title (30%), description (20%)
     const combinedSimilarity = (keywordScore * 0.5) + (titleSimilarity * 0.3) + (descSimilarity * 0.2) + titleBoost;
-    
+
     if (combinedSimilarity > highestSimilarity) {
       highestSimilarity = combinedSimilarity;
       bestMatch = template;
     }
   }
-  
-  return { 
+
+  return {
     template: (bestMatch && highestSimilarity > 0.1) ? bestMatch : null,
     isEmergency: false
   };
@@ -305,11 +307,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // PII Redaction for logging - log redacted version only
+    const redactedInput = redactPII(user_input);
+    if (redactedInput.redactedFields.length > 0) {
+      safeLog(`Processing request with PII redacted: [${redactedInput.redactedFields.join(', ')}]`);
+    } else {
+      safeLog(`Processing request for jurisdiction: ${jurisdiction}`);
+    }
+
     // Static grounding layer - check common procedural questions first (saves API calls)
     const { getLegalLookupResponse } = await import('../../../src/utils/legal-lookup');
     const staticResponse = await getLegalLookupResponse(`${user_input} ${jurisdiction}`);
 
     if (staticResponse) {
+      safeLog('Static grounding match found, returning cached response');
       return NextResponse.json(staticResponse);
     }
 
@@ -342,15 +353,15 @@ export async function POST(req: NextRequest) {
           const templateResponse = await fetch(`${req.nextUrl.origin}${templatePath}`);
           if (templateResponse.ok) {
             templateContent = await templateResponse.text();
-            console.log(`Using template: ${bestMatch.title}`);
+            safeLog(`Using template: ${bestMatch.title}`);
           }
         } else {
           templateContent = GENERIC_MOTION_TEMPLATE;
-          console.log('No template match found, using generic motion template');
+          safeLog('No template match found, using generic motion template');
         }
       }
     } catch (error) {
-      console.warn('Template matching failed:', error);
+      safeWarn('Template matching failed:', error);
       templateContent = GENERIC_MOTION_TEMPLATE;
     }
 
@@ -401,6 +412,68 @@ export async function POST(req: NextRequest) {
  Return only valid JSON.
  `;
 
+    // Convert Zod schema to Google's responseSchema format
+    // Google uses a subset of JSON Schema format
+    const responseSchema = {
+      type: 'object',
+      properties: {
+        disclaimer: { type: 'string' },
+        strategy: { type: 'string' },
+        adversarial_strategy: { type: 'string' },
+        roadmap: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              step: { type: 'integer' },
+              title: { type: 'string' },
+              description: { type: 'string' },
+              estimated_time: { type: 'string' },
+              required_documents: { type: 'array', items: { type: 'string' } }
+            },
+            required: ['step', 'title', 'description']
+          }
+        },
+        filing_template: { type: 'string' },
+        citations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              text: { type: 'string' },
+              source: { type: 'string', enum: ['federal statute', 'state statute', 'court rule', 'case law', 'local rule', 'other'] },
+              url: { type: 'string' }
+            },
+            required: ['text']
+          }
+        },
+        sources: { type: 'array', items: { type: 'string' } },
+        local_logistics: {
+          type: 'object',
+          properties: {
+            courthouse_address: { type: 'string' },
+            filing_fees: { type: 'string' },
+            dress_code: { type: 'string' },
+            parking_info: { type: 'string' },
+            hours_of_operation: { type: 'string' },
+            local_rules_url: { type: 'string' }
+          },
+          required: ['courthouse_address']
+        },
+        procedural_checks: { type: 'array', items: { type: 'string' } }
+      },
+      required: [
+        'disclaimer',
+        'strategy',
+        'adversarial_strategy',
+        'roadmap',
+        'filing_template',
+        'citations',
+        'local_logistics',
+        'procedural_checks'
+      ]
+    };
+
     // TRUE STREAMING: Send chunks as they arrive from Gemini to avoid Vercel 10s timeout
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
@@ -409,7 +482,11 @@ export async function POST(req: NextRequest) {
           const result = await client.models.generateContentStream({
             model: "gemini-2.5-flash-preview-09-2025",
             contents: prompt,
-            config: { systemInstruction: SYSTEM_INSTRUCTION }
+            config: { 
+              systemInstruction: SYSTEM_INSTRUCTION,
+              responseMimeType: 'application/json',
+              responseSchema: responseSchema
+            }
           });
 
           let accumulatedText = '';
@@ -419,51 +496,52 @@ export async function POST(req: NextRequest) {
             if (chunkText) {
               accumulatedText += chunkText;
               // Stream each chunk immediately to keep connection alive
-              controller.enqueue(encoder.encode(JSON.stringify({ 
-                type: 'chunk', 
-                content: chunkText 
+              controller.enqueue(encoder.encode(JSON.stringify({
+                type: 'chunk',
+                content: chunkText
               }) + '\n'));
             }
           }
 
-          // Process final accumulated text
-          let processedOutput = accumulatedText;
-          const jsonMatch = accumulatedText.match(/```json\s*([\s\S]*?)\s*```/);
-          if (jsonMatch) {
-            processedOutput = jsonMatch[1].trim();
-          } else {
-            const braceStart = accumulatedText.indexOf('{');
-            const braceEnd = accumulatedText.lastIndexOf('}');
-            if (braceStart !== -1 && braceEnd !== -1 && braceEnd > braceStart) {
-              processedOutput = accumulatedText.substring(braceStart, braceEnd + 1);
-            }
-          }
-
+          // Process final accumulated text - should be valid JSON due to responseMimeType
           let parsedOutput;
           try {
-            parsedOutput = JSON.parse(processedOutput);
+            parsedOutput = JSON.parse(accumulatedText);
+            
+            // Validate against our Zod schema for extra safety
+            const validation = await import('../../../lib/schemas/legal-output');
+            const validationResult = validation.validateLegalOutput(parsedOutput);
+            
+            if (!validationResult.valid) {
+              safeError('Schema validation failed:', validationResult.errors);
+              parsedOutput = {
+                error: "AI response failed schema validation",
+                validation_errors: validationResult.errors,
+                raw: accumulatedText.substring(0, 500)
+              };
+            }
           } catch (parseError) {
-            console.error("Failed to parse final JSON:", parseError);
-            parsedOutput = { 
-              error: "Failed to parse AI response", 
-              raw: processedOutput.substring(0, 500) 
+            safeError("Failed to parse final JSON:", parseError);
+            parsedOutput = {
+              error: "Failed to parse AI response",
+              raw: accumulatedText.substring(0, 500)
             };
           }
 
-          const sources = parsedOutput.citations?.map((c: { text: string; url?: string }) => 
+          const sources = parsedOutput.citations?.map((c: { text: string; url?: string }) =>
             ({ title: c.text, uri: c.url })
           ) || [];
 
           // Send final complete response
-          controller.enqueue(encoder.encode(JSON.stringify({ 
-            type: 'complete', 
-            result: { text: JSON.stringify(parsedOutput), sources } 
+          controller.enqueue(encoder.encode(JSON.stringify({
+            type: 'complete',
+            result: { text: JSON.stringify(parsedOutput), sources }
           }) + '\n'));
         } catch (e) {
-          console.error("AI processing error:", e);
-          controller.enqueue(encoder.encode(JSON.stringify({ 
-            type: 'error', 
-            error: e instanceof Error ? e.message : 'Unknown error' 
+          safeError("AI processing error:", e);
+          controller.enqueue(encoder.encode(JSON.stringify({
+            type: 'error',
+            error: e instanceof Error ? e.message : 'Unknown error'
           }) + '\n'));
         } finally {
           controller.close();
@@ -471,26 +549,31 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    return new Response(stream, { 
-      headers: { 
+    return new Response(stream, {
+      headers: {
         'Content-Type': 'application/x-ndjson',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive'
-      } 
+      }
     });
   } catch (error: unknown) {
-    console.error("Error in analyze API route:", error);
+    safeError("Error in analyze API route:", error);
 
     const errorMessage = typeof error === 'object' && error !== null && 'message' in error
       ? String((error as Record<string, unknown>).message)
       : 'Unknown error occurred';
 
-    if (errorMessage.includes("429") || errorMessage.toLowerCase().includes("quota")) {
+    // Check for rate limit errors and provide graceful degradation
+    if (errorMessage.includes("429") || errorMessage.toLowerCase().includes("quota") || errorMessage.toLowerCase().includes("rate limit")) {
       return NextResponse.json(
-        { type: "RateLimitError", detail: "AI service rate limit exceeded. Please try again in a few minutes." } satisfies StandardErrorResponse,
+        { 
+          type: "RateLimitError", 
+          detail: "Host API key rate limit exceeded. Please enter your own free Gemini API key in Settings to continue immediately.",
+          suggestion: "Visit https://aistudio.google.com/app/apikey to get your free API key"
+        } satisfies StandardErrorResponse & { suggestion: string },
         { status: 429 }
       );
-    } else if (errorMessage.includes("400") || errorMessage.includes("invalid")) {
+    } else if (errorMessage.includes("400") || errorMessage.toLowerCase().includes("invalid")) {
       return NextResponse.json(
         { type: "AIClientError", detail: errorMessage || "Invalid request to AI service" } satisfies StandardErrorResponse,
         { status: 400 }

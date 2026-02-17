@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Upload } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Upload, Download, FileUp, Save, FolderOpen } from 'lucide-react';
 import { processImageForOCR } from '../src/utils/image-processor';
 import { updateUrlWithState, watchStateAndSyncToUrl, createVirtualCaseFolderState, restoreVirtualCaseFolderState } from '../src/utils/state-sync';
+import { exportCaseFile, importCaseFile, saveCaseToLocalStorage } from '../src/utils/case-file-manager';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ResultDisplay from './ResultDisplay';
@@ -36,7 +37,7 @@ interface Source {
   uri: string | null;
 }
 
-interface LegalResult {
+export interface LegalResult {
   text: string;
   sources: Source[];
 }
@@ -75,6 +76,48 @@ const US_STATES = [
   "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming", "Federal"
 ];
 
+// Legal keywords for pre-flight validation
+const LEGAL_KEYWORDS = [
+  'eviction', 'landlord', 'tenant', 'lease', 'rent', 'deposit',
+  'court', 'judge', 'motion', 'complaint', 'answer', 'filing',
+  'custody', 'divorce', 'support', 'visitation',
+  'contract', 'breach', 'damages', 'payment', 'money',
+  'injury', 'accident', 'negligence', 'liability',
+  'criminal', 'arrest', 'charge', 'defense',
+  'bankruptcy', 'debt', 'creditor', 'loan',
+  'discrimination', 'harassment', 'rights', 'violation',
+  'notice', 'deadline', 'hearing', 'trial', 'order',
+  'lawyer', 'attorney', 'legal', 'pro se', 'self-represent'
+];
+
+/**
+ * Pre-flight validation for user input
+ * Checks if input has sufficient detail for accurate legal analysis
+ */
+function validateUserInput(input: string): { valid: boolean; warning?: string } {
+  const trimmed = input.trim();
+  
+  // Check minimum length
+  if (trimmed.length < 10) {
+    return {
+      valid: false,
+      warning: 'Please provide more details about your legal situation (at least 10 characters).'
+    };
+  }
+  
+  // Check for legal keywords (at least 1 for better analysis)
+  const inputLower = trimmed.toLowerCase();
+  const keywordMatches = LEGAL_KEYWORDS.filter(keyword => inputLower.includes(keyword));
+  
+  if (keywordMatches.length === 0) {
+    return {
+      valid: true,
+      warning: 'For more accurate analysis, try to include specific legal terms related to your situation (e.g., eviction, contract, custody, etc.).'
+    };
+  }
+  
+  return { valid: true };
+}
 
 export default function LegalInterface() {
   const [userInput, setUserInput] = useState('');
@@ -84,6 +127,7 @@ export default function LegalInterface() {
   const [result, setResult] = useState<LegalResult | null>(null);
   const [activeTab, setActiveTab] = useState<'strategy' | 'filings' | 'sources' | 'survival-guide' | 'opposition-view'>('strategy');
   const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
   const [history, setHistory] = useState<CaseHistoryItem[]>([]);
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<string | null>(null);
   const [backendUnreachable, setBackendUnreachable] = useState(false);
@@ -91,6 +135,7 @@ export default function LegalInterface() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [caseLedger, setCaseLedger] = useState<CaseLedgerEntry[]>([]);
   const [apiKey, setApiKey] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize state from URL fragment on component mount
   useEffect(() => {
@@ -276,7 +321,9 @@ export default function LegalInterface() {
 
 
   const handleSubmit = async () => {
-    setError(''); // Ensure error is cleared at start
+    setError('');
+    setWarning('');
+    
     const apiKey = localStorage.getItem('GEMINI_API_KEY');
     if (!apiKey) {
       setError('Please set your Gemini API Key in Settings first.');
@@ -285,6 +332,19 @@ export default function LegalInterface() {
     if (!userInput.trim() && !selectedFile) {
       setError('Please describe your legal situation or upload an image.');
       return;
+    }
+
+    // Pre-flight validation for text input
+    if (!selectedFile) {
+      const validation = validateUserInput(userInput);
+      if (!validation.valid) {
+        setError(validation.warning || 'Input validation failed');
+        return;
+      }
+      if (validation.warning) {
+        setWarning(validation.warning);
+        // Don't block submission, just warn
+      }
     }
 
     setLoading(true);
@@ -311,7 +371,7 @@ export default function LegalInterface() {
 
           if (!response.ok) {
             if (response.status === 429) {
-              setError('Rate limit exceeded. Please check your API quota or try again later.');
+              setError('Rate limit exceeded. Please enter your own free Gemini API key in Settings to continue.');
               return;
             } else if (response.status === 401) {
               setError('Invalid API key. Please update your key in Settings.');
@@ -356,7 +416,7 @@ export default function LegalInterface() {
 
         if (!response.ok) {
           if (response.status === 429) {
-            setError('Rate limit exceeded. Please check your API quota or try again later.');
+            setError('Rate limit exceeded. Please enter your own free Gemini API key in Settings to continue.');
             return;
           } else if (response.status === 401) {
             setError('Invalid API key. Please update your key in Settings.');
@@ -368,7 +428,7 @@ export default function LegalInterface() {
         }
 
         const contentType = response.headers.get('content-type');
-        
+
         // Handle streaming NDJSON response
         if (contentType && contentType.includes('application/x-ndjson')) {
           const reader = response.body?.getReader();
@@ -505,6 +565,72 @@ export default function LegalInterface() {
     setCaseLedger(prev => [...prev, newEntry]);
   };
 
+  // Case File Management Functions
+  const handleExportCaseFile = () => {
+    const caseFolderState = {
+      userInput,
+      jurisdiction,
+      activeTab,
+      history,
+      selectedHistoryItem,
+      backendUnreachable
+    };
+    exportCaseFile(caseFolderState, result || undefined, caseLedger);
+    addToCaseLedger('other', `Case file exported to disk`);
+  };
+
+  const handleImportCaseFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const importedData = await importCaseFile(file);
+      
+      // Restore state from imported file
+      if (importedData.caseFolder) {
+        setUserInput(importedData.caseFolder.userInput || '');
+        setJurisdiction(importedData.caseFolder.jurisdiction || 'California');
+        setActiveTab(importedData.caseFolder.activeTab as typeof activeTab || 'strategy');
+        setHistory(importedData.caseFolder.history || []);
+        setSelectedHistoryItem(importedData.caseFolder.selectedHistoryItem);
+        setBackendUnreachable(importedData.caseFolder.backendUnreachable || false);
+      }
+      
+      if (importedData.analysisResult) {
+        setResult(importedData.analysisResult);
+      }
+      
+      if (importedData.ledger && importedData.ledger.length > 0) {
+        setCaseLedger(importedData.ledger);
+      }
+      
+      setError('');
+      setWarning(`Successfully imported case file from ${new Date(importedData.exportedAt).toLocaleDateString()}`);
+      addToCaseLedger('other', `Case file imported from disk`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to import case file');
+    } finally {
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleSaveToLocalStorage = () => {
+    const caseFolderState = {
+      userInput,
+      jurisdiction,
+      activeTab,
+      history,
+      selectedHistoryItem,
+      backendUnreachable
+    };
+    saveCaseToLocalStorage(caseFolderState, result || undefined, caseLedger);
+    setWarning('Case saved to local storage');
+    setTimeout(() => setWarning(''), 3000);
+  };
+
 
   return (
     <div className="space-y-8">
@@ -516,6 +642,60 @@ export default function LegalInterface() {
           </p>
         </div>
       )}
+      
+      {/* Warning Message */}
+      {warning && (
+        <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-3 text-amber-800 shadow-sm">
+          <AlertCircle className="shrink-0" size={20} />
+          <p className="text-sm font-medium">{warning}</p>
+        </div>
+      )}
+      
+      {/* Case File Management */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+            <Save size={20} />
+            Case File Management
+          </h2>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportCaseFile}
+              className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+              title="Export case to .lawsage file"
+            >
+              <Download size={16} />
+              Export Case
+            </button>
+            
+            <label className="flex items-center gap-1 px-3 py-1.5 border border-slate-300 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors cursor-pointer">
+              <FolderOpen size={16} />
+              Import Case
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".lawsage"
+                onChange={handleImportCaseFile}
+                className="hidden"
+              />
+            </label>
+            
+            <button
+              onClick={handleSaveToLocalStorage}
+              className="flex items-center gap-1 px-3 py-1.5 border border-slate-300 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
+              title="Save to browser local storage"
+            >
+              <Save size={16} />
+              Save Local
+            </button>
+          </div>
+        </div>
+        <p className="text-sm text-slate-600">
+          <strong>Export/Import:</strong> Save your complete case file to disk (bypasses URL limits). 
+          <strong> Local Storage:</strong> Quick save in your browser for this jurisdiction.
+        </p>
+      </div>
+      
       {/* History Section */}
       {history.length > 0 && (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
