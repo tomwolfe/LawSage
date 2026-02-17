@@ -49,7 +49,7 @@ Jurisdiction: ${jurisdiction}
 
 Each query should be designed to find:
 1. Relevant statutes or codes for this specific legal issue
-2. Local court rules or procedures for this jurisdiction
+2. County-level Local Rules of Court and specific procedural requirements for this jurisdiction. PRIORITIZE THE "MONDAY MORNING RULE": find procedural technicalities (filing deadlines, ex parte notice times, mandatory forms) that could cause a case to be dismissed.
 3. Case law or legal precedents related to this matter
 
 Return ONLY a JSON array in this exact format:
@@ -60,10 +60,6 @@ Return ONLY a JSON array in this exact format:
     "jurisdiction": "applicable jurisdiction if relevant"
   }
 ]
-
-Make queries specific and actionable. For example:
-- Instead of "eviction laws", use "California unlawful detainer notice requirements CCP 1161"
-- Instead of "court rules", use "Los Angeles Superior Court ex parte application rules local rules"
 `;
 
     const result = await client.models.generateContent({

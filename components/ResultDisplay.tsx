@@ -1,6 +1,6 @@
 'use client';
 
-import { Copy, Download, FileText, Gavel, Link as LinkIcon, FileDown, CheckCircle, AlertTriangle, RotateCcw, AlertCircle } from 'lucide-react';
+import { Copy, Download, FileText, Gavel, Link as LinkIcon, FileDown, CheckCircle, AlertTriangle, RotateCcw, AlertCircle, Info } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useState } from 'react';
@@ -63,10 +63,11 @@ interface LegalResult {
 
 interface ResultDisplayProps {
   result: LegalResult;
-  activeTab: 'strategy' | 'filings' | 'sources' | 'survival-guide' | 'opposition-view';
-  setActiveTab: (tab: 'strategy' | 'filings' | 'sources' | 'survival-guide' | 'opposition-view') => void;
+  activeTab: 'strategy' | 'filings' | 'sources' | 'survival-guide' | 'opposition-view' | 'roadmap';
+  setActiveTab: (tab: 'strategy' | 'filings' | 'sources' | 'survival-guide' | 'opposition-view' | 'roadmap') => void;
   jurisdiction: string;
   apiKey?: string;
+  addToCaseLedger: (eventType: 'complaint_filed' | 'answer_due' | 'motion_submitted' | 'discovery_served' | 'trial_date_set' | 'other', description: string, dueDate?: Date) => void;
 }
 
 // Enhanced parsing function to handle both legacy and structured formats
@@ -849,6 +850,16 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
           Opposition View
         </button>
         <button
+          onClick={() => setActiveTab('roadmap')}
+          className={cn(
+            "px-6 py-4 font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap",
+            activeTab === 'roadmap' ? "border-indigo-600 text-indigo-600 bg-indigo-50/30" : "border-transparent text-slate-500 hover:text-slate-700"
+          )}
+        >
+          <CheckCircle size={18} />
+          Next Steps Checklist
+        </button>
+        <button
           onClick={() => setActiveTab('filings')}
           className={cn(
             "px-6 py-4 font-bold flex items-center gap-2 border-b-2 transition-colors whitespace-nowrap",
@@ -952,6 +963,98 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                     {adversarialText}
                   </ReactMarkdown>
                 </div>
+              </div>
+            );
+          }
+
+          if (activeTab === 'roadmap') {
+            const roadmapItems = structured?.roadmap || [];
+            
+            return (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-bold text-slate-800">Your Legal Roadmap</h2>
+                  <div className="text-sm text-slate-500 font-medium bg-slate-100 px-3 py-1 rounded-full">
+                    {roadmapItems.length} Steps Total
+                  </div>
+                </div>
+
+                <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 mb-6 text-sm text-indigo-700">
+                  <p className="flex items-center gap-2">
+                    <Info size={16} />
+                    <strong>Tip:</strong> Checking an item below will automatically add a corresponding entry to your <strong>Case Ledger</strong> in the history section.
+                  </p>
+                </div>
+
+                {roadmapItems.length > 0 ? (
+                  <div className="space-y-4">
+                    {roadmapItems.map((item, index) => (
+                      <div 
+                        key={index} 
+                        className="group flex gap-4 p-5 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-indigo-300 hover:shadow-md transition-all cursor-default"
+                      >
+                        <div className="flex-shrink-0 mt-1">
+                          <button
+                            onClick={() => {
+                              addToCaseLedger('other', `Completed Roadmap Step ${item.step}: ${item.title}`);
+                              // We could track internal check state here if we wanted to visually persistent checkmarks 
+                              // but since the result state is from props, we'd need to lift that state up or 
+                              // just rely on the ledger as requested. 
+                              // Let's add a visual feedback.
+                              setCopyStatus(prev => ({ ...prev, [`step-${index}`]: true }));
+                              setTimeout(() => setCopyStatus(prev => ({ ...prev, [`step-${index}`]: false })), 2000);
+                            }}
+                            className={cn(
+                              "w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all",
+                              copyStatus[`step-${index}`] 
+                                ? "bg-green-500 border-green-500 text-white" 
+                                : "border-slate-300 text-slate-300 hover:border-indigo-500 hover:text-indigo-500"
+                            )}
+                          >
+                            {copyStatus[`step-${index}`] ? <CheckCircle size={18} /> : <div className="text-xs font-bold">{item.step}</div>}
+                          </button>
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex justify-between items-start">
+                            <h3 className="text-lg font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">
+                              {item.title}
+                            </h3>
+                            {item.estimated_time && (
+                              <span className="text-xs font-semibold bg-slate-100 text-slate-500 py-1 px-2 rounded-lg">
+                                {item.estimated_time}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-slate-600 mt-2 text-sm leading-relaxed">
+                            {item.description}
+                          </p>
+                          {item.required_documents && item.required_documents.length > 0 && (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-1">Required:</span>
+                              {item.required_documents.map((doc, docIdx) => (
+                                <span key={docIdx} className="text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded-md border border-indigo-100 flex items-center gap-1">
+                                  <FileText size={10} />
+                                  {doc}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          
+                          {copyStatus[`step-${index}`] && (
+                            <div className="mt-2 text-xs font-bold text-green-600 flex items-center gap-1 animate-in fade-in slide-in-from-left-2">
+                              <CheckCircle size={12} />
+                              Added to Case Ledger
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                    <p className="text-slate-500">No roadmap data available for this case.</p>
+                  </div>
+                )}
               </div>
             );
           }

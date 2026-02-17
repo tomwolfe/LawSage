@@ -505,19 +505,32 @@ export async function POST(req: NextRequest) {
       const stream = new ReadableStream({
         async start(controller) {
           try {
-            // Send research status update
+            // Send initial research status update
             controller.enqueue(encoder.encode(JSON.stringify({
               type: 'status',
               message: 'Conducting legal research...'
             }) + '\n'));
 
+            // Heartbeat to keep connection alive during long research phase
+            const heartbeatInterval = setInterval(() => {
+              controller.enqueue(encoder.encode(JSON.stringify({
+                type: 'status',
+                message: 'Searching for relevant statutes and local rules...'
+              }) + '\n'));
+            }, 2000);
+
             // Step 1-3: Generate queries, execute searches, format context
-            const researchContext = await orchestrateLegalResearch(user_input, jurisdiction, apiKey);
+            let researchContext = "";
+            try {
+              researchContext = await orchestrateLegalResearch(user_input, jurisdiction, apiKey);
+            } finally {
+              clearInterval(heartbeatInterval);
+            }
             
             // Send research complete status
             controller.enqueue(encoder.encode(JSON.stringify({
               type: 'status',
-              message: 'Generating legal analysis...'
+              message: 'Research complete. Generating legal analysis...'
             }) + '\n'));
 
             const prompt = `

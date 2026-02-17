@@ -10,8 +10,8 @@ import { twMerge } from 'tailwind-merge';
 import ResultDisplay from './ResultDisplay';
 import HistoryActions from './HistoryActions';
 import ApiKeyModal from './ApiKeyModal';
-import { checkClientSideRateLimit, getClientSideRateLimitStatus, RATE_LIMIT_CONFIG, generateClientFingerprint } from '../lib/rate-limiter-client';
-import { safeLog, safeError, safeWarn } from '../lib/pii-redactor';
+import { checkClientSideRateLimit, generateClientFingerprint } from '../lib/rate-limiter-client';
+import { safeError } from '../lib/pii-redactor';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -39,7 +39,7 @@ export interface CaseLedgerEntry {
 export interface CaseFolderState {
   userInput: string;
   jurisdiction: string;
-  activeTab: string;
+  activeTab: 'strategy' | 'filings' | 'sources' | 'survival-guide' | 'opposition-view' | 'roadmap';
   history: CaseHistoryItem[];
   selectedHistoryItem: string | null;
   backendUnreachable: boolean;
@@ -126,14 +126,14 @@ export default function LegalInterface() {
   const [isListening, setIsListening] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<LegalResult | null>(null);
-  const [activeTab, setActiveTab] = useState<'strategy' | 'filings' | 'sources' | 'survival-guide' | 'opposition-view'>('strategy');
+  const [activeTab, setActiveTab] = useState<'strategy' | 'filings' | 'sources' | 'survival-guide' | 'opposition-view' | 'roadmap'>('strategy');
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
   const [history, setHistory] = useState<CaseHistoryItem[]>([]);
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<string | null>(null);
   const [backendUnreachable, setBackendUnreachable] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [caseLedger, setCaseLedger] = useState<CaseLedgerEntry[]>([]);
   const [streamingStatus, setStreamingStatus] = useState<string>('');
   const [rateLimitInfo, setRateLimitInfo] = useState<{ remaining: number; resetAt: Date | null } | null>(null);
@@ -162,7 +162,7 @@ export default function LegalInterface() {
 
         if (caseFolder.userInput !== undefined) setUserInput(caseFolder.userInput);
         if (caseFolder.jurisdiction !== undefined) setJurisdiction(caseFolder.jurisdiction);
-        if (caseFolder.activeTab !== undefined) setActiveTab(caseFolder.activeTab as "strategy" | "filings" | "sources" | "survival-guide" | "opposition-view");
+        if (caseFolder.activeTab !== undefined) setActiveTab(caseFolder.activeTab as "strategy" | "filings" | "sources" | "survival-guide" | "opposition-view" | "roadmap");
         if (caseFolder.history !== undefined) setHistory(caseFolder.history);
         if (caseFolder.selectedHistoryItem !== undefined) setSelectedHistoryItem(caseFolder.selectedHistoryItem);
         if (caseFolder.backendUnreachable !== undefined) setBackendUnreachable(caseFolder.backendUnreachable);
@@ -191,7 +191,7 @@ export default function LegalInterface() {
         if (legacyState.userInput !== undefined) setUserInput(legacyState.userInput as string);
         if (legacyState.jurisdiction !== undefined) setJurisdiction(legacyState.jurisdiction as string);
         if (legacyState.result !== undefined) setResult(legacyState.result as LegalResult);
-        if (legacyState.activeTab !== undefined) setActiveTab(legacyState.activeTab as "strategy" | "filings" | "sources" | "survival-guide" | "opposition-view");
+        if (legacyState.activeTab !== undefined) setActiveTab(legacyState.activeTab as "strategy" | "filings" | "sources" | "survival-guide" | "opposition-view" | "roadmap");
         if (legacyState.history !== undefined) setHistory(legacyState.history as CaseHistoryItem[]);
         if (legacyState.selectedHistoryItem !== undefined) setSelectedHistoryItem(legacyState.selectedHistoryItem as string | null);
         if (legacyState.backendUnreachable !== undefined) setBackendUnreachable(legacyState.backendUnreachable as boolean);
@@ -316,29 +316,57 @@ export default function LegalInterface() {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const newFiles: File[] = [];
+    const newPreviewUrls: string[] = [];
+    const errors: string[] = [];
+
+    // Limit to 5 files total
+    const totalFiles = selectedFiles.length + files.length;
+    const allowedFiles = files.slice(0, Math.max(0, 5 - selectedFiles.length));
+
+    if (totalFiles > 5) {
+      setWarning('Maximum 5 files allowed in the Virtual Case Folder.');
+    }
+
+    allowedFiles.forEach(file => {
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        setError('Please select an image file (JPEG, PNG, etc.)');
+        errors.push(`${file.name} is not an image file.`);
         return;
       }
 
       // Validate file size (max 10MB)
       if (file.size > 10 * 1024 * 1024) {
-        setError('File size exceeds 10MB limit');
+        errors.push(`${file.name} exceeds 10MB limit.`);
         return;
       }
 
-      setSelectedFile(file);
+      newFiles.push(file);
+      newPreviewUrls.push(URL.createObjectURL(file));
+    });
 
-      // Create preview URL
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
-
-      // Clear any previous errors
+    if (errors.length > 0) {
+      setError(errors.join(' '));
+    } else {
       setError('');
     }
+
+    setSelectedFiles(prev => [...prev, ...newFiles]);
+    setPreviewUrls(prev => [...prev, ...newPreviewUrls]);
+    
+    // Reset file input so same file can be selected again
+    if (e.target) {
+      e.target.value = '';
+    }
+  };
+
+  const removeFile = (index: number) => {
+    URL.revokeObjectURL(previewUrls[index]);
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    setPreviewUrls(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleUploadClick = () => {
@@ -373,7 +401,7 @@ export default function LegalInterface() {
     setWarning('');
     setStreamingStatus('');
 
-    if (!userInput.trim() && !selectedFile) {
+    if (!userInput.trim() && selectedFiles.length === 0) {
       setError('Please describe your legal situation or upload an image.');
       return;
     }
@@ -395,7 +423,7 @@ export default function LegalInterface() {
     }
 
     // Pre-flight validation for text input
-    if (!selectedFile) {
+    if (selectedFiles.length === 0) {
       const validation = validateUserInput(userInput);
       if (!validation.valid) {
         setError(validation.warning || 'Input validation failed');
@@ -409,488 +437,197 @@ export default function LegalInterface() {
 
     setLoading(true);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 55000); // 55s timeout (under Vercel 60s limit)
+    const timeoutId = setTimeout(() => controller.abort(), 120000); // Increased to 120s for multi-file processing
 
     try {
-      if (selectedFile) {
-        // Process uploaded image with OCR using the image processor
+      const documents: string[] = [];
+      let isUsingFallbackKeyHeader = false;
+
+      // Process all selected files with OCR
+      if (selectedFiles.length > 0) {
+        for (let i = 0; i < selectedFiles.length; i++) {
+          const file = selectedFiles[i];
+          setStreamingStatus(`Processing file ${i + 1}/${selectedFiles.length}: ${file.name}...`);
+          
+          try {
+            const processedImage = await processImageForOCR(file);
+            const response = await fetch('/api/ocr', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Gemini-API-Key': apiKey,
+                'X-Client-Fingerprint': generateClientFingerprint(),
+              },
+              body: JSON.stringify({
+                image: processedImage,
+                jurisdiction
+              }),
+            });
+
+            if (response.headers.get('x-using-fallback-key') === 'true') {
+              isUsingFallbackKeyHeader = true;
+            }
+
+            if (!response.ok) {
+              if (response.status === 429) {
+                throw new Error('Demo limit reached for OCR. Please add your own API key.');
+              }
+              const errorData = await response.json();
+              throw new Error(errorData.detail || `Failed to process ${file.name}`);
+            }
+
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/x-ndjson')) {
+              const reader = response.body?.getReader();
+              if (!reader) throw new Error('ReadableStream not supported');
+
+              const decoder = new TextDecoder();
+              let ocrResult: OCRResult | null = null;
+
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split('\n').filter(line => line.trim());
+
+                for (const line of lines) {
+                  const message = JSON.parse(line);
+                  if (message.type === 'status') {
+                    setStreamingStatus(`File ${i + 1}: ${message.message}`);
+                  } else if (message.type === 'complete') {
+                    ocrResult = message.result;
+                    if (message.result?.isUsingFallbackKey) isUsingFallbackKeyHeader = true;
+                  } else if (message.type === 'error') {
+                    throw new Error(message.error);
+                  }
+                }
+              }
+
+              if (ocrResult && ocrResult.extracted_text) {
+                documents.push(ocrResult.extracted_text);
+              }
+            }
+          } catch (fileErr) {
+            safeError(`Failed to process file ${file.name}:`, fileErr);
+            setError(`Error processing ${file.name}: ${fileErr instanceof Error ? fileErr.message : 'Unknown error'}`);
+            // Continue with other files if one fails, or stop? 
+            // Let's stop to be safe and clear.
+            setLoading(false);
+            return;
+          }
+        }
+      }
+
+      // Process complete analysis with (optionally) all extracted documents
+      setStreamingStatus('Synthesizing virtual case folder and generating strategy...');
+      
+      const analysisInput = userInput.trim() || `Analyze the ${documents.length} document(s) in the Virtual Case Folder and provide a comprehensive legal strategy.`;
+
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Gemini-API-Key': apiKey,
+          'X-Client-Fingerprint': generateClientFingerprint(),
+        },
+        body: JSON.stringify({ 
+          user_input: analysisInput, 
+          jurisdiction,
+          documents // Multi-file documents array
+        }),
+        signal: controller.signal,
+      });
+
+      handleRateLimitInfo();
+      if (response.headers.get('x-using-fallback-key') === 'true') {
+        isUsingFallbackKeyHeader = true;
+      }
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        if (response.status === 429) {
+          setError('Demo limit reached. Please enter your own free Gemini API key in Settings to continue instantly.');
+          setShowApiKeyModal(true);
+          return;
+        } else if (response.status === 401) {
+          setError('API key is missing or invalid. Please enter your Gemini API key.');
+          localStorage.removeItem('lawsage_gemini_api_key');
+          setApiKey('');
+          setShowApiKeyModal(true);
+          return;
+        } else {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || 'Failed to generate response');
+        }
+      }
+
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/x-ndjson')) {
+        const reader = response.body?.getReader();
+        if (!reader) throw new Error('ReadableStream not supported');
+
+        const decoder = new TextDecoder();
+        let finalResult: LegalResult | null = null;
+        let resultIncludesFallbackKey = false;
+
         try {
-          const processedImage = await processImageForOCR(selectedFile);
-
-          const response = await fetch('/api/ocr', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Gemini-API-Key': apiKey, // Explicitly send the key we checked above
-              'X-Client-Fingerprint': generateClientFingerprint(),
-            },
-            body: JSON.stringify({
-              image: processedImage,
-              jurisdiction
-            }),
-          });
-
-                    // Handle rate limit headers
-
-                    handleRateLimitInfo();
-
-          
-
-                    const isUsingFallbackKeyHeader = response.headers.get('x-using-fallback-key') === 'true';
-
-          
-
-                    if (!response.ok) {
-
-                      if (response.status === 429) {
-
-                        setError('Demo limit reached. Please enter your own free Gemini API key in Settings to continue instantly.');
-
-                        setShowApiKeyModal(true);
-
-                        return;
-
-                      } else if (response.status === 401) {
-
-                        setError('API key is missing or invalid. Please enter your Gemini API key.');
-
-                        // Reset the key and show modal
-
-                        localStorage.removeItem('lawsage_gemini_api_key');
-
-                        setApiKey('');
-
-                        setShowApiKeyModal(true);
-
-                        return;
-
-                      } else {
-
-                        const errorData = await response.json();
-
-                        throw new Error(errorData.detail || 'Failed to process image');
-
-                      }
-
-                    }
-
-          
-
-                    // Handle streaming response
-
-                    const contentType = response.headers.get('content-type');
-
-                    
-
-                    if (contentType && contentType.includes('application/x-ndjson')) {
-
-                      const reader = response.body?.getReader();
-
-                      if (!reader) {
-
-                        throw new Error('ReadableStream not supported');
-
-                      }
-
-          
-
-                      const decoder = new TextDecoder();
-
-                      let finalResult: LegalResult | null = null;
-
-                      let resultIncludesFallbackKey = false;
-
-          
-
-                      try {
-
-                        while (true) {
-
-                          const { done, value } = await reader.read();
-
-                          if (done) break;
-
-          
-
-                          const chunk = decoder.decode(value, { stream: true });
-
-                          const lines = chunk.split('\n').filter(line => line.trim());
-
-          
-
-                          for (const line of lines) {
-
-                            try {
-
-                              const message = JSON.parse(line);
-
-          
-
-                              if (message.type === 'status') {
-
-                                setStreamingStatus(message.message);
-
-                              } else if (message.type === 'complete') {
-
-                                finalResult = message.result;
-
-                                if (message.result && message.result.isUsingFallbackKey) {
-
-                                  resultIncludesFallbackKey = true;
-
-                                }
-
-                              } else if (message.type === 'error') {
-
-                                throw new Error(message.error);
-
-                              }
-
-                              // chunk messages are streamed for progress but not accumulated here
-
-                            } catch (parseError) {
-
-                              safeWarn('Failed to parse stream chunk:', parseError);
-
-                            }
-
-                          }
-
-                        }
-
-          
-
-                        if (finalResult) {
-
-                          // Convert OCR result to LegalResult format
-
-                          const ocrResult = finalResult as unknown as OCRResult & { isUsingFallbackKey?: boolean };
-
-                          const legalResult: LegalResult = {
-
-                            text: ocrResult.extracted_text,
-
-                            sources: []
-
-                          };
-
-                          
-
-                          setResult(legalResult);
-
-                          setActiveTab('strategy');
-
-          
-
-                          // Proactive BYOK enforcement
-
-                          if (isUsingFallbackKeyHeader || resultIncludesFallbackKey || ocrResult.isUsingFallbackKey) {
-
-                            setWarning('You are using the limited public demo key. Please add your own free key for unlimited access.');
-
-                            setTimeout(() => setShowApiKeyModal(true), 2000);
-
-                          }
-
-          
-
-                          const newHistoryItem: CaseHistoryItem = {
-
-                            id: Date.now().toString(),
-
-                            timestamp: new Date(),
-
-                            jurisdiction,
-
-                            userInput: `OCR Analysis of: ${selectedFile.name}`,
-
-                            result: legalResult
-
-                          };
-
-          
-
-                          const updatedHistory = [newHistoryItem, ...history];
-
-                          setHistory(updatedHistory);
-
-                          localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
-
-                        } else {
-
-                          throw new Error('No complete response received from server');
-
-                        }
-
-                      } catch (streamError) {
-
-                        if (streamError instanceof Error && streamError.name === 'AbortError') {
-
-                          throw new Error('Request timed out. Please try again.');
-
-                        }
-
-                        throw streamError;
-
-                      }
-
-                    }
-
-           else {
-            // Fallback for non-streaming responses
-            const data: LegalResult = await response.json();
-            setResult(data);
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n').filter(line => line.trim());
+
+            for (const line of lines) {
+              try {
+                const message = JSON.parse(line);
+                if (message.type === 'status') {
+                  setStreamingStatus(message.message);
+                } else if (message.type === 'complete') {
+                  finalResult = message.result;
+                  if (message.result && message.result.isUsingFallbackKey) {
+                    resultIncludesFallbackKey = true;
+                  }
+                } else if (message.type === 'error') {
+                  throw new Error(message.error);
+                }
+              } catch (parseError) {
+                safeWarn('Failed to parse stream chunk:', parseError);
+              }
+            }
+          }
+
+          if (finalResult) {
+            setResult(finalResult);
             setActiveTab('strategy');
+
+            if (isUsingFallbackKeyHeader || resultIncludesFallbackKey) {
+              setWarning('You are using the limited public demo key. Please add your own free key for unlimited access.');
+              setTimeout(() => setShowApiKeyModal(true), 2000);
+            }
 
             const newHistoryItem: CaseHistoryItem = {
               id: Date.now().toString(),
               timestamp: new Date(),
               jurisdiction,
-              userInput: `OCR Analysis of: ${selectedFile.name}`,
-              result: data
+              userInput: analysisInput,
+              result: finalResult
             };
 
             const updatedHistory = [newHistoryItem, ...history];
             setHistory(updatedHistory);
             localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
+            addToCaseLedger('complaint_filed', `Analysis generated for ${selectedFiles.length} document(s) and user input.`);
+          } else {
+            throw new Error('No complete response received from server');
           }
-        } catch (err) {
-          setError(err instanceof Error ? err.message : 'An unknown error occurred during OCR processing');
-        }
-      } else {
-        // Process text input with streaming
-        const response = await fetch('/api/analyze', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Gemini-API-Key': apiKey, // Explicitly send the key
-            'X-Client-Fingerprint': generateClientFingerprint(),
-          },
-          body: JSON.stringify({ user_input: userInput, jurisdiction }),
-          signal: controller.signal,
-        });
-
-                // Handle rate limit headers
-
-                handleRateLimitInfo();
-
-        
-
-                const isUsingFallbackKeyHeader = response.headers.get('x-using-fallback-key') === 'true';
-
-        
-
-                clearTimeout(timeoutId);
-
-        
-
-                if (!response.ok) {
-
-                  if (response.status === 429) {
-
-                    setError('Demo limit reached. Please enter your own free Gemini API key in Settings to continue instantly.');
-
-                    setShowApiKeyModal(true);
-
-                    return;
-
-                  } else if (response.status === 401) {
-
-                    setError('API key is missing or invalid. Please enter your Gemini API key.');
-
-                    // Reset the key and show modal
-
-                    localStorage.removeItem('lawsage_gemini_api_key');
-
-                    setApiKey('');
-
-                    setShowApiKeyModal(true);
-
-                    return;
-
-                  } else {
-
-                    const errorData = await response.json();
-
-                    throw new Error(errorData.detail || 'Failed to generate response');
-
-                  }
-
-                }
-
-        
-
-                const contentType = response.headers.get('content-type');
-
-        
-
-                // Handle streaming NDJSON response
-
-                if (contentType && contentType.includes('application/x-ndjson')) {
-
-                  const reader = response.body?.getReader();
-
-                  if (!reader) {
-
-                    throw new Error('ReadableStream not supported');
-
-                  }
-
-        
-
-                  const decoder = new TextDecoder();
-
-                  let finalResult: LegalResult | null = null;
-
-                  let resultIncludesFallbackKey = false;
-
-        
-
-                  try {
-
-                    while (true) {
-
-                      const { done, value } = await reader.read();
-
-                      if (done) break;
-
-        
-
-                      const chunk = decoder.decode(value, { stream: true });
-
-                      const lines = chunk.split('\n').filter(line => line.trim());
-
-        
-
-                      for (const line of lines) {
-
-                        try {
-
-                          const message = JSON.parse(line);
-
-        
-
-                          if (message.type === 'status') {
-
-                            setStreamingStatus(message.message);
-
-                          } else if (message.type === 'complete') {
-
-                            finalResult = message.result;
-
-                            if (message.result && message.result.isUsingFallbackKey) {
-
-                              resultIncludesFallbackKey = true;
-
-                            }
-
-                          } else if (message.type === 'error') {
-
-                            throw new Error(message.error);
-
-                          }
-
-                          // chunk messages are streamed for progress but not accumulated here
-
-                        } catch (parseError) {
-
-                          safeWarn('Failed to parse stream chunk:', parseError);
-
-                        }
-
-                      }
-
-                    }
-
-        
-
-                    if (finalResult) {
-
-                      setResult(finalResult);
-
-                      setActiveTab('strategy');
-
-        
-
-                      // Proactive BYOK enforcement
-
-                      if (isUsingFallbackKeyHeader || resultIncludesFallbackKey) {
-
-                        setWarning('You are using the limited public demo key. Please add your own free key for unlimited access.');
-
-                        setTimeout(() => setShowApiKeyModal(true), 2000);
-
-                      }
-
-        
-
-                      const newHistoryItem: CaseHistoryItem = {
-
-                        id: Date.now().toString(),
-
-                        timestamp: new Date(),
-
-                        jurisdiction,
-
-                        userInput,
-
-                        result: finalResult
-
-                      };
-
-        
-
-                      const updatedHistory = [newHistoryItem, ...history];
-
-                      setHistory(updatedHistory);
-
-                      localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
-
-                      addToCaseLedger('complaint_filed', `Initial analysis submitted for: ${userInput.substring(0, 50)}${userInput.length > 50 ? '...' : ''}`);
-
-                    } else {
-
-                      throw new Error('No complete response received from server');
-
-                    }
-
-                  } catch (streamError) {
-
-                    if (streamError instanceof Error && streamError.name === 'AbortError') {
-
-                      throw new Error('Request timed out. Please try again.');
-
-                    }
-
-                    throw streamError;
-
-                  }
-
-                }
-
-         else {
-          // Fallback for non-streaming responses
-          if (!contentType || !contentType.includes('application/json')) {
-            const textBody = await response.text();
-            throw new Error(`Expected JSON response but received ${contentType}. Body: ${textBody.slice(0, 100)}...`);
+        } catch (streamError) {
+          if (streamError instanceof Error && streamError.name === 'AbortError') {
+            throw new Error('Request timed out. Please try again.');
           }
-
-          const data: LegalResult = await response.json();
-          setResult(data);
-          setActiveTab('strategy');
-
-          const newHistoryItem: CaseHistoryItem = {
-            id: Date.now().toString(),
-            timestamp: new Date(),
-            jurisdiction,
-            userInput,
-            result: data
-          };
-
-          const updatedHistory = [newHistoryItem, ...history];
-          setHistory(updatedHistory);
-          localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
-          addToCaseLedger('complaint_filed', `Initial analysis submitted for: ${userInput.substring(0, 50)}${userInput.length > 50 ? '...' : ''}`);
+          throw streamError;
         }
       }
     } catch (err) {
@@ -1015,6 +752,24 @@ export default function LegalInterface() {
 
   return (
     <div className="space-y-8">
+      {!apiKey && (
+        <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl flex items-center justify-between gap-3 text-orange-800 shadow-sm animate-pulse">
+          <div className="flex items-center gap-3">
+            <Key className="shrink-0" size={20} />
+            <div>
+              <p className="text-sm font-bold">Limited Demo Mode</p>
+              <p className="text-xs">Using public trial key. Access may be throttled. Add your own free key in settings for full speed.</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => setShowApiKeyModal(true)}
+            className="px-3 py-1.5 bg-orange-600 text-white rounded-lg text-xs font-bold hover:bg-orange-700 transition-colors"
+          >
+            Add API Key
+          </button>
+        </div>
+      )}
+
       {backendUnreachable && (
         <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-3 text-amber-800 shadow-sm">
           <AlertCircle className="shrink-0" size={20} />
@@ -1150,49 +905,57 @@ export default function LegalInterface() {
 
             {/* File Upload Section */}
             <div className="mt-4">
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Upload Evidence (Image)</label>
-              <div className="flex items-center gap-2">
+              <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                <Upload size={16} />
+                Virtual Case Folder (Images)
+              </label>
+              <div className="flex flex-wrap items-center gap-3">
                 <input
                   id="file-upload"
                   type="file"
                   accept="image/*"
+                  multiple
                   onChange={handleFileChange}
                   className="hidden"
                 />
                 <button
                   type="button"
                   onClick={handleUploadClick}
-                  className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                  disabled={selectedFiles.length >= 5}
+                  className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Upload size={16} />
-                  <span>Choose File</span>
+                  <span>{selectedFiles.length === 0 ? 'Upload Evidence' : 'Add More'}</span>
                 </button>
-                {selectedFile && (
-                  <div className="flex items-center gap-2 ml-2">
-                    <span className="text-sm text-slate-600 truncate max-w-[150px]">{selectedFile.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedFile(null);
-                        setPreviewUrl(null);
-                      }}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      ×
-                    </button>
-                  </div>
+                
+                {selectedFiles.length > 0 && (
+                  <span className="text-xs text-slate-500 font-medium">
+                    {selectedFiles.length}/5 files selected
+                  </span>
                 )}
               </div>
 
-              {previewUrl && (
-                <div className="mt-2">
-                  <img
-                    src={previewUrl}
-                    alt="Preview"
-                    className="max-h-32 object-contain border rounded-lg"
-                    width={128}
-                    height={128}
-                  />
+              {previewUrls.length > 0 && (
+                <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                  {previewUrls.map((url, index) => (
+                    <div key={index} className="relative group">
+                      <img
+                        src={url}
+                        alt={`Preview ${index}`}
+                        className="w-full h-24 object-cover border rounded-lg shadow-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeFile(index)}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                      <div className="mt-1 text-[10px] text-slate-500 truncate px-1">
+                        {selectedFiles[index]?.name}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -1270,6 +1033,7 @@ export default function LegalInterface() {
           setActiveTab={setActiveTab}
           jurisdiction={jurisdiction}
           apiKey={apiKey}
+          addToCaseLedger={addToCaseLedger}
         />
       )}
 
