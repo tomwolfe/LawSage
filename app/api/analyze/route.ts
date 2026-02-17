@@ -107,21 +107,31 @@ function generateRetryPrompt(
   validationResult: ValidationResult,
   accumulatedText: string
 ): string {
-  const missingFieldsStr = validationResult.missingFields?.join(', ') || 'unknown fields';
+  const errors = validationResult.errors || [];
+  let aggressiveInstructions = "";
   
+  if (errors.some(e => e.includes('citations'))) {
+    aggressiveInstructions += "\n- CRITICAL FAILURE: You failed the citation count. You MUST provide at least 3+ verified legal citations in the requested JSON format.";
+  }
+  
+  if (errors.some(e => e.includes('adversarial_strategy'))) {
+    aggressiveInstructions += "\n- CRITICAL FAILURE: Missing or generic adversarial strategy. You MUST provide a detailed red-team analysis of the specific legal weaknesses in this case.";
+  }
+
   return `Your previous response was incomplete or malformed.
   
 Validation failed because: ${validationResult.errors?.join('; ')}.
+${aggressiveInstructions}
 
-Please regenerate ONLY the missing or incomplete sections (${missingFieldsStr}) and combine them with your previous analysis to provide a COMPLETE and VALID JSON response.
+Please regenerate the COMPLETE JSON response. Ensure ALL fields are present and substantial. Combine your previous analysis with the fixes requested above.
 
 Original context:
-${originalPrompt.substring(0, 1000)}
+${originalPrompt.substring(0, 800)}
 
 Previous (partial/invalid) response:
-${accumulatedText.substring(0, 2000)}
+${accumulatedText.substring(0, 1500)}
 
-Provide a COMPLETE JSON response that includes ALL required fields. Do not use placeholders - provide actual content.`;
+Provide a COMPLETE JSON response that includes ALL required fields. This is your final chance to comply with the structural hardening requirements. Do not use placeholders.`;
 }
 
 /**

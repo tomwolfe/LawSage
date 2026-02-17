@@ -10,6 +10,7 @@ import { validateLegalStructure } from '../src/utils/reliability';
 import { LegalMotion, MotionToDismiss, MotionForDiscovery, validateLegalMotion } from '../lib/schemas/motions';
 import { verifyCitationWithCache } from '../src/utils/citation-cache';
 import { safeError } from '../lib/pii-redactor';
+import { CaseLedgerEntry } from './LegalInterface';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -68,6 +69,7 @@ interface ResultDisplayProps {
   jurisdiction: string;
   apiKey?: string;
   addToCaseLedger: (eventType: 'complaint_filed' | 'answer_due' | 'motion_submitted' | 'discovery_served' | 'trial_date_set' | 'other', description: string, dueDate?: Date) => void;
+  caseLedger: CaseLedgerEntry[];
 }
 
 // Enhanced parsing function to handle both legacy and structured formats
@@ -182,7 +184,7 @@ function parseLegalOutput(text: string): { strategy: string; filings: string; st
   };
 }
 
-export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdiction, apiKey }: ResultDisplayProps) {
+export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdiction, apiKey, addToCaseLedger, caseLedger }: ResultDisplayProps) {
   const [copyStatus, setCopyStatus] = useState<{[key: string]: boolean | string}>({ all: false, 'opposition-view': false, 'survival-guide': false });
   const [citationVerificationStatus, setCitationVerificationStatus] = useState<{[key: string]: {
     is_verified: boolean | undefined;
@@ -190,6 +192,13 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
     status_message?: string;
     loading: boolean;
   }}>({});
+
+  // Derive completed steps from the case ledger for persistence
+  const isStepCompleted = (stepNumber: number, title: string) => {
+    return (caseLedger || []).some((entry: CaseLedgerEntry) => 
+      entry.description && entry.description.includes(`Step [${stepNumber}] Completed: ${title}`)
+    );
+  };
 
   const copyToClipboard = async (text: string, section: string) => {
     try {
@@ -996,27 +1005,31 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                         <div className="flex-shrink-0 mt-1">
                           <button
                             onClick={() => {
-                              addToCaseLedger('other', `Completed Roadmap Step ${item.step}: ${item.title}`);
-                              // We could track internal check state here if we wanted to visually persistent checkmarks 
-                              // but since the result state is from props, we'd need to lift that state up or 
-                              // just rely on the ledger as requested. 
-                              // Let's add a visual feedback.
+                              const stepTitle = `Step [${item.step}] Completed: ${item.title}`;
+                              // Only add if not already completed
+                              if (!isStepCompleted(item.step, item.title)) {
+                                addToCaseLedger('other', stepTitle);
+                              }
+                              // We keep the visual feedback state for immediate response
                               setCopyStatus(prev => ({ ...prev, [`step-${index}`]: true }));
                               setTimeout(() => setCopyStatus(prev => ({ ...prev, [`step-${index}`]: false })), 2000);
                             }}
                             className={cn(
                               "w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all",
-                              copyStatus[`step-${index}`] 
+                              isStepCompleted(item.step, item.title) || copyStatus[`step-${index}`] 
                                 ? "bg-green-500 border-green-500 text-white" 
                                 : "border-slate-300 text-slate-300 hover:border-indigo-500 hover:text-indigo-500"
                             )}
                           >
-                            {copyStatus[`step-${index}`] ? <CheckCircle size={18} /> : <div className="text-xs font-bold">{item.step}</div>}
+                            {isStepCompleted(item.step, item.title) || copyStatus[`step-${index}`] ? <CheckCircle size={18} /> : <div className="text-xs font-bold">{item.step}</div>}
                           </button>
                         </div>
                         <div className="flex-1">
                           <div className="flex justify-between items-start">
-                            <h3 className="text-lg font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">
+                            <h3 className={cn(
+                              "text-lg font-bold transition-colors",
+                              isStepCompleted(item.step, item.title) ? "text-green-600 line-through opacity-70" : "text-slate-800 group-hover:text-indigo-600"
+                            )}>
                               {item.title}
                             </h3>
                             {item.estimated_time && (
@@ -1025,7 +1038,10 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                               </span>
                             )}
                           </div>
-                          <p className="text-slate-600 mt-2 text-sm leading-relaxed">
+                          <p className={cn(
+                            "mt-2 text-sm leading-relaxed",
+                            isStepCompleted(item.step, item.title) ? "text-slate-400" : "text-slate-600"
+                          )}>
                             {item.description}
                           </p>
                           {item.required_documents && item.required_documents.length > 0 && (
@@ -1040,10 +1056,10 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                             </div>
                           )}
                           
-                          {copyStatus[`step-${index}`] && (
+                          {isStepCompleted(item.step, item.title) && (
                             <div className="mt-2 text-xs font-bold text-green-600 flex items-center gap-1 animate-in fade-in slide-in-from-left-2">
                               <CheckCircle size={12} />
-                              Added to Case Ledger
+                              Recorded in Case Ledger
                             </div>
                           )}
                         </div>

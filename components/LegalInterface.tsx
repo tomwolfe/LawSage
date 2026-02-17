@@ -440,15 +440,14 @@ export default function LegalInterface() {
     const timeoutId = setTimeout(() => controller.abort(), 120000); // Increased to 120s for multi-file processing
 
     try {
-      const documents: string[] = [];
       let isUsingFallbackKeyHeader = false;
 
-      // Process all selected files with OCR
+      // Task 1: Process all selected files with OCR in parallel
+      const documents: string[] = [];
       if (selectedFiles.length > 0) {
-        for (let i = 0; i < selectedFiles.length; i++) {
-          const file = selectedFiles[i];
-          setStreamingStatus(`Processing file ${i + 1}/${selectedFiles.length}: ${file.name}...`);
-          
+        setStreamingStatus(`Step 1/3: Extracting text from ${selectedFiles.length} document(s)...`);
+        
+        const ocrPromises = selectedFiles.map(async (file) => {
           try {
             const processedImage = await processImageForOCR(file);
             const response = await fetch('/api/ocr', {
@@ -493,9 +492,7 @@ export default function LegalInterface() {
 
                 for (const line of lines) {
                   const message = JSON.parse(line);
-                  if (message.type === 'status') {
-                    setStreamingStatus(`File ${i + 1}: ${message.message}`);
-                  } else if (message.type === 'complete') {
+                  if (message.type === 'complete') {
                     ocrResult = message.result;
                     if (message.result?.isUsingFallbackKey) isUsingFallbackKeyHeader = true;
                   } else if (message.type === 'error') {
@@ -504,23 +501,23 @@ export default function LegalInterface() {
                 }
               }
 
-              if (ocrResult && ocrResult.extracted_text) {
-                documents.push(ocrResult.extracted_text);
-              }
+              return ocrResult?.extracted_text || null;
             }
+            return null;
           } catch (fileErr) {
             safeError(`Failed to process file ${file.name}:`, fileErr);
-            setError(`Error processing ${file.name}: ${fileErr instanceof Error ? fileErr.message : 'Unknown error'}`);
-            // Continue with other files if one fails, or stop? 
-            // Let's stop to be safe and clear.
-            setLoading(false);
-            return;
+            throw fileErr;
           }
-        }
+        });
+
+        const results = await Promise.all(ocrPromises);
+        results.forEach(text => {
+          if (text) documents.push(text);
+        });
       }
 
       // Process complete analysis with (optionally) all extracted documents
-      setStreamingStatus('Synthesizing virtual case folder and generating strategy...');
+      setStreamingStatus('Step 2/3: Conducting legal research and grounding...');
       
       const analysisInput = userInput.trim() || `Analyze the ${documents.length} document(s) in the Virtual Case Folder and provide a comprehensive legal strategy.`;
 
@@ -584,7 +581,14 @@ export default function LegalInterface() {
               try {
                 const message = JSON.parse(line);
                 if (message.type === 'status') {
-                  setStreamingStatus(message.message);
+                  // Map server statuses to our steps
+                  if (message.message.includes('research')) {
+                    setStreamingStatus('Step 2/3: Conducting legal research and grounding...');
+                  } else if (message.message.includes('Generating') || message.message.includes('Analyzing')) {
+                    setStreamingStatus('Step 3/3: Synthesizing strategy and filings...');
+                  } else {
+                    setStreamingStatus(message.message);
+                  }
                 } else if (message.type === 'complete') {
                   finalResult = message.result;
                   if (message.result && message.result.isUsingFallbackKey) {
@@ -1034,6 +1038,7 @@ export default function LegalInterface() {
           jurisdiction={jurisdiction}
           apiKey={apiKey}
           addToCaseLedger={addToCaseLedger}
+          caseLedger={caseLedger}
         />
       )}
 
