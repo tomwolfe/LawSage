@@ -3,13 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"next dev\" \"PYTHONPATH=. uvicorn api.index:app --host 127.0.0.1 --port 8000 --reload\"",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "jest",
-    "test:api": "PYTHONPATH=. pytest api/",
-    "test:all": "npm run test:api && npm run lint"
+    "test": "jest"
   },
   "dependencies": {
     "@google/genai": "^1.39.0",
@@ -34,7 +32,6 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
-    "concurrently": "^9.2.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "jest": "^30.2.0",

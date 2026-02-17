@@ -289,13 +289,12 @@ export default function LegalInterface() {
 
     setLoading(true);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 55000); // 55s timeout (under Vercel 60s limit)
 
     try {
       if (selectedFile) {
         // Process uploaded image with OCR using the image processor
         try {
-          // Process the image to resize and compress it before sending to OCR
           const processedImage = await processImageForOCR(selectedFile);
 
           const response = await fetch('/api/ocr', {
@@ -327,7 +326,6 @@ export default function LegalInterface() {
           setResult(data);
           setActiveTab('strategy');
 
-          // Add to history
           const newHistoryItem: CaseHistoryItem = {
             id: Date.now().toString(),
             timestamp: new Date(),
@@ -343,7 +341,7 @@ export default function LegalInterface() {
           setError(err instanceof Error ? err.message : 'An unknown error occurred during OCR processing');
         }
       } else {
-        // Process text input normally
+        // Process text input with streaming
         const response = await fetch('/api/analyze', {
           method: 'POST',
           headers: {
@@ -356,7 +354,6 @@ export default function LegalInterface() {
 
         clearTimeout(timeoutId);
 
-        const contentType = response.headers.get('content-type');
         if (!response.ok) {
           if (response.status === 429) {
             setError('Rate limit exceeded. Please check your API quota or try again later.');
@@ -365,42 +362,96 @@ export default function LegalInterface() {
             setError('Invalid API key. Please update your key in Settings.');
             return;
           } else {
-            let errorMessage = 'Failed to generate response';
-            if (contentType && contentType.includes('application/json')) {
-              const errData = await response.json();
-              errorMessage = errData.detail || errorMessage;
-            } else {
-              const textError = await response.text();
-              errorMessage = `Server Error (${response.status}): ${textError.slice(0, 100)}...`;
-            }
-            throw new Error(errorMessage);
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Failed to generate response');
           }
         }
 
-        if (!contentType || !contentType.includes('application/json')) {
-          const textBody = await response.text();
-          throw new Error(`Expected JSON response but received ${contentType}. Body: ${textBody.slice(0, 100)}...`);
+        const contentType = response.headers.get('content-type');
+        
+        // Handle streaming NDJSON response
+        if (contentType && contentType.includes('application/x-ndjson')) {
+          const reader = response.body?.getReader();
+          if (!reader) {
+            throw new Error('ReadableStream not supported');
+          }
+
+          const decoder = new TextDecoder();
+          let finalResult: LegalResult | null = null;
+
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              const chunk = decoder.decode(value, { stream: true });
+              const lines = chunk.split('\n').filter(line => line.trim());
+
+              for (const line of lines) {
+                try {
+                  const message = JSON.parse(line);
+
+                  if (message.type === 'complete') {
+                    finalResult = message.result;
+                  } else if (message.type === 'error') {
+                    throw new Error(message.error);
+                  }
+                  // Note: chunk messages are streamed for progress but not accumulated here
+                } catch (parseError) {
+                  console.warn('Failed to parse stream chunk:', parseError);
+                }
+              }
+            }
+
+            if (finalResult) {
+              setResult(finalResult);
+              setActiveTab('strategy');
+
+              const newHistoryItem: CaseHistoryItem = {
+                id: Date.now().toString(),
+                timestamp: new Date(),
+                jurisdiction,
+                userInput,
+                result: finalResult
+              };
+
+              const updatedHistory = [newHistoryItem, ...history];
+              setHistory(updatedHistory);
+              localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
+              addToCaseLedger('complaint_filed', `Initial analysis submitted for: ${userInput.substring(0, 50)}${userInput.length > 50 ? '...' : ''}`);
+            } else {
+              throw new Error('No complete response received from server');
+            }
+          } catch (streamError) {
+            if (streamError instanceof Error && streamError.name === 'AbortError') {
+              throw new Error('Request timed out. Please try again.');
+            }
+            throw streamError;
+          }
+        } else {
+          // Fallback for non-streaming responses
+          if (!contentType || !contentType.includes('application/json')) {
+            const textBody = await response.text();
+            throw new Error(`Expected JSON response but received ${contentType}. Body: ${textBody.slice(0, 100)}...`);
+          }
+
+          const data: LegalResult = await response.json();
+          setResult(data);
+          setActiveTab('strategy');
+
+          const newHistoryItem: CaseHistoryItem = {
+            id: Date.now().toString(),
+            timestamp: new Date(),
+            jurisdiction,
+            userInput,
+            result: data
+          };
+
+          const updatedHistory = [newHistoryItem, ...history];
+          setHistory(updatedHistory);
+          localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
+          addToCaseLedger('complaint_filed', `Initial analysis submitted for: ${userInput.substring(0, 50)}${userInput.length > 50 ? '...' : ''}`);
         }
-
-        const data: LegalResult = await response.json();
-        setResult(data);
-        setActiveTab('strategy');
-
-        // Add to history
-        const newHistoryItem: CaseHistoryItem = {
-          id: Date.now().toString(),
-          timestamp: new Date(),
-          jurisdiction,
-          userInput,
-          result: data
-        };
-
-        const updatedHistory = [newHistoryItem, ...history];
-        setHistory(updatedHistory);
-        localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
-
-        // Add to case ledger
-        addToCaseLedger('complaint_filed', `Initial analysis submitted for: ${userInput.substring(0, 50)}${userInput.length > 50 ? '...' : ''}`);
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
@@ -461,7 +512,7 @@ export default function LegalInterface() {
         <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-3 text-amber-800 shadow-sm">
           <AlertCircle className="shrink-0" size={20} />
           <p className="text-sm font-medium">
-            Backend API unreachable. Please ensure the FastAPI server is running on port 8000.
+            Unable to connect to the API. Please refresh the page and try again.
           </p>
         </div>
       )}

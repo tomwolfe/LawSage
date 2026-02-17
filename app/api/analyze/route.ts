@@ -1,23 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
-import { SafetyValidator, Source } from '../../../lib/validation';
+import { SafetyValidator } from '../../../lib/validation';
 
-// Mandatory safety disclosure hardcoded for the response stream
-// const _LEGAL_DISCLAIMER = (  // Commented out unused variable
-//   "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. " +
-//   "This is legal information, not legal advice. Always consult with a qualified attorney.\n\n"
-// );
-
-// Define types to match the Python models
+// Define types
 interface LegalRequest {
   user_input: string;
   jurisdiction: string;
-  documents?: string[]; // Virtual Case Folder - array of document texts
-}
-
-interface LegalResult {
-  text: string;
-  sources: Source[];
+  documents?: string[];
 }
 
 interface StandardErrorResponse {
@@ -110,11 +99,18 @@ function hasEmergencyKeywords(userInput: string): boolean {
   return emergencyKeywords.some(keyword => userInputLower.includes(keyword));
 }
 
+interface Template {
+  title: string;
+  description: string;
+  templatePath: string;
+  keywords: string[];
+}
+
 /**
  * Find the best matching template using enhanced keyword overlap prioritization.
  * Emergency keywords (eviction, lockout) force high-priority template matching.
  */
-function findBestTemplate(userInput: string, templates: any[]): { template: any | null, isEmergency: boolean } {
+function findBestTemplate(userInput: string, templates: Template[]): { template: Template | null, isEmergency: boolean } {
   // Check for emergency keywords - force lockout template if detected
   if (hasEmergencyKeywords(userInput)) {
     for (const template of templates) {
@@ -291,47 +287,36 @@ export const runtime = 'edge'; // Enable edge runtime
 
 export async function POST(req: NextRequest) {
   try {
-    // Get the Gemini API key from headers
     const xGeminiApiKey = req.headers.get('X-Gemini-API-Key');
-
-    // Parse the request body
     const { user_input, jurisdiction, documents }: LegalRequest = await req.json();
 
     // Validate inputs
     if (!user_input?.trim()) {
       return NextResponse.json(
-        {
-          type: "ValidationError",
-          detail: "User input is required."
-        } satisfies StandardErrorResponse,
+        { type: "ValidationError", detail: "User input is required." } satisfies StandardErrorResponse,
         { status: 400 }
       );
     }
 
     if (!jurisdiction?.trim()) {
       return NextResponse.json(
-        {
-          type: "ValidationError",
-          detail: "Jurisdiction is required."
-        } satisfies StandardErrorResponse,
+        { type: "ValidationError", detail: "Jurisdiction is required." } satisfies StandardErrorResponse,
         { status: 400 }
       );
     }
 
-    // Try the static grounding layer first - check if this is a common procedural question
+    // Static grounding layer - check common procedural questions first (saves API calls)
     const { getLegalLookupResponse } = await import('../../../src/utils/legal-lookup');
     const staticResponse = await getLegalLookupResponse(`${user_input} ${jurisdiction}`);
 
     if (staticResponse) {
-      // If we found a match in the static grounding layer, return it immediately
       return NextResponse.json(staticResponse);
     }
 
-    // Template injection: Find the best matching template for the user's input
+    // Template injection
     let templateContent = '';
     const isEmergency = hasEmergencyKeywords(user_input);
 
-    // Fetch Ex Parte rules if it's an emergency
     let exParteRulesText = "";
     if (isEmergency) {
       const { searchExParteRules } = await import('../../../src/utils/legal-lookup');
@@ -345,15 +330,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Use enhanced template matching
     try {
       const manifestResponse = await fetch(`${req.nextUrl.origin}/templates/manifest.json`);
       if (manifestResponse.ok) {
         const manifest = await manifestResponse.json();
         const templates = manifest.templates || [];
-        
-        const { template: bestMatch, isEmergency: emergencyMatch } = findBestTemplate(user_input, templates);
-        
+        const { template: bestMatch } = findBestTemplate(user_input, templates);
+
         if (bestMatch) {
           const templatePath = bestMatch.templatePath;
           const templateResponse = await fetch(`${req.nextUrl.origin}${templatePath}`);
@@ -362,33 +345,25 @@ export async function POST(req: NextRequest) {
             console.log(`Using template: ${bestMatch.title}`);
           }
         } else {
-          // Fallback to generic template
           templateContent = GENERIC_MOTION_TEMPLATE;
           console.log('No template match found, using generic motion template');
         }
       }
     } catch (error) {
       console.warn('Template matching failed:', error);
-      // Fallback to generic template on error
       templateContent = GENERIC_MOTION_TEMPLATE;
     }
 
     if (!xGeminiApiKey) {
       return NextResponse.json(
-        {
-          type: "AuthenticationError",
-          detail: "Gemini API Key is missing. Static grounding layer did not find a match for this query."
-        } satisfies StandardErrorResponse,
+        { type: "AuthenticationError", detail: "Gemini API Key is missing. Static grounding layer did not find a match for this query." } satisfies StandardErrorResponse,
         { status: 401 }
       );
     }
 
     if (!SafetyValidator.redTeamAudit(user_input, jurisdiction)) {
       return NextResponse.json(
-        {
-          type: "SafetyViolation",
-          detail: "Request blocked: Missing jurisdiction or potential safety violation."
-        } satisfies StandardErrorResponse,
+        { type: "SafetyViolation", detail: "Request blocked: Missing jurisdiction or potential safety violation." } satisfies StandardErrorResponse,
         { status: 400 }
       );
     }
@@ -403,7 +378,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-const prompt = `
+    const prompt = `
  ${documentsText}
  ${exParteRulesText}
 
@@ -426,6 +401,7 @@ const prompt = `
  Return only valid JSON.
  `;
 
+    // TRUE STREAMING: Send chunks as they arrive from Gemini to avoid Vercel 10s timeout
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
@@ -433,77 +409,95 @@ const prompt = `
           const result = await client.models.generateContentStream({
             model: "gemini-2.5-flash-preview-09-2025",
             contents: prompt,
-            config: {
-              systemInstruction: SYSTEM_INSTRUCTION,
-            }
+            config: { systemInstruction: SYSTEM_INSTRUCTION }
           });
-          let rawOutput = '';
+
+          let accumulatedText = '';
 
           for await (const chunk of result) {
-            rawOutput += chunk.text;
+            const chunkText = chunk.text;
+            if (chunkText) {
+              accumulatedText += chunkText;
+              // Stream each chunk immediately to keep connection alive
+              controller.enqueue(encoder.encode(JSON.stringify({ 
+                type: 'chunk', 
+                content: chunkText 
+              }) + '\n'));
+            }
           }
 
-          let processedOutput = rawOutput;
-          const jsonMatch = rawOutput.match(/```json\s*([\s\S]*?)\s*```/);
+          // Process final accumulated text
+          let processedOutput = accumulatedText;
+          const jsonMatch = accumulatedText.match(/```json\s*([\s\S]*?)\s*```/);
           if (jsonMatch) {
             processedOutput = jsonMatch[1].trim();
           } else {
-            const braceStart = rawOutput.indexOf('{');
-            const braceEnd = rawOutput.lastIndexOf('}');
+            const braceStart = accumulatedText.indexOf('{');
+            const braceEnd = accumulatedText.lastIndexOf('}');
             if (braceStart !== -1 && braceEnd !== -1 && braceEnd > braceStart) {
-              processedOutput = rawOutput.substring(braceStart, braceEnd + 1);
+              processedOutput = accumulatedText.substring(braceStart, braceEnd + 1);
             }
           }
 
-          const parsedOutput = JSON.parse(processedOutput);
-          
-          const legalResult: LegalResult = {
-            text: JSON.stringify(parsedOutput),
-            sources: parsedOutput.citations?.map((c: { text: string; url?: string }) => ({ title: c.text, uri: c.url })) || []
-          };
+          let parsedOutput;
+          try {
+            parsedOutput = JSON.parse(processedOutput);
+          } catch (parseError) {
+            console.error("Failed to parse final JSON:", parseError);
+            parsedOutput = { 
+              error: "Failed to parse AI response", 
+              raw: processedOutput.substring(0, 500) 
+            };
+          }
 
-          controller.enqueue(encoder.encode(JSON.stringify(legalResult)));
+          const sources = parsedOutput.citations?.map((c: { text: string; url?: string }) => 
+            ({ title: c.text, uri: c.url })
+          ) || [];
+
+          // Send final complete response
+          controller.enqueue(encoder.encode(JSON.stringify({ 
+            type: 'complete', 
+            result: { text: JSON.stringify(parsedOutput), sources } 
+          }) + '\n'));
         } catch (e) {
           console.error("AI processing error:", e);
-          controller.enqueue(encoder.encode(JSON.stringify({ text: "Error processing request", sources: [] })));
+          controller.enqueue(encoder.encode(JSON.stringify({ 
+            type: 'error', 
+            error: e instanceof Error ? e.message : 'Unknown error' 
+          }) + '\n'));
         } finally {
           controller.close();
         }
       }
     });
 
-    return new Response(stream, { headers: { 'Content-Type': 'application/json' } });
+    return new Response(stream, { 
+      headers: { 
+        'Content-Type': 'application/x-ndjson',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+      } 
+    });
   } catch (error: unknown) {
     console.error("Error in analyze API route:", error);
 
-    // Handle specific error types
     const errorMessage = typeof error === 'object' && error !== null && 'message' in error
       ? String((error as Record<string, unknown>).message)
       : 'Unknown error occurred';
 
     if (errorMessage.includes("429") || errorMessage.toLowerCase().includes("quota")) {
       return NextResponse.json(
-        {
-          type: "RateLimitError",
-          detail: "AI service rate limit exceeded. Please try again in a few minutes."
-        } satisfies StandardErrorResponse,
+        { type: "RateLimitError", detail: "AI service rate limit exceeded. Please try again in a few minutes." } satisfies StandardErrorResponse,
         { status: 429 }
       );
     } else if (errorMessage.includes("400") || errorMessage.includes("invalid")) {
       return NextResponse.json(
-        {
-          type: "AIClientError",
-          detail: errorMessage || "Invalid request to AI service"
-        } satisfies StandardErrorResponse,
+        { type: "AIClientError", detail: errorMessage || "Invalid request to AI service" } satisfies StandardErrorResponse,
         { status: 400 }
       );
     } else {
-      // Don't expose internal error details to prevent API key leakage
       return NextResponse.json(
-        {
-          type: "InternalServerError",
-          detail: "An internal server error occurred"
-        } satisfies StandardErrorResponse,
+        { type: "InternalServerError", detail: "An internal server error occurred" } satisfies StandardErrorResponse,
         { status: 500 }
       );
     }
