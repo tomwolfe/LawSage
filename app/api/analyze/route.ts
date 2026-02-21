@@ -588,6 +588,14 @@ Do NOT use placeholders. Provide substantive content for all fields.`;
               }) + '\n'));
             }, 2000);
 
+            // Create AbortController for timeout handling
+            const abortController = new AbortController();
+            const timeoutMs = 45000; // 45 second timeout (leave buffer for Vercel's 60s limit)
+            const timeoutId = setTimeout(() => {
+              safeWarn('GLM API request timed out after 45 seconds');
+              abortController.abort();
+            }, timeoutMs);
+
             // Call GLM with PII-redacted input for privacy protection
             const response = await fetch(GLM_API_URL, {
               method: 'POST',
@@ -602,14 +610,23 @@ Do NOT use placeholders. Provide substantive content for all fields.`;
                   { role: "user", content: userPrompt }
                 ],
                 temperature: 0.2,
-                max_tokens: 8192,
+                max_tokens: 4096, // Reduced from 8192 to speed up response
                 stream: true
-              })
+              }),
+              signal: abortController.signal
             });
+
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
               const errorText = await response.text();
               safeError(`GLM API error: ${response.status} - ${errorText}`);
+              
+              // Check if request was aborted due to timeout
+              if (response.status === 499 || errorText.includes('timeout') || errorText.toLowerCase().includes('aborted')) {
+                throw new Error('AI service timeout - request took too long. Please try again with a simpler query.');
+              }
+              
               throw new Error(`GLM API error: ${response.status}`);
             }
 
@@ -799,7 +816,16 @@ Do NOT use placeholders. Provide substantive content for all fields.`;
         ? String((error as Record<string, unknown>).message)
         : 'Unknown error occurred';
 
-      if (errorMessage.includes("429") || errorMessage.toLowerCase().includes("quota") || errorMessage.toLowerCase().includes("rate limit")) {
+      // Check for timeout errors first
+      if (errorMessage.toLowerCase().includes('timeout') || errorMessage.toLowerCase().includes('aborted')) {
+        return NextResponse.json(
+          {
+            type: "TimeoutError",
+            detail: "Request timed out. The AI service took too long to respond. Please try again with a simpler query or check your internet connection."
+          } satisfies StandardErrorResponse,
+          { status: 504 }
+        );
+      } else if (errorMessage.includes("429") || errorMessage.toLowerCase().includes("quota") || errorMessage.toLowerCase().includes("rate limit")) {
         return NextResponse.json(
           {
             type: "RateLimitError",
