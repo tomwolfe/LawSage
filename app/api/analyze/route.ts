@@ -262,6 +262,7 @@ ${templateContent ? 'Use this template as a reference for formatting: ' + templa
 
 Return a SINGLE JSON response with all required sections as specified in the system instructions. Do NOT wrap in markdown code blocks.`;
 
+      // Enable streaming to avoid Vercel Hobby 25s timeout
       const response = await fetch(GLM_ENDPOINT, {
         method: 'POST',
         headers: {
@@ -276,7 +277,7 @@ Return a SINGLE JSON response with all required sections as specified in the sys
           ],
           temperature: 0.1,
           response_format: { type: 'json_object' },
-          stream: false
+          stream: true // Enable streaming
         }),
       });
 
@@ -289,41 +290,92 @@ Return a SINGLE JSON response with all required sections as specified in the sys
         );
       }
 
-      const data = await response.json();
-      const aiContent = data.choices?.[0]?.message?.content;
+      // Create a streaming response
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          // Send initial status to keep connection alive and show progress
+          controller.enqueue(encoder.encode(JSON.stringify({
+            type: 'status',
+            message: 'Connecting to AI analysis engine...'
+          }) + '\n'));
 
-      if (!aiContent) {
-        return NextResponse.json(
-          { type: 'ApiError', detail: 'GLM API returned empty response' } satisfies StandardErrorResponse,
-          { status: 500 }
-        );
-      }
+          const reader = response.body?.getReader();
+          if (!reader) {
+            controller.close();
+            return;
+          }
 
-      // Parse and validate the JSON output
-      const parsedOutput = parseJsonFromResponse(aiContent);
-      
-      if (!parsedOutput) {
-        return NextResponse.json(
-          { type: 'ParseError', detail: 'Failed to parse AI response as JSON' } satisfies StandardErrorResponse,
-          { status: 500 }
-        );
-      }
+          const decoder = new TextDecoder();
+          let fullContent = '';
 
-      // Validate output structure
-      const validation = validateLegalOutputStructure(parsedOutput);
-      if (!validation.valid) {
-        safeError('GLM output validation failed:', validation.errors);
-        // Still return the response, but log the validation errors
-        // The frontend can handle partial data
-      }
+          try {
+            // Send progress update as we start receiving data
+            controller.enqueue(encoder.encode(JSON.stringify({
+              type: 'status',
+              message: 'Analyzing case documents and conducting legal research...'
+            }) + '\n'));
 
-      // Maintain the "complete" message type for frontend compatibility
-      return NextResponse.json({
-        type: 'complete',
-        result: { 
-          text: aiContent, 
-          sources: staticSources,
-          parsed: parsedOutput // Include parsed JSON for frontend consumption
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+
+              const chunk = decoder.decode(value);
+              // Parse SSE (Server-Sent Events) format from GLM API
+              const lines = chunk.split('\n');
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  const data = line.slice(6);
+                  if (data === '[DONE]') continue;
+                  try {
+                    const parsed = JSON.parse(data);
+                    const content = parsed.choices?.[0]?.delta?.content || '';
+                    if (content) {
+                      fullContent += content;
+                    }
+                  } catch {
+                    // Skip invalid JSON chunks
+                  }
+                }
+              }
+            }
+
+            // Parse and validate the complete response
+            const parsedOutput = parseJsonFromResponse(fullContent);
+            
+            if (parsedOutput) {
+              const validation = validateLegalOutputStructure(parsedOutput);
+              if (!validation.valid) {
+                safeError('GLM output validation failed:', validation.errors);
+              }
+            }
+
+            // Send completion signal
+            controller.enqueue(encoder.encode(JSON.stringify({
+              type: 'complete',
+              result: {
+                text: fullContent,
+                sources: staticSources,
+                parsed: parsedOutput
+              }
+            }) + '\n'));
+          } catch (error) {
+            safeError('Streaming error:', error);
+            controller.enqueue(encoder.encode(JSON.stringify({
+              type: 'error',
+              detail: 'Streaming failed'
+            }) + '\n'));
+          } finally {
+            controller.close();
+          }
+        }
+      });
+
+      return new NextResponse(stream, {
+        headers: {
+          'Content-Type': 'application/x-ndjson',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive'
         }
       });
 
