@@ -12,6 +12,7 @@
   "dependencies": {
     "@google/genai": "^1.39.0",
     "@tailwindcss/typography": "^0.5.19",
+    "@vercel/kv": "^3.0.0",
     "clsx": "^2.1.1",
     "docx": "^9.0.3",
     "lucide-react": "^0.563.0",
