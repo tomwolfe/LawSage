@@ -314,7 +314,7 @@ Return a SINGLE JSON response with all required sections as specified in the sys
           }
 
           // Retry logic with exponential backoff
-          const MAX_RETRIES = 3;
+          const MAX_RETRIES = 5; // Increased from 3 to handle aggressive GLM rate limiting
           let attempt = 0;
           let glmResponse: Response | null = null;
           let lastError: Error | null = null;
@@ -343,7 +343,7 @@ Return a SINGLE JSON response with all required sections as specified in the sys
               if (glmResponse.status === 429) {
                 const errorData = await glmResponse.json().catch(() => ({}));
                 const retryAfter = glmResponse.headers.get('Retry-After');
-                
+
                 updateGLMRateLimit(apiKeyHash, {
                   is429: true,
                   rateLimitHeaders: {
@@ -366,8 +366,20 @@ Return a SINGLE JSON response with all required sections as specified in the sys
                   return;
                 }
 
-                // Calculate backoff delay
-                const backoffDelay = calculateBackoff(attempt, 2000, 15000);
+                // Calculate backoff delay - prefer Retry-After header if present
+                let backoffDelay: number;
+                if (retryAfter) {
+                  const retryAfterSeconds = parseInt(retryAfter, 10);
+                  if (!isNaN(retryAfterSeconds)) {
+                    backoffDelay = retryAfterSeconds * 1000;
+                    safeWarn(`GLM API returned 429. Using Retry-After header: ${retryAfterSeconds}s`);
+                  } else {
+                    backoffDelay = calculateBackoff(attempt, 3000, 120000);
+                  }
+                } else {
+                  // Use exponential backoff: 3s, 9s, 27s, 81s (capped at 120s)
+                  backoffDelay = calculateBackoff(attempt, 3000, 120000);
+                }
                 safeWarn(`GLM API returned 429. Retrying in ${Math.ceil(backoffDelay / 1000)}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
                 
                 // Send progress update to client
