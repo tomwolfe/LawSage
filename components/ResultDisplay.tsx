@@ -70,6 +70,7 @@ interface ResultDisplayProps {
   apiKey?: string;
   addToCaseLedger: (eventType: 'complaint_filed' | 'answer_due' | 'motion_submitted' | 'discovery_served' | 'trial_date_set' | 'other', description: string, dueDate?: Date) => void;
   caseLedger: CaseLedgerEntry[];
+  streamingPreview?: { strategy?: string; roadmap?: string } | null;
 }
 
 // Helper function to calculate deadline from roadmap
@@ -219,7 +220,7 @@ function parseLegalOutput(text: string): { strategy: string; filings: string; st
   };
 }
 
-export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdiction, apiKey, addToCaseLedger, caseLedger }: ResultDisplayProps) {
+export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdiction, apiKey, addToCaseLedger, caseLedger, streamingPreview }: ResultDisplayProps) {
   const [copyStatus, setCopyStatus] = useState<{[key: string]: boolean | string}>({ all: false, 'opposition-view': false, 'survival-guide': false });
   const [citationVerificationStatus, setCitationVerificationStatus] = useState<{[key: string]: {
     is_verified: boolean | undefined;
@@ -260,10 +261,19 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
     URL.revokeObjectURL(url);
   };
 
-  // Function to download filings as PDF with court-standard formatting
+  // Function to download filings as PDF with court-standard pleading paper formatting
   const downloadFilingsAsPDF = async () => {
     if (!result) return;
     const { filings } = parseLegalOutput(result.text);
+
+    // Generate line numbers for pleading paper format
+    const lines = filings.split('\n');
+    const maxLines = 100; // Standard pleading paper has 28 lines per page
+    const linedContent = lines.slice(0, maxLines).map((line, index) => {
+      const lineNum = index + 1;
+      const pageBreak = lineNum > 0 && lineNum % 28 === 0 ? '<div class="page-break"></div>' : '';
+      return `${pageBreak}<div class="pleading-line"><span class="line-number">${lineNum}</span><span class="line-content">${line || '&nbsp;'}</span></div>`;
+    }).join('');
 
     // Create a temporary HTML document for PDF conversion with court-standard formatting
     const htmlContent = `
@@ -274,20 +284,53 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
           <title>Court Filing - ${jurisdiction}</title>
           <style>
             @page {
-              margin: 1in;
+              margin: 0.5in 1in;
+              size: 8.5in 11in;
+            }
+            @media print {
+              .page-break {
+                page-break-before: always;
+              }
             }
             body {
-              font-family: "Times New Roman", Times, serif;
-              font-size: 14pt;
-              line-height: 1.6;
-              margin: 1in;
+              font-family: "Courier New", Courier, monospace;
+              font-size: 12pt;
+              line-height: 2em;
+              margin: 0;
+              padding: 0;
               counter-reset: page;
+            }
+            .pleading-paper-container {
+              position: relative;
+              padding-left: 45px;
+              border-left: 2px solid #cc0000;
+              margin-left: 20px;
+            }
+            .pleading-line {
+              display: flex;
+              min-height: 2em;
+            }
+            .line-number {
+              position: absolute;
+              left: 5px;
+              width: 35px;
+              text-align: right;
+              color: #666;
+              font-size: 10pt;
+              font-family: Arial, sans-serif;
+              user-select: none;
+            }
+            .line-content {
+              flex: 1;
+              padding-left: 10px;
+              white-space: pre-wrap;
             }
             .court-caption {
               text-align: center;
               margin-bottom: 1.5em;
               border-bottom: 2px solid black;
               padding-bottom: 10px;
+              margin-left: 45px;
             }
             .case-number {
               font-weight: bold;
@@ -298,21 +341,15 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
             }
             .document-title {
               text-align: center;
-              font-size: 16pt;
+              font-size: 14pt;
               font-weight: bold;
               margin: 1.5em 0;
-            }
-            h1, h2, h3 {
-              font-family: "Times New Roman", Times, serif;
-              margin: 1em 0 0.5em 0;
-            }
-            p {
-              margin: 0.8em 0;
-              text-align: justify;
+              margin-left: 45px;
             }
             .signature-block {
               margin-top: 3em;
               text-align: right;
+              margin-right: 1in;
             }
             .page-number::after {
               content: counter(page);
@@ -322,33 +359,46 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
               bottom: 0;
               width: 100%;
               text-align: center;
-              font-size: 12pt;
+              font-size: 10pt;
+              font-family: Arial, sans-serif;
+            }
+            .red-line {
+              position: absolute;
+              left: 45px;
+              top: 0;
+              bottom: 0;
+              width: 2px;
+              background-color: #cc0000;
             }
           </style>
         </head>
         <body>
-          <div class="court-caption">
-            <div class="court-name"><strong>${jurisdiction.toUpperCase()} SUPERIOR COURT</strong></div>
-            <div class="county-address">COUNTY, STATE</div>
-            <div class="case-number">CASE NO: ________________________</div>
-            <div class="parties">
-              <div class="plaintiff">PLAINTIFF,</div>
-              <div class="v-line">v.</div>
-              <div class="defendant">DEFENDANT.</div>
+          <div class="pleading-paper-container">
+            <div class="red-line"></div>
+            
+            <div class="court-caption">
+              <div class="court-name"><strong>${jurisdiction.toUpperCase()} SUPERIOR COURT</strong></div>
+              <div class="county-address">COUNTY, STATE</div>
+              <div class="case-number">CASE NO: ________________________</div>
+              <div class="parties">
+                <div class="plaintiff">PLAINTIFF,</div>
+                <div class="v-line">v.</div>
+                <div class="defendant">DEFENDANT.</div>
+              </div>
             </div>
-          </div>
 
-          <div class="document-title">MOTION FOR ________________________</div>
+            <div class="document-title">MOTION FOR ________________________</div>
 
-          <div class="content">${filings.replace(/\n/g, '<br>')}</div>
+            ${linedContent}
 
-          <div class="signature-block">
-            <div>___________________________</div>
-            <div>Attorney for Plaintiff/Defendant</div>
-            <div>Attorney Bar No. _______________</div>
-            <div>Firm Name</div>
-            <div>Address Line 1</div>
-            <div>Address Line 2</div>
+            <div class="signature-block">
+              <div>___________________________</div>
+              <div>Attorney for Plaintiff/Defendant</div>
+              <div>Attorney Bar No. _______________</div>
+              <div>Firm Name</div>
+              <div>Address Line 1</div>
+              <div>Address Line 2</div>
+            </div>
           </div>
 
           <div class="footer">
@@ -1022,10 +1072,15 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
       <div className="flex-1 p-6 overflow-y-auto">
         {(() => {
           if (activeTab === 'strategy') {
+            // Use streaming preview if available and no complete result yet
+            const displayStrategyText = streamingPreview?.strategy && !structured?.strategy
+              ? `## Strategy (Streaming Preview)\n\n${streamingPreview.strategy}\n\n_More content being generated..._`
+              : strategyText;
+              
             return (
               <div className="relative">
                 <button
-                  onClick={() => copyToClipboard(strategyText, 'strategy')}
+                  onClick={() => copyToClipboard(displayStrategyText, 'strategy')}
                   className="absolute top-0 right-0 p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors z-10"
                   title={copyStatus.strategy ? "Copied!" : "Copy to clipboard"}
                 >
@@ -1034,7 +1089,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                 </button>
                 <div className="prose max-w-none prose-slate mt-8">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {strategyText}
+                    {displayStrategyText}
                   </ReactMarkdown>
                 </div>
               </div>

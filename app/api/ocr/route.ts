@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { safeLog, safeError } from '../../../lib/pii-redactor';
+import { safeLog, safeError, safeWarn } from '../../../lib/pii-redactor';
 import { validateOCRResult } from '../../../lib/schemas/legal-output';
+import fs from 'fs';
+import path from 'path';
 
 interface StandardErrorResponse {
   type: string;
@@ -11,7 +13,7 @@ interface OCRRequest {
   image: string; // base64 encoded image
 }
 
-export const runtime = 'edge'; // Enable edge runtime
+export const runtime = 'nodejs'; // Use Node.js runtime for fs access to rules files
 
 /**
  * OCR Endpoint - GLM-4V-Flash Multimodal
@@ -141,8 +143,78 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // AUTOMATED DEADLINE TRIGGER: Calculate deadlines based on document type
+    const ocrData = validated.data;
+    const jurisdiction = 'California'; // Default to California, can be enhanced to accept jurisdiction parameter
+    let calculatedDeadline: { date: string; daysRemaining: number; rule: string } | undefined;
+
+    try {
+      // Load jurisdiction-specific rules from public/rules/*.json
+      const rulesPath = path.join(process.cwd(), 'public', 'rules', `${jurisdiction.toLowerCase()}.json`);
+      if (fs.existsSync(rulesPath)) {
+        const rulesRaw = fs.readFileSync(rulesPath, 'utf8');
+        const rules = JSON.parse(rulesRaw);
+        
+        const docType = ocrData.document_type?.toLowerCase() || '';
+        const filingDeadlines = rules.filing_deadlines;
+        
+        if (filingDeadlines) {
+          const now = new Date();
+          let daysToAdd = 0;
+          let ruleDescription = '';
+          
+          // Summons → Answer deadline (30 days from service)
+          if (docType.includes('summons')) {
+            if (filingDeadlines.answer_to_complaint) {
+              daysToAdd = 30; // Default, can be parsed from rule string
+              ruleDescription = 'Answer to Complaint deadline (30 days from service)';
+            }
+          }
+          // Complaint → Answer deadline
+          else if (docType.includes('complaint')) {
+            if (filingDeadlines.answer_to_complaint) {
+              daysToAdd = 30;
+              ruleDescription = 'Answer to Complaint deadline (30 days from service)';
+            }
+          }
+          // Motion to Dismiss → Response deadline
+          else if (docType.includes('motion to dismiss')) {
+            if (filingDeadlines.motion_to_dismiss) {
+              daysToAdd = 60; // Or 30 days after answer, whichever is later
+              ruleDescription = 'Motion to Dismiss response deadline';
+            }
+          }
+          // Discovery documents → Response deadline
+          else if (docType.includes('discovery') || docType.includes('interrogatory') || docType.includes('request for production')) {
+            if (filingDeadlines.discovery_deadlines?.interrogatories) {
+              daysToAdd = 30;
+              ruleDescription = 'Discovery response deadline (30 days)';
+            }
+          }
+          
+          if (daysToAdd > 0) {
+            const deadlineDate = new Date(now.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
+            calculatedDeadline = {
+              date: deadlineDate.toISOString(),
+              daysRemaining: daysToAdd,
+              rule: ruleDescription
+            };
+          }
+        }
+      }
+    } catch (ruleError) {
+      safeWarn('Failed to calculate deadline from rules:', ruleError);
+      // Continue without deadline calculation - don't fail the OCR request
+    }
+
     safeLog('OCR processing successful');
-    return NextResponse.json(validated.data);
+    
+    // Return OCR data with calculated deadline if available
+    const responseData = calculatedDeadline 
+      ? { ...ocrData, calculated_deadline: calculatedDeadline }
+      : ocrData;
+    
+    return NextResponse.json(responseData);
   } catch (error: unknown) {
     safeError("Error in OCR API route:", error);
     return NextResponse.json(

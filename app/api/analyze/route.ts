@@ -3,6 +3,8 @@ import { SafetyValidator } from '../../../lib/validation';
 import { safeLog, safeError, safeWarn, redactPII } from '../../../lib/pii-redactor';
 import { withRateLimit } from '../../../lib/rate-limiter';
 import { getLegalLookupResponse, searchExParteRules } from '../../../src/utils/legal-lookup';
+import fs from 'fs';
+import path from 'path';
 
 // Define types
 interface LegalRequest {
@@ -401,9 +403,12 @@ CRITICAL INSTRUCTIONS:
 6. MANDATORY: The 'adversarial_strategy' must NOT be empty or use generic placeholders. It must be a critical analysis of the specific facts provided by the user.
 `;
 
-export const runtime = 'edge'; // Enable edge runtime for Vercel Hobby tier compliance
+export const runtime = 'nodejs'; // Use Node.js runtime for fs access
 
 const GLM_API_URL = "https://api.z.ai/api/paas/v4/chat/completions";
+
+// Get model from environment variable with fallback
+const ANALYSIS_MODEL = process.env.NEXT_PUBLIC_DEFAULT_MODEL || "glm-4.7-flash";
 
 export async function POST(req: NextRequest) {
   // Wrap handler with rate limiting
@@ -447,10 +452,10 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // PII Redaction for logging - log redacted version only
-      const redactedInput = redactPII(user_input);
-      if (redactedInput.redactedFields.length > 0) {
-        safeLog(`Processing request with PII redacted: [${redactedInput.redactedFields.join(', ')}]`);
+      // PII Redaction - CRITICAL: Redact before sending to GLM API to protect user privacy
+      const { redacted: safeInput, redactedFields } = redactPII(user_input);
+      if (redactedFields.length > 0) {
+        safeLog(`Processing request with PII redacted: [${redactedFields.join(', ')}]`);
       } else {
         safeLog(`Processing request for jurisdiction: ${jurisdiction}`);
       }
@@ -463,7 +468,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(staticResponse);
       }
 
-      // Template injection
+      // Template injection - use fs.readFileSync instead of fetch to avoid network round-trips
       let templateContent = '';
       const isEmergency = hasEmergencyKeywords(user_input);
 
@@ -480,23 +485,20 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        const manifestResponse = await fetch(`${req.nextUrl.origin}/templates/manifest.json`);
-        if (manifestResponse.ok) {
-          const manifest = await manifestResponse.json();
-          const templates = manifest.templates || [];
-          const { template: bestMatch } = findBestTemplate(user_input, templates);
+        // Read manifest directly from filesystem
+        const manifestPath = path.join(process.cwd(), 'public', 'templates', 'manifest.json');
+        const manifestRaw = fs.readFileSync(manifestPath, 'utf8');
+        const manifest = JSON.parse(manifestRaw);
+        const templates = manifest.templates || [];
+        const { template: bestMatch } = findBestTemplate(user_input, templates);
 
-          if (bestMatch) {
-            const templatePath = bestMatch.templatePath;
-            const templateResponse = await fetch(`${req.nextUrl.origin}${templatePath}`);
-            if (templateResponse.ok) {
-              templateContent = await templateResponse.text();
-              safeLog(`Using template: ${bestMatch.title}`);
-            }
-          } else {
-            templateContent = GENERIC_MOTION_TEMPLATE;
-            safeLog('No template match found, using generic motion template');
-          }
+        if (bestMatch) {
+          const templatePath = path.join(process.cwd(), 'public', bestMatch.templatePath);
+          templateContent = fs.readFileSync(templatePath, 'utf8');
+          safeLog(`Using template: ${bestMatch.title}`);
+        } else {
+          templateContent = GENERIC_MOTION_TEMPLATE;
+          safeLog('No template match found, using generic motion template');
         }
       } catch (error) {
         safeWarn('Template matching failed:', error);
@@ -545,10 +547,10 @@ ${templateContent ? "Use this template as a reference for formatting: " + templa
 
 Return a SINGLE JSON response with all required sections as specified in the schema.`;
 
-      // Build the user prompt
+      // Build the user prompt with PII-redacted input
       const userPrompt = `Jurisdiction: ${jurisdiction}
 
-Situation: ${user_input}
+Situation: ${safeInput}
 
 ${documents && documents.length > 0 ? `\nEVIDENCE DOCUMENTS PROVIDED: ${documents.length} document(s) have been uploaded. Cross-reference the user's claims against these official court documents. Identify any contradictions and use specific case details from the evidence in your analysis.\n` : ''}
 
@@ -586,7 +588,7 @@ Do NOT use placeholders. Provide substantive content for all fields.`;
               }) + '\n'));
             }, 2000);
 
-            // Call GLM-4.7-flash with streaming
+            // Call GLM with PII-redacted input for privacy protection
             const response = await fetch(GLM_API_URL, {
               method: 'POST',
               headers: {
@@ -594,7 +596,7 @@ Do NOT use placeholders. Provide substantive content for all fields.`;
                 'Authorization': `Bearer ${apiKey}`
               },
               body: JSON.stringify({
-                model: "glm-4.7-flash",
+                model: ANALYSIS_MODEL,
                 messages: [
                   { role: "system", content: systemPrompt },
                   { role: "user", content: userPrompt }

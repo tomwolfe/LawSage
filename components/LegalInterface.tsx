@@ -11,6 +11,7 @@ import HistoryActions from './HistoryActions';
 import { checkClientSideRateLimit, generateClientFingerprint } from '../lib/rate-limiter-client';
 import { safeError, safeWarn } from '../lib/pii-redactor';
 import { processImageForOCR } from '../src/utils/image-processor';
+import { parsePartialJSON } from '../lib/streaming-json-parser';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -61,6 +62,11 @@ export interface OCRResult {
   parties?: string[];
   important_dates?: string[];
   legal_references?: string[];
+  calculated_deadline?: {
+    date: string;
+    daysRemaining: number;
+    rule: string;
+  };
 }
 
 const US_STATES = [
@@ -136,6 +142,7 @@ export default function LegalInterface() {
   const [streamingStatus, setStreamingStatus] = useState<string>('');
   const [rateLimitInfo, setRateLimitInfo] = useState<{ remaining: number; resetAt: Date | null } | null>(null);
   const [evidence, setEvidence] = useState<OCRResult[]>([]);
+  const [streamingPreview, setStreamingPreview] = useState<{ strategy?: string; roadmap?: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const ocrFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -381,6 +388,7 @@ export default function LegalInterface() {
 
         const decoder = new TextDecoder();
         let finalResult: LegalResult | null = null;
+        let accumulatedContent = '';
 
         try {
           while (true) {
@@ -395,8 +403,21 @@ export default function LegalInterface() {
                 const message = JSON.parse(line);
                 if (message.type === 'status') {
                   setStreamingStatus(message.message);
+                } else if (message.type === 'chunk') {
+                  // Accumulate content for partial JSON parsing
+                  accumulatedContent += message.content || '';
+                  
+                  // Try to parse partial JSON to show streaming updates
+                  const partialData = parsePartialJSON<{ strategy?: string; roadmap?: string; adversarial_strategy?: string }>(accumulatedContent);
+                  if (partialData) {
+                    setStreamingPreview({
+                      strategy: partialData.strategy,
+                      roadmap: partialData.roadmap ? JSON.stringify(partialData.roadmap, null, 2) : undefined
+                    });
+                  }
                 } else if (message.type === 'complete') {
                   finalResult = message.result;
+                  setStreamingPreview(null); // Clear preview when complete
                 } else if (message.type === 'error') {
                   throw new Error(message.error);
                 }
@@ -586,6 +607,28 @@ export default function LegalInterface() {
       addToCaseLedger('other', `Document scanned: ${ocrData.document_type || 'Unknown Type'}`);
       setWarning(`Document scanned successfully: ${ocrData.document_type || 'Legal Document'}`);
       setTimeout(() => setWarning(''), 3000);
+      
+      // 4. Check for calculated deadline and show urgent banner
+      if (ocrData.calculated_deadline) {
+        const deadlineDate = new Date(ocrData.calculated_deadline.date);
+        const formattedDate = deadlineDate.toLocaleDateString('en-US', { 
+          weekday: 'long', 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        });
+        
+        // Add to case ledger as a critical deadline
+        addToCaseLedger(
+          'answer_due',
+          `CRITICAL DEADLINE: ${ocrData.calculated_deadline.rule} - Due ${formattedDate}`,
+          deadlineDate
+        );
+        
+        // Show urgent deadline warning (will be displayed in the UI)
+        setWarning(`⚠️ CALENDAR WARNING: ${ocrData.calculated_deadline.rule} - Due in ${ocrData.calculated_deadline.daysRemaining} days (${formattedDate})`);
+        setTimeout(() => setWarning(''), 10000); // Show for 10 seconds for critical deadlines
+      }
 
     } catch (err) {
       safeError('OCR upload failed:', err);
@@ -872,14 +915,15 @@ export default function LegalInterface() {
       </div>
 
       {/* Output Section */}
-      {result && (
+      {(result || streamingPreview) && (
         <ResultDisplay
-          result={result}
+          result={result || { text: JSON.stringify({ strategy: streamingPreview?.strategy || '' }), sources: [] }}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           jurisdiction={jurisdiction}
           addToCaseLedger={addToCaseLedger}
           caseLedger={caseLedger}
+          streamingPreview={streamingPreview}
         />
       )}
     </div>
