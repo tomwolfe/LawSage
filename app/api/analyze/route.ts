@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
-import { SafetyValidator, ResponseValidator } from '../../../lib/validation';
+import { SafetyValidator } from '../../../lib/validation';
 import { safeLog, safeError, safeWarn, redactPII } from '../../../lib/pii-redactor';
 import { withRateLimit } from '../../../lib/rate-limiter';
 import { getLegalLookupResponse, searchExParteRules } from '../../../src/utils/legal-lookup';
@@ -10,7 +9,7 @@ interface LegalRequest {
   user_input: string;
   jurisdiction: string;
   documents?: string[];
-  images?: string[]; // Base64 encoded images for unified multimodal analysis
+  images?: string[]; // Base64 encoded images (will be rejected - GLM is text-only)
 }
 
 interface StandardErrorResponse {
@@ -18,7 +17,6 @@ interface StandardErrorResponse {
   detail: string;
 }
 
-// Define types for template matching
 interface Template {
   title: string;
   description: string;
@@ -109,17 +107,17 @@ function generateRetryPrompt(
 ): string {
   const errors = validationResult.errors || [];
   let aggressiveInstructions = "";
-  
+
   if (errors.some(e => e.includes('citations'))) {
     aggressiveInstructions += "\n- CRITICAL FAILURE: You failed the citation count. You MUST provide at least 3+ verified legal citations in the requested JSON format.";
   }
-  
+
   if (errors.some(e => e.includes('adversarial_strategy'))) {
     aggressiveInstructions += "\n- CRITICAL FAILURE: Missing or generic adversarial strategy. You MUST provide a detailed red-team analysis of the specific legal weaknesses in this case.";
   }
 
   return `Your previous response was incomplete or malformed.
-  
+
 Validation failed because: ${validationResult.errors?.join('; ')}.
 ${aggressiveInstructions}
 
@@ -128,7 +126,7 @@ Please regenerate the COMPLETE JSON response. Ensure ALL fields are present and 
 Original context:
 ${originalPrompt.substring(0, 800)}
 
-Previous (partial/invalid) response:
+Previous (partial) response:
 ${accumulatedText.substring(0, 1500)}
 
 Provide a COMPLETE JSON response that includes ALL required fields. This is your final chance to comply with the structural hardening requirements. Do not use placeholders.`;
@@ -157,7 +155,7 @@ function keywordOverlapScore(userInput: string, templateKeywords: string[]): num
 }
 
 /**
- * Check if user input contains emergency legal keywords.
+ * Check if user input contains emergency keywords.
  * Emergency keywords force high-priority template matching.
  */
 function hasEmergencyKeywords(userInput: string): boolean {
@@ -347,14 +345,13 @@ _______________________
 
 // System instruction for the model
 const SYSTEM_INSTRUCTION = `
-You are a Universal Public Defender helping pro se litigants (people representing themselves).
+You are LawSage, a Public Defender AI helping pro se litigants (people representing themselves).
 You MUST perform a comprehensive analysis that batches three critical areas into a SINGLE response.
 
-CRITICAL: You have the ability to see and analyze images directly. When images are provided:
-- Analyze the visual content of each image to extract facts, case numbers, court names, and jurisdiction data.
-- Look for document layouts, seals, signatures, and formatting that indicate document type.
-- Cross-reference information across multiple images to build a complete case picture.
-- Extract text AND interpret visual context (e.g., a stamped "FILED" date, handwritten notes, highlighted sections).
+IMPORTANT LIMITATIONS:
+- You do NOT have web search capabilities. Rely on the provided RESEARCH CONTEXT and your internal legal knowledge.
+- You do NOT support image analysis. All analysis must be text-based.
+- You MUST ground your responses in the provided static legal lookup data when available.
 
 You MUST:
 1. ADVERSARIAL STRATEGY: A 'red-team' analysis of the user's claims. You MUST identify at least three specific weaknesses or potential opposition arguments. DO NOT provide placeholders like "No strategy provided" or "To be determined." If you cannot find a weakness, analyze the most likely procedural hurdles the opposition will raise.
@@ -375,7 +372,7 @@ Your response MUST be in valid JSON format with the following structure:
       "required_documents": ["List of documents needed"]
     }
   ],
-  "filing_template": "A comprehensive template that includes TWO distinct sections:\\n(A) The Civil Complaint (grounded in relevant statutes like CC § 789.3 and CCP § 1160.2 for California lockouts). MANDATORY: When citing CC § 789.3, explicitly mention the statutory penalty structure: $250 per violation (substantial damages) PLUS $100 per day from the date of violation (substantial damages per Civil Code § 789.3(c)(3)).\\n(B) The Ex Parte Application for TRO/OSC.\\nInclude explicit placeholders for required Judicial Council forms like CM-010, MC-030, and CIV-100.",
+  "filing_template": "A comprehensive template that includes TWO distinct sections:\\n(A) The Civil Complaint (grounded in relevant statutes). MANDATORY: When citing statutes, explicitly mention the statutory penalty structure where applicable.\\n(B) The Ex Parte Application for TRO/OSC.\\nInclude explicit placeholders for required Judicial Council forms like CM-010, MC-030, and CIV-100.",
   "citations": [
     {
       "text": "12 U.S.C. § 345",
@@ -385,11 +382,11 @@ Your response MUST be in valid JSON format with the following structure:
   ],
   "sources": ["Additional sources referenced in the response"],
   "local_logistics": {
-    "courthouse_address": "For Los Angeles housing TROs, prioritize: Stanley Mosk Courthouse, 111 N. Hill St, Los Angeles, CA 90012. Specify the 'Ex Parte' window or housing department.",
-    "filing_fees": "Specific filing fees for this case type (e.g., $435 for LASC Civil, or fee waiver info)",
+    "courthouse_address": "For housing TROs, prioritize the main civil courthouse. Specify the 'Ex Parte' window or housing department.",
+    "filing_fees": "Specific filing fees for this case type (e.g., $435 for Civil, or fee waiver info)",
     "dress_code": "Courthouse dress code requirements",
     "parking_info": "Parking information near courthouse",
-    "hours_of_operation": "Courthouse hours of operation (Note: 10:00 AM rule for Ex Parte notice in LASC)",
+    "hours_of_operation": "Courthouse hours of operation (Note: 10:00 AM rule for Ex Parte notice in many jurisdictions)",
     "local_rules_url": "URL to local rules of court"
   },
   "procedural_checks": ["Results of procedural technicality checks against Local Rules of Court"]
@@ -402,10 +399,11 @@ CRITICAL INSTRUCTIONS:
 4. Include at least 3 proper legal citations.
 5. Provide a detailed roadmap with at least 3 steps.
 6. MANDATORY: The 'adversarial_strategy' must NOT be empty or use generic placeholders. It must be a critical analysis of the specific facts provided by the user.
-7. When images are provided, analyze them directly to extract information - do NOT rely solely on extracted text.
 `;
 
-export const runtime = 'edge'; // Enable edge runtime
+export const runtime = 'edge'; // Enable edge runtime for Vercel Hobby tier compliance
+
+const GLM_API_URL = "https://api.z.ai/api/paas/v4/chat/completions";
 
 export async function POST(req: NextRequest) {
   // Wrap handler with rate limiting
@@ -428,15 +426,24 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Get API key from request header (user-provided) or fall back to environment variable
-      const xGeminiApiKey = req.headers.get('X-Gemini-API-Key');
-      const isUsingFallbackKey = !xGeminiApiKey;
-      const apiKey = xGeminiApiKey || process.env.GEMINI_API_KEY;
+      // GLM-4.7-flash is text-only - reject image uploads
+      if (images && images.length > 0) {
+        return NextResponse.json(
+          { 
+            type: "ModelError", 
+            detail: "Image analysis is not supported. GLM-4.7-flash is a text-only model. Please describe your document in the text input." 
+          } satisfies StandardErrorResponse,
+          { status: 400 }
+        );
+      }
+
+      // Get API key from environment variable (server-side only)
+      const apiKey = process.env.GLM_API_KEY;
 
       if (!apiKey) {
         return NextResponse.json(
-          { type: "AuthenticationError", detail: "Gemini API Key is missing. Please provide your API key in Settings." } satisfies StandardErrorResponse,
-          { status: 401 }
+          { type: "AuthenticationError", detail: "Server API Key missing. Please configure GLM_API_KEY environment variable." } satisfies StandardErrorResponse,
+          { status: 500 }
         );
       }
 
@@ -453,11 +460,7 @@ export async function POST(req: NextRequest) {
 
       if (staticResponse) {
         safeLog('Static grounding match found, returning cached response');
-        const response = NextResponse.json(staticResponse);
-        if (isUsingFallbackKey) {
-          response.headers.set('x-using-fallback-key', 'true');
-        }
-        return response;
+        return NextResponse.json(staticResponse);
       }
 
       // Template injection
@@ -516,8 +519,44 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // Send initial status chunk to keep connection alive
+      // Prepare the system prompt
+      const systemPrompt = `You are LawSage, a Public Defender AI helping pro se litigants.
+Your response MUST be a single, valid JSON object matching the schema provided in the user message.
+
+IMPORTANT LIMITATIONS:
+- You do NOT have web search capabilities. Rely ONLY on the provided RESEARCH CONTEXT and your internal legal knowledge.
+- You do NOT support image analysis. All analysis is text-based.
+- For jurisdiction-specific questions, use the provided context and your training data for ${jurisdiction}.
+
+${exParteRulesText}
+
+${documentsText || ''}
+
+${templateContent ? "Use this template as a reference for formatting: " + templateContent.substring(0, 1000) + "..." : ""}
+
+Return a SINGLE JSON response with all required sections as specified in the schema.`;
+
+      // Build the user prompt
+      const userPrompt = `Jurisdiction: ${jurisdiction}
+
+Situation: ${user_input}
+
+${staticResponse ? `\nRESEARCH CONTEXT:\n${(staticResponse as { text: string }).text}` : ""}
+
+Return a COMPLETE JSON response with ALL required fields:
+- disclaimer
+- strategy
+- adversarial_strategy (detailed red-team analysis)
+- roadmap (at least 3 steps)
+- filing_template
+- citations (at least 3)
+- local_logistics
+- procedural_checks
+
+Do NOT use placeholders. Provide substantive content for all fields.`;
+
       const encoder = new TextEncoder();
+      const decoder = new TextDecoder();
 
       const stream = new ReadableStream({
         async start(controller) {
@@ -525,10 +564,10 @@ export async function POST(req: NextRequest) {
             // Send initial status
             controller.enqueue(encoder.encode(JSON.stringify({
               type: 'status',
-              message: 'Analyzing documents and conducting legal research...'
+              message: 'Conducting legal research and analysis...'
             }) + '\n'));
 
-            // Heartbeat to keep connection alive during long processing
+            // Heartbeat to keep connection alive during processing
             const heartbeatInterval = setInterval(() => {
               controller.enqueue(encoder.encode(JSON.stringify({
                 type: 'status',
@@ -536,254 +575,112 @@ export async function POST(req: NextRequest) {
               }) + '\n'));
             }, 2000);
 
-            const client = new GoogleGenAI({ apiKey });
+            // Call GLM-4.7-flash with streaming
+            const response = await fetch(GLM_API_URL, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+              },
+              body: JSON.stringify({
+                model: "glm-4.7-flash",
+                messages: [
+                  { role: "system", content: systemPrompt },
+                  { role: "user", content: userPrompt }
+                ],
+                temperature: 0.2,
+                max_tokens: 8192,
+                stream: true
+              })
+            });
 
-            // Build the user prompt
-            const userPrompt = `
-${exParteRulesText}
-
-${documentsText || ''}
-
-User Situation: ${user_input}
-Jurisdiction: ${jurisdiction}
-
-${templateContent ? "Use this template as a reference for formatting: " + templateContent.substring(0, 1000) + "..." : ""}
-
-Return a SINGLE JSON response with all required sections as specified in the system instructions.
-`;
-
-            // Prepare content array - starts with text prompt
-            const contents: any[] = [userPrompt];
-
-            // Add images for unified multimodal analysis
-            if (images && images.length > 0) {
-              safeLog(`Processing ${images.length} images with unified multimodal analysis`);
-              
-              for (const base64Image of images) {
-                // Remove data URL prefix if present
-                let base64Data = base64Image;
-                if (base64Image.startsWith('data:')) {
-                  const parts = base64Image.split(',');
-                  base64Data = parts[1] || base64Image;
-                }
-
-                // Add image to contents array
-                contents.push({
-                  inlineData: {
-                    data: base64Data,
-                    mimeType: 'image/jpeg'
-                  }
-                });
-              }
+            if (!response.ok) {
+              const errorText = await response.text();
+              safeError(`GLM API error: ${response.status} - ${errorText}`);
+              throw new Error(`GLM API error: ${response.status}`);
             }
 
-            // Convert Zod schema to Google's responseSchema format
-            const responseSchema = {
-              type: 'object',
-              properties: {
-                disclaimer: { type: 'string' },
-                strategy: { type: 'string' },
-                adversarial_strategy: { type: 'string' },
-                roadmap: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      step: { type: 'integer' },
-                      title: { type: 'string' },
-                      description: { type: 'string' },
-                      estimated_time: { type: 'string' },
-                      required_documents: { type: 'array', items: { type: 'string' } }
-                    },
-                    required: ['step', 'title', 'description']
-                  }
-                },
-                filing_template: { type: 'string' },
-                citations: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      text: { type: 'string' },
-                      source: { type: 'string', enum: ['federal statute', 'state statute', 'court rule', 'case law', 'local rule', 'other'] },
-                      url: { type: 'string' }
-                    },
-                    required: ['text']
-                  }
-                },
-                sources: { type: 'array', items: { type: 'string' } },
-                local_logistics: {
-                  type: 'object',
-                  properties: {
-                    courthouse_address: { type: 'string' },
-                    filing_fees: { type: 'string' },
-                    dress_code: { type: 'string' },
-                    parking_info: { type: 'string' },
-                    hours_of_operation: { type: 'string' },
-                    local_rules_url: { type: 'string' }
-                  },
-                  required: ['courthouse_address']
-                },
-                procedural_checks: { type: 'array', items: { type: 'string' } }
-              },
-              required: [
-                'disclaimer',
-                'strategy',
-                'adversarial_strategy',
-                'roadmap',
-                'filing_template',
-                'citations',
-                'local_logistics',
-                'procedural_checks'
-              ]
-            };
+            clearInterval(heartbeatInterval);
 
-            // Auto-retry logic for validation failures
-            const MAX_RETRIES = 2;
-            let retryCount = 0;
-            let accumulatedText = '';
-            let parsedOutput: LegalOutput | null = null;
-            let currentContents: any[] = contents;
+            let accumulatedJson = "";
+            let firstTokenReceived = false;
 
-            while (retryCount <= MAX_RETRIES) {
-              accumulatedText = '';
-              let firstTokenReceived = false;
+            const reader = response.body?.getReader();
+            if (!reader) {
+              throw new Error('ReadableStream not supported');
+            }
 
-              try {
-                if (retryCount > 0) {
-                  controller.enqueue(encoder.encode(JSON.stringify({
-                    type: 'status',
-                    message: `Regenerating incomplete sections (Attempt ${retryCount}/${MAX_RETRIES})...`
-                  }) + '\n'));
-                }
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
 
-                // UNIFIED MULTIMODAL CALL with native Google Search tool
-                const result = await client.models.generateContentStream({
-                  model: "gemini-2.5-flash-preview-09-2025",
-                  contents: currentContents,
-                  config: {
-                    systemInstruction: SYSTEM_INSTRUCTION,
-                    responseMimeType: 'application/json',
-                    responseSchema: responseSchema,
-                    // Enable native Google Search grounding
-                    tools: [{ googleSearch: {} }],
-                    temperature: 0.1,
-                    maxOutputTokens: 8192
-                  }
-                });
-
-                for await (const chunk of result) {
-                  const chunkText = chunk.text;
-                  if (chunkText) {
-                    accumulatedText += chunkText;
-
-                    if (!firstTokenReceived) {
-                      firstTokenReceived = true;
-                      if (retryCount === 0) {
+              const chunk = decoder.decode(value, { stream: true });
+              // Parse SSE format (data: {...})
+              const lines = chunk.split('\n');
+              
+              for (const line of lines) {
+                const trimmedLine = line.trim();
+                if (trimmedLine.startsWith('data: ') && trimmedLine !== 'data: [DONE]') {
+                  try {
+                    const data = JSON.parse(trimmedLine.slice(6));
+                    const content = data.choices?.[0]?.delta?.content || "";
+                    
+                    if (content) {
+                      accumulatedJson += content;
+                      
+                      if (!firstTokenReceived) {
+                        firstTokenReceived = true;
                         controller.enqueue(encoder.encode(JSON.stringify({
                           type: 'status',
                           message: 'Generating legal analysis...'
                         }) + '\n'));
                       }
+
+                      // Stream the raw chunk in the format the frontend expects
+                      controller.enqueue(encoder.encode(JSON.stringify({
+                        type: 'chunk',
+                        content: content
+                      }) + '\n'));
                     }
-
-                    // Stream each chunk immediately
-                    controller.enqueue(encoder.encode(JSON.stringify({
-                      type: 'chunk',
-                      content: chunkText
-                    }) + '\n'));
+                  } catch (parseError) {
+                    // Skip malformed JSON chunks
+                    safeWarn('Failed to parse GLM chunk:', parseError);
                   }
-                }
-
-                // Process final accumulated text
-                try {
-                  parsedOutput = JSON.parse(accumulatedText) as LegalOutput;
-
-                  // Validate structure
-                  const validation = validateLegalOutputStructure(parsedOutput);
-
-                  if (!validation.valid) {
-                    safeError(`Validation failed (attempt ${retryCount + 1}/${MAX_RETRIES + 1}):`, validation.errors);
-
-                    if (retryCount < MAX_RETRIES) {
-                      // Retry with focused prompt - rebuild contents with enhanced user prompt
-                      retryCount++;
-                      const retryPrompt = generateRetryPrompt(userPrompt, validation, accumulatedText);
-                      currentContents = [retryPrompt, ...contents.slice(1)]; // Keep images, replace text prompt
-                      safeWarn(`Retrying generation to fix: ${validation.missingFields?.join(', ')}`);
-                      continue; // Retry the loop
-                    } else {
-                      // Final attempt failed, use fallback for missing fields
-                      safeError('All retry attempts failed, applying structural hardening fallback');
-                      parsedOutput = {
-                        disclaimer: parsedOutput.disclaimer || ResponseValidator.STANDARD_DISCLAIMER,
-                        strategy: parsedOutput.strategy || "Analysis incomplete. Please try again with more details.",
-                        adversarial_strategy: parsedOutput.adversarial_strategy || "Red-team analysis unavailable due to incomplete output structure.",
-                        roadmap: parsedOutput.roadmap && parsedOutput.roadmap.length > 0 ? parsedOutput.roadmap : [{ step: 1, title: "Consult an attorney", description: "Seek professional legal advice for your specific situation." }],
-                        filing_template: parsedOutput.filing_template || "Template generation failed. Please provide more specific details.",
-                        citations: parsedOutput.citations || [],
-                        local_logistics: parsedOutput.local_logistics || { courthouse_address: "Consult local court directory" },
-                        procedural_checks: parsedOutput.procedural_checks || []
-                      };
-                    }
-                  }
-
-                  // Additional Zod schema validation for extra safety
-                  try {
-                    const zodValidation = await import('../../../lib/schemas/legal-output');
-                    const zodResult = zodValidation.validateLegalOutput(parsedOutput);
-                    if (!zodResult.valid) {
-                      safeWarn('Zod validation warnings:', zodResult.errors);
-                    }
-                  } catch (zodError) {
-                    safeWarn('Zod validation error (non-blocking):', zodError);
-                  }
-
-                  // Validation passed or fallback applied, exit loop
-                  break;
-                } catch (parseError) {
-                  safeError("Failed to parse JSON:", parseError);
-
-                  if (retryCount < MAX_RETRIES) {
-                    retryCount++;
-                    const enhancedPrompt = `${userPrompt}\n\nERROR: Your previous response was not valid JSON. Please respond with ONLY valid JSON matching the requested schema. Ensure all fields are present.`;
-                    currentContents = [enhancedPrompt, ...contents.slice(1)]; // Keep images
-                    continue;
-                  } else {
-                    // Return error response
-                    parsedOutput = {
-                      disclaimer: ResponseValidator.STANDARD_DISCLAIMER,
-                      strategy: "Unable to generate analysis. The AI service returned malformed data.",
-                      adversarial_strategy: "Analysis unavailable.",
-                      roadmap: [{ step: 1, title: "Try again", description: "Please resubmit your request." }],
-                      filing_template: "Template unavailable.",
-                      citations: [],
-                      local_logistics: { courthouse_address: "Unknown" },
-                      procedural_checks: []
-                    };
-                    break;
-                  }
-                }
-              } catch (streamError) {
-                safeError("Streaming error:", streamError);
-
-                if (retryCount < MAX_RETRIES) {
-                  retryCount++;
-                  currentContents = contents; // Retry with original contents
-                  continue;
-                } else {
-                  throw streamError; // Re-throw to be caught by outer catch
                 }
               }
             }
 
-            // Ensure parsedOutput is never null at this point
-            if (!parsedOutput) {
+            // Process final accumulated text
+            let parsedOutput: LegalOutput | null = null;
+            
+            try {
+              parsedOutput = JSON.parse(accumulatedJson) as LegalOutput;
+
+              // Validate structure
+              const validation = validateLegalOutputStructure(parsedOutput);
+
+              if (!validation.valid) {
+                safeError(`Validation failed:`, validation.errors);
+                // Apply fallback for missing fields
+                parsedOutput = {
+                  disclaimer: parsedOutput.disclaimer || "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. This is legal information, not legal advice. Always consult with a qualified attorney.",
+                  strategy: parsedOutput.strategy || "Analysis incomplete. Please try again with more details.",
+                  adversarial_strategy: parsedOutput.adversarial_strategy || "Red-team analysis unavailable due to incomplete output structure.",
+                  roadmap: parsedOutput.roadmap && parsedOutput.roadmap.length > 0 ? parsedOutput.roadmap : [{ step: 1, title: "Consult an attorney", description: "Seek professional legal advice for your specific situation." }],
+                  filing_template: parsedOutput.filing_template || "Template generation failed. Please provide more specific details.",
+                  citations: parsedOutput.citations || [],
+                  local_logistics: parsedOutput.local_logistics || { courthouse_address: "Consult local court directory" },
+                  procedural_checks: parsedOutput.procedural_checks || []
+                };
+              }
+            } catch (parseError) {
+              safeError("Failed to parse JSON:", parseError);
+              // Return error response
               parsedOutput = {
-                disclaimer: ResponseValidator.STANDARD_DISCLAIMER,
-                strategy: "Analysis unavailable due to a processing error.",
+                disclaimer: "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. This is legal information, not legal advice. Always consult with a qualified attorney.",
+                strategy: "Unable to generate analysis. The AI service returned malformed data.",
                 adversarial_strategy: "Analysis unavailable.",
-                roadmap: [{ step: 1, title: "Contact support", description: "An error occurred during analysis." }],
+                roadmap: [{ step: 1, title: "Try again", description: "Please resubmit your request." }],
                 filing_template: "Template unavailable.",
                 citations: [],
                 local_logistics: { courthouse_address: "Unknown" },
@@ -798,10 +695,9 @@ Return a SINGLE JSON response with all required sections as specified in the sys
             // Send final complete response with metadata
             controller.enqueue(encoder.encode(JSON.stringify({
               type: 'complete',
-              result: { 
-                text: JSON.stringify(parsedOutput), 
-                sources,
-                isUsingFallbackKey
+              result: {
+                text: JSON.stringify(parsedOutput),
+                sources
               }
             }) + '\n'));
           } catch (e) {
@@ -822,8 +718,7 @@ Return a SINGLE JSON response with all required sections as specified in the sys
           'Cache-Control': 'no-cache',
           'Connection': 'keep-alive',
           'X-RateLimit-Limit': '5',
-          'X-RateLimit-Window': '3600',
-          ...(isUsingFallbackKey ? { 'x-using-fallback-key': 'true' } : {})
+          'X-RateLimit-Window': '3600'
         }
       });
     } catch (error: unknown) {
@@ -837,9 +732,8 @@ Return a SINGLE JSON response with all required sections as specified in the sys
         return NextResponse.json(
           {
             type: "RateLimitError",
-            detail: "Rate limit exceeded. Please enter your own free Gemini API key in Settings to continue immediately.",
-            suggestion: "Visit https://aistudio.google.com/app/apikey to get your free API key"
-          } satisfies StandardErrorResponse & { suggestion: string },
+            detail: "Rate limit exceeded. Please wait and try again later."
+          } satisfies StandardErrorResponse,
           { status: 429 }
         );
       } else if (errorMessage.includes("400") || errorMessage.toLowerCase().includes("invalid")) {

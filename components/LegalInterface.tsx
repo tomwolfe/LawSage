@@ -1,15 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Upload, Download, Save, FolderOpen, Info, Key } from 'lucide-react';
-import { processImageForOCR } from '../src/utils/image-processor';
+import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Download, Save, FolderOpen, Info } from 'lucide-react';
 import { updateUrlWithState, watchStateAndSyncToUrl, createVirtualCaseFolderState, restoreVirtualCaseFolderState, cleanupLocalStorage } from '../src/utils/state-sync';
 import { exportCaseFile, importCaseFile, saveCaseToLocalStorage } from '../src/utils/case-file-manager';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ResultDisplay from './ResultDisplay';
 import HistoryActions from './HistoryActions';
-import ApiKeyModal from './ApiKeyModal';
 import { checkClientSideRateLimit, generateClientFingerprint } from '../lib/rate-limiter-client';
 import { safeError, safeWarn } from '../lib/pii-redactor';
 
@@ -132,14 +130,9 @@ export default function LegalInterface() {
   const [history, setHistory] = useState<CaseHistoryItem[]>([]);
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<string | null>(null);
   const [backendUnreachable, setBackendUnreachable] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [caseLedger, setCaseLedger] = useState<CaseLedgerEntry[]>([]);
   const [streamingStatus, setStreamingStatus] = useState<string>('');
   const [rateLimitInfo, setRateLimitInfo] = useState<{ remaining: number; resetAt: Date | null } | null>(null);
-  const [apiKey, setApiKey] = useState<string>('');
-  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
-  const resumeAnalysisRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize state from URL fragment on component mount
@@ -242,14 +235,6 @@ export default function LegalInterface() {
     checkHealth();
   }, []);
 
-  // Initialize API key from localStorage
-  useEffect(() => {
-    const storedApiKey = localStorage.getItem('lawsage_gemini_api_key');
-    if (storedApiKey) {
-      setApiKey(storedApiKey);
-    }
-  }, []);
-
   // Load history from localStorage on component mount
   useEffect(() => {
     const savedHistory = localStorage.getItem('lawsage_history');
@@ -275,22 +260,6 @@ export default function LegalInterface() {
     }
   }, []);
 
-  const handleApiKeySave = (key?: string) => {
-    if (key) {
-      setApiKey(key);
-    }
-    setShowApiKeyModal(false);
-    
-    // Resume analysis if it was interrupted for key entry
-    if (resumeAnalysisRef.current) {
-      resumeAnalysisRef.current = false;
-      // Use setTimeout to ensure the modal state is fully updated before starting fetch
-      setTimeout(() => {
-        handleSubmit();
-      }, 100);
-    }
-  };
-
   const handleVoice = () => {
     if (!('webkitSpeechRecognition' in window)) {
       alert('Voice recognition is not supported in this browser.');
@@ -315,74 +284,15 @@ export default function LegalInterface() {
     recognition.start();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
-    const newFiles: File[] = [];
-    const newPreviewUrls: string[] = [];
-    const errors: string[] = [];
-
-    // Limit to 5 files total
-    const totalFiles = selectedFiles.length + files.length;
-    const allowedFiles = files.slice(0, Math.max(0, 5 - selectedFiles.length));
-
-    if (totalFiles > 5) {
-      setWarning('Maximum 5 files allowed in the Virtual Case Folder.');
-    }
-
-    allowedFiles.forEach(file => {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        errors.push(`${file.name} is not an image file.`);
-        return;
-      }
-
-      // Validate file size (max 10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        errors.push(`${file.name} exceeds 10MB limit.`);
-        return;
-      }
-
-      newFiles.push(file);
-      newPreviewUrls.push(URL.createObjectURL(file));
-    });
-
-    if (errors.length > 0) {
-      setError(errors.join(' '));
-    } else {
-      setError('');
-    }
-
-    setSelectedFiles(prev => [...prev, ...newFiles]);
-    setPreviewUrls(prev => [...prev, ...newPreviewUrls]);
-    
-    // Reset file input so same file can be selected again
-    if (e.target) {
-      e.target.value = '';
-    }
-  };
-
-  const removeFile = (index: number) => {
-    URL.revokeObjectURL(previewUrls[index]);
-    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
-    setPreviewUrls(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleUploadClick = () => {
-    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
-    fileInput?.click();
-  };
-
   const handleRateLimitInfo = async () => {
     try {
       const response = await fetch('/api/analyze', {
         method: 'HEAD',
       });
-      
+
       const remaining = response.headers.get('X-RateLimit-Remaining');
       const reset = response.headers.get('X-RateLimit-Reset');
-      
+
       if (remaining && reset) {
         setRateLimitInfo({
           remaining: parseInt(remaining, 10),
@@ -401,8 +311,8 @@ export default function LegalInterface() {
     setWarning('');
     setStreamingStatus('');
 
-    if (!userInput.trim() && selectedFiles.length === 0) {
-      setError('Please describe your legal situation or upload an image.');
+    if (!userInput.trim()) {
+      setError('Please describe your legal situation.');
       return;
     }
 
@@ -410,97 +320,45 @@ export default function LegalInterface() {
     const clientRateLimit = checkClientSideRateLimit();
     if (!clientRateLimit.allowed) {
       const waitMinutes = Math.ceil((clientRateLimit.resetAt - Date.now()) / (1000 * 60));
-      setError(`Rate limit exceeded. You have used all 5 free requests in the last hour. Please wait ${waitMinutes} minutes or enter your own Gemini API key in Settings.`);
-      return;
-    }
-
-    // Check for API key if user is about to make a request
-    if (!apiKey) {
-      // Don't block, but prepare to resume
-      resumeAnalysisRef.current = true;
-      setShowApiKeyModal(true);
+      setError(`Rate limit exceeded. You have used all 5 free requests in the last hour. Please wait ${waitMinutes} minutes.`);
       return;
     }
 
     // Pre-flight validation for text input
-    if (selectedFiles.length === 0) {
-      const validation = validateUserInput(userInput);
-      if (!validation.valid) {
-        setError(validation.warning || 'Input validation failed');
-        return;
-      }
-      if (validation.warning) {
-        setWarning(validation.warning);
-        // Don't block submission, just warn
-      }
+    const validation = validateUserInput(userInput);
+    if (!validation.valid) {
+      setError(validation.warning || 'Input validation failed');
+      return;
+    }
+    if (validation.warning) {
+      setWarning(validation.warning);
+      // Don't block submission, just warn
     }
 
     setLoading(true);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000); // Increased to 120s for multi-file processing
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
 
     try {
-      let isUsingFallbackKeyHeader = false;
-
-      // UNIFIED MULTIMODAL: Process images directly in the analyze call
-      const images: string[] = [];
-      if (selectedFiles.length > 0) {
-        setStreamingStatus(`Step 1/2: Processing ${selectedFiles.length} document(s) for unified analysis...`);
-
-        // Convert all selected files to base64
-        const base64Promises = selectedFiles.map(async (file) => {
-          try {
-            // Use the existing image processor to resize/compress
-            const processedImage = await processImageForOCR(file);
-            // Remove data URL prefix for API
-            const base64Data = processedImage.includes(',') ? processedImage.split(',')[1] : processedImage;
-            return base64Data;
-          } catch (fileErr) {
-            safeError(`Failed to process file ${file.name}:`, fileErr);
-            throw fileErr;
-          }
-        });
-
-        images.push(...await Promise.all(base64Promises));
-      }
-
-      // Unified multimodal analysis - NO separate OCR step
-      setStreamingStatus(selectedFiles.length > 0 ? 'Step 2/2: Analyzing documents and conducting legal research...' : 'Step 1/1: Conducting legal research and analysis...');
-
-      const analysisInput = userInput.trim() || `Analyze the ${images.length} document(s) in the Virtual Case Folder and provide a comprehensive legal strategy.`;
-
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Gemini-API-Key': apiKey,
           'X-Client-Fingerprint': generateClientFingerprint(),
         },
         body: JSON.stringify({
-          user_input: analysisInput,
-          jurisdiction,
-          images // Send base64 images directly for unified multimodal analysis
+          user_input: userInput.trim(),
+          jurisdiction
         }),
         signal: controller.signal,
       });
 
       handleRateLimitInfo();
-      if (response.headers.get('x-using-fallback-key') === 'true') {
-        isUsingFallbackKeyHeader = true;
-      }
-
       clearTimeout(timeoutId);
 
       if (!response.ok) {
         if (response.status === 429) {
-          setError('Demo limit reached. Please enter your own free Gemini API key in Settings to continue instantly.');
-          setShowApiKeyModal(true);
-          return;
-        } else if (response.status === 401) {
-          setError('API key is missing or invalid. Please enter your Gemini API key.');
-          localStorage.removeItem('lawsage_gemini_api_key');
-          setApiKey('');
-          setShowApiKeyModal(true);
+          setError('Rate limit exceeded. Please wait and try again later.');
           return;
         } else {
           const errorData = await response.json();
@@ -515,7 +373,6 @@ export default function LegalInterface() {
 
         const decoder = new TextDecoder();
         let finalResult: LegalResult | null = null;
-        let resultIncludesFallbackKey = false;
 
         try {
           while (true) {
@@ -529,19 +386,9 @@ export default function LegalInterface() {
               try {
                 const message = JSON.parse(line);
                 if (message.type === 'status') {
-                  // Map server statuses to our steps
-                  if (message.message.includes('research') || message.message.includes('Analyzing')) {
-                    setStreamingStatus(selectedFiles.length > 0 ? 'Step 2/2: Analyzing documents and conducting legal research...' : 'Conducting legal research...');
-                  } else if (message.message.includes('Regenerating')) {
-                    setStreamingStatus(message.message);
-                  } else {
-                    setStreamingStatus(message.message);
-                  }
+                  setStreamingStatus(message.message);
                 } else if (message.type === 'complete') {
                   finalResult = message.result;
-                  if (message.result && message.result.isUsingFallbackKey) {
-                    resultIncludesFallbackKey = true;
-                  }
                 } else if (message.type === 'error') {
                   throw new Error(message.error);
                 }
@@ -555,23 +402,18 @@ export default function LegalInterface() {
             setResult(finalResult);
             setActiveTab('strategy');
 
-            if (isUsingFallbackKeyHeader || resultIncludesFallbackKey) {
-              setWarning('You are using the limited public demo key. Please add your own free key for unlimited access.');
-              setTimeout(() => setShowApiKeyModal(true), 2000);
-            }
-
             const newHistoryItem: CaseHistoryItem = {
               id: Date.now().toString(),
               timestamp: new Date(),
               jurisdiction,
-              userInput: analysisInput,
+              userInput: userInput.trim(),
               result: finalResult
             };
 
             const updatedHistory = [newHistoryItem, ...history];
             setHistory(updatedHistory);
             localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
-            addToCaseLedger('complaint_filed', `Analysis generated for ${selectedFiles.length} document(s) and user input.`);
+            addToCaseLedger('complaint_filed', `Analysis generated for user input.`);
           } else {
             throw new Error('No complete response received from server');
           }
@@ -704,24 +546,6 @@ export default function LegalInterface() {
 
   return (
     <div className="space-y-8">
-      {!apiKey && (
-        <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl flex items-center justify-between gap-3 text-orange-800 shadow-sm animate-pulse">
-          <div className="flex items-center gap-3">
-            <Key className="shrink-0" size={20} />
-            <div>
-              <p className="text-sm font-bold">Limited Demo Mode</p>
-              <p className="text-xs">Using public trial key. Access may be throttled. Add your own free key in settings for full speed.</p>
-            </div>
-          </div>
-          <button 
-            onClick={() => setShowApiKeyModal(true)}
-            className="px-3 py-1.5 bg-orange-600 text-white rounded-lg text-xs font-bold hover:bg-orange-700 transition-colors"
-          >
-            Add API Key
-          </button>
-        </div>
-      )}
-
       {backendUnreachable && (
         <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-3 text-amber-800 shadow-sm">
           <AlertCircle className="shrink-0" size={20} />
@@ -855,61 +679,11 @@ export default function LegalInterface() {
               className="w-full h-40 p-4 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
             />
 
-            {/* File Upload Section */}
-            <div className="mt-4">
-              <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                <Upload size={16} />
-                Virtual Case Folder (Images)
-              </label>
-              <div className="flex flex-wrap items-center gap-3">
-                <input
-                  id="file-upload"
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={handleUploadClick}
-                  disabled={selectedFiles.length >= 5}
-                  className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Upload size={16} />
-                  <span>{selectedFiles.length === 0 ? 'Upload Evidence' : 'Add More'}</span>
-                </button>
-                
-                {selectedFiles.length > 0 && (
-                  <span className="text-xs text-slate-500 font-medium">
-                    {selectedFiles.length}/5 files selected
-                  </span>
-                )}
-              </div>
-
-              {previewUrls.length > 0 && (
-                <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                  {previewUrls.map((url, index) => (
-                    <div key={index} className="relative group">
-                      <img
-                        src={url}
-                        alt={`Preview ${index}`}
-                        className="w-full h-24 object-cover border rounded-lg shadow-sm"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeFile(index)}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600 transition-colors"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                      <div className="mt-1 text-[10px] text-slate-500 truncate px-1">
-                        {selectedFiles[index]?.name}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+            {/* Image Upload Disabled Notice */}
+            <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p className="text-xs text-amber-800">
+                <strong>Note:</strong> Image analysis is not currently supported. Please describe your document in the text box above.
+              </p>
             </div>
           </div>
 
@@ -984,18 +758,10 @@ export default function LegalInterface() {
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           jurisdiction={jurisdiction}
-          apiKey={apiKey}
           addToCaseLedger={addToCaseLedger}
           caseLedger={caseLedger}
         />
       )}
-
-      {/* API Key Modal */}
-      <ApiKeyModal
-        isOpen={showApiKeyModal}
-        onClose={handleApiKeySave}
-        existingKey={apiKey}
-      />
     </div>
   );
 }

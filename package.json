@@ -10,7 +10,6 @@
     "test": "jest"
   },
   "dependencies": {
-    "@google/genai": "^1.39.0",
     "@tailwindcss/typography": "^0.5.19",
     "clsx": "^2.1.1",
     "docx": "^9.0.3",
