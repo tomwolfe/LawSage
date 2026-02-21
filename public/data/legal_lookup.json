@@ -1,5 +1,21 @@
 {
   "pro_se_procedural_rules": [
+    {
+      "id": 120,
+      "rule_number": "Wis. Stat. § 823.01",
+      "title": "Private Nuisance Action",
+      "description": "Statutory authority to bring an action to abate a nuisance and recover damages.",
+      "jurisdiction": "Wisconsin",
+      "category": "Nuisance"
+    },
+    {
+      "id": 121,
+      "rule_number": "Wis. Stat. § 799.01(1)(d)",
+      "title": "Small Claims Threshold",
+      "description": "Actions for eviction or for money judgments $10,000 or less belong in Small Claims.",
+      "jurisdiction": "Wisconsin",
+      "category": "Procedure"
+    },
     { "id": 1, "rule_number": "FRCP 1", "title": "Scope of Rules", "description": "These rules govern procedure in the United States district courts.", "jurisdiction": "Federal", "category": "General" },
     { "id": 2, "rule_number": "FRCP 4", "title": "Summons", "description": "Service of process requirements and methods for federal court.", "jurisdiction": "Federal", "category": "Service" },
     { "id": 3, "rule_number": "FRCP 8", "title": "General Rules of Pleading", "description": "A pleading must contain a short and plain statement of the claim.", "jurisdiction": "Federal", "category": "Pleading" },

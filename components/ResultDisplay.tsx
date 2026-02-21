@@ -3,7 +3,7 @@
 import { Copy, Download, FileText, Gavel, Link as LinkIcon, FileDown, CheckCircle, AlertTriangle, RotateCcw, AlertCircle, Info } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { validateLegalStructure } from '../src/utils/reliability';
@@ -194,8 +194,20 @@ function parseLegalOutput(text: string): { strategy: string; filings: string; st
         if ('type' in parsed.filing_template && 'caseInfo' in parsed.filing_template) {
           filingsContent = JSON.stringify(parsed.filing_template, null, 2);
         } else {
-          // For other objects, try to extract text content or stringify
-          filingsContent = JSON.stringify(parsed.filing_template, null, 2);
+          // Convert nested JSON object to beautiful Markdown
+          const f = parsed.filing_template as Record<string, unknown>;
+          filingsContent = `
+# ${String(f.motion_title || f.title || 'LEGAL PLEADING')}
+**COURT:** ${String(f.court || f.courtName || '[COURT NAME]')}
+**CASE NO:** ${String(f.case_no || f.caseNumber || '[CASE NUMBER]')}
+
+**${String(f.plaintiff || '[PLAINTIFF]')}**, 
+v. 
+**${String(f.defendant || '[DEFENDANT]')}**
+
+---
+${String(f.body || f.description || 'Filing content generation failed.')}
+          `.trim();
         }
       } else if (typeof parsed.filing_template === 'string') {
         // Check if the string itself contains JSON that needs parsing
@@ -268,6 +280,30 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
     status_message?: string;
     loading: boolean;
   }}>({});
+
+  // Quality Audit: Log low-quality responses to localStorage for monitoring
+  useEffect(() => {
+    if (result && result.text) {
+      try {
+        const validation = validateLegalStructure(result.text);
+        if (!validation.isValid) {
+          // Save failed attempt to a "Quality Log" in localStorage
+          const log = JSON.parse(localStorage.getItem('lawsage_quality_audit') || '[]');
+          log.push({
+            timestamp: new Date().toISOString(),
+            jurisdiction,
+            input: result.text.substring(0, 100),
+            missing: validation
+          });
+          // Keep only last 10 entries to avoid bloating localStorage
+          localStorage.setItem('lawsage_quality_audit', JSON.stringify(log.slice(-10)));
+          console.warn("LawSage Quality Audit: Low quality response detected.");
+        }
+      } catch (_error) {
+        // Ignore parsing errors for audit logging
+      }
+    }
+  }, [result, jurisdiction]);
 
   // Derive completed steps from the case ledger for persistence
   const isStepCompleted = (stepNumber: number, title: string) => {

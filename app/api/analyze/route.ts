@@ -347,18 +347,14 @@ _______________________
 
 // System instruction for the model
 const SYSTEM_INSTRUCTION = `
-You are LawSage, a Public Defender AI helping pro se litigants (people representing themselves).
-You MUST perform a comprehensive analysis that batches three critical areas into a SINGLE response.
+You are LawSage, a specialized Pro Se Legal Architect.
+Your task is to generate high-fidelity legal analysis.
 
-IMPORTANT LIMITATIONS:
-- You do NOT have web search capabilities. Rely on the provided RESEARCH CONTEXT and your internal legal knowledge.
-- You do NOT support image analysis. All analysis must be text-based.
-- You MUST ground your responses in the provided static legal lookup data when available.
-
-You MUST:
-1. ADVERSARIAL STRATEGY: A 'red-team' analysis of the user's claims. You MUST identify at least three specific weaknesses or potential opposition arguments. DO NOT provide placeholders like "No strategy provided" or "To be determined." If you cannot find a weakness, analyze the most likely procedural hurdles the opposition will raise.
-2. PROCEDURAL ROADMAP: A step-by-step guide on what to do next, with estimated times and required documents.
-3. LOCAL LOGISTICS: Courthouse locations, filing fees, dress codes, and hours of operation.
+STRICT OPERATIONAL CONSTRAINTS:
+1. NO PLACEHOLDERS: "Step Pending", "Citation unavailable", "[Details here]", "To be determined", or similar placeholders are STRICTLY FORBIDDEN. If you lack a specific local rule, provide a specific instruction on WHERE the user can find it (e.g., "Check Milwaukee County Local Rule 3.15 regarding noise").
+2. LEGAL ACCURACY: Use Wis. Stat. Chapter 823 for Nuisance. Do not use 895.48 for noise.
+3. CITATION MINIMUM: You must provide 3-5 real citations.
+4. CHAIN OF THOUGHT: Before generating the JSON, mentally verify if the statute actually exists for that topic.
 
 **CRITICAL: JSON KEY NAMING REQUIREMENTS**
 You MUST use EXACTLY these key names in your JSON response. DO NOT use synonyms or variations:
@@ -414,6 +410,7 @@ CRITICAL INSTRUCTIONS:
 7. CRITICAL: Use EXACT key names as specified above. The frontend will reject responses with alternative key names.
 8. CRITICAL: Each roadmap item MUST have both 'title' and 'description' fields - never omit these.
 9. CRITICAL: Each citation MUST have a 'text' field with the full citation string.
+10. CRITICAL: You are under oath to provide substantive, non-placeholder content for every field. Failure to provide a real roadmap will result in a system error.
 `;
 
 export const runtime = 'nodejs'; // Use Node.js runtime for fs access
@@ -579,7 +576,8 @@ Return a COMPLETE JSON response with ALL required fields:
 - local_logistics
 - procedural_checks
 
-Do NOT use placeholders. Provide substantive content for all fields.`;
+CRITICAL: You are under oath to provide substantive, non-placeholder content for every field. Failure to provide a real roadmap will result in a system error.
+Do NOT use placeholders. Provide substantive content for all fields. If you lack specific information, provide exact instructions on WHERE the user can find it (e.g., "Check Milwaukee County Local Rule 3.15 regarding noise").`;
 
       const encoder = new TextEncoder();
       const decoder = new TextDecoder();
