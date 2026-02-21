@@ -6,6 +6,7 @@
 import * as LZString from 'lz-string';
 import { safeError } from '../../lib/pii-redactor';
 import type { CaseLedgerEntry, LegalResult } from '../../components/LegalInterface';
+import type { OCRResult } from '../../lib/schemas/legal-output';
 
 export interface CaseHistoryItem {
   id: string;
@@ -25,6 +26,7 @@ export interface CaseFile {
     history: CaseHistoryItem[];
     selectedHistoryItem: string | null;
     backendUnreachable: boolean;
+    evidence: OCRResult[];
   };
   analysisResult?: LegalResult;
   ledger: CaseLedgerEntry[];

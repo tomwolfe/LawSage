@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Download, Save, FolderOpen, Info } from 'lucide-react';
+import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Download, Save, FolderOpen, Info, Upload } from 'lucide-react';
 import { updateUrlWithState, watchStateAndSyncToUrl, createVirtualCaseFolderState, restoreVirtualCaseFolderState, cleanupLocalStorage } from '../src/utils/state-sync';
 import { exportCaseFile, importCaseFile, saveCaseToLocalStorage } from '../src/utils/case-file-manager';
 import { clsx, type ClassValue } from 'clsx';
@@ -10,6 +10,7 @@ import ResultDisplay from './ResultDisplay';
 import HistoryActions from './HistoryActions';
 import { checkClientSideRateLimit, generateClientFingerprint } from '../lib/rate-limiter-client';
 import { safeError, safeWarn } from '../lib/pii-redactor';
+import { processImageForOCR } from '../src/utils/image-processor';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -41,6 +42,7 @@ export interface CaseFolderState {
   history: CaseHistoryItem[];
   selectedHistoryItem: string | null;
   backendUnreachable: boolean;
+  evidence: OCRResult[];
 }
 
 interface CaseHistoryItem {
@@ -51,7 +53,7 @@ interface CaseHistoryItem {
   result: LegalResult;
 }
 
-interface OCRResult {
+export interface OCRResult {
   extracted_text: string;
   document_type?: string;
   case_number?: string;
@@ -133,7 +135,9 @@ export default function LegalInterface() {
   const [caseLedger, setCaseLedger] = useState<CaseLedgerEntry[]>([]);
   const [streamingStatus, setStreamingStatus] = useState<string>('');
   const [rateLimitInfo, setRateLimitInfo] = useState<{ remaining: number; resetAt: Date | null } | null>(null);
+  const [evidence, setEvidence] = useState<OCRResult[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const ocrFileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize state from URL fragment on component mount
   useEffect(() => {
@@ -159,6 +163,7 @@ export default function LegalInterface() {
         if (caseFolder.history !== undefined) setHistory(caseFolder.history);
         if (caseFolder.selectedHistoryItem !== undefined) setSelectedHistoryItem(caseFolder.selectedHistoryItem);
         if (caseFolder.backendUnreachable !== undefined) setBackendUnreachable(caseFolder.backendUnreachable);
+        if (caseFolder.evidence !== undefined && Array.isArray(caseFolder.evidence)) setEvidence(caseFolder.evidence);
 
         if (analysisResult !== undefined) setResult(analysisResult as LegalResult);
 
@@ -202,7 +207,8 @@ export default function LegalInterface() {
       activeTab,
       history,
       selectedHistoryItem,
-      backendUnreachable
+      backendUnreachable,
+      evidence
     }, result, caseLedger);
 
     // Use debounced watcher for ongoing state changes
@@ -214,7 +220,7 @@ export default function LegalInterface() {
       // On unmount, ensure latest state is saved immediately
       updateUrlWithState(getStateToSync());
     };
-  }, [userInput, jurisdiction, result, activeTab, history, selectedHistoryItem, backendUnreachable, caseLedger]);
+  }, [userInput, jurisdiction, result, activeTab, history, selectedHistoryItem, backendUnreachable, caseLedger, evidence]);
 
   useEffect(() => {
     const checkHealth = async (retries = 3, delay = 1000) => {
@@ -348,7 +354,9 @@ export default function LegalInterface() {
         },
         body: JSON.stringify({
           user_input: userInput.trim(),
-          jurisdiction
+          jurisdiction,
+          // NEW: Map evidence objects to strings for the AI
+          documents: evidence.map(e => `[Document: ${e.document_type || 'Unknown'}] Case No: ${e.case_number || 'N/A'} | Court: ${e.court_name || 'N/A'} | Content: ${e.extracted_text}`)
         }),
         signal: controller.signal,
       });
@@ -485,7 +493,8 @@ export default function LegalInterface() {
       activeTab,
       history,
       selectedHistoryItem,
-      backendUnreachable
+      backendUnreachable,
+      evidence
     };
     exportCaseFile(caseFolderState, result || undefined, caseLedger);
     addToCaseLedger('other', `Case file exported to disk`);
@@ -506,6 +515,9 @@ export default function LegalInterface() {
         setHistory(importedData.caseFolder.history || []);
         setSelectedHistoryItem(importedData.caseFolder.selectedHistoryItem);
         setBackendUnreachable(importedData.caseFolder.backendUnreachable || false);
+        if (importedData.caseFolder.evidence && Array.isArray(importedData.caseFolder.evidence)) {
+          setEvidence(importedData.caseFolder.evidence);
+        }
       }
 
       if (importedData.analysisResult) {
@@ -536,11 +548,61 @@ export default function LegalInterface() {
       activeTab,
       history,
       selectedHistoryItem,
-      backendUnreachable
+      backendUnreachable,
+      evidence
     };
     saveCaseToLocalStorage(caseFolderState, result || undefined, caseLedger);
     setWarning('Case saved to local storage');
     setTimeout(() => setWarning(''), 3000);
+  };
+
+  // OCR Evidence Upload Handler
+  const handleOCRSubmit = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    setStreamingStatus('Scanning document for evidence...');
+
+    try {
+      // 1. Process and compress image (Vercel limit is 4.5MB!)
+      const base64 = await processImageForOCR(file);
+
+      // 2. Call OCR route
+      const res = await fetch('/api/ocr', {
+        method: 'POST',
+        body: JSON.stringify({ image: base64 })
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.detail || 'OCR processing failed');
+      }
+
+      const ocrData: OCRResult = await res.json();
+
+      // 3. Add to our "Evidence Vault"
+      setEvidence(prev => [...prev, ocrData]);
+      addToCaseLedger('other', `Document scanned: ${ocrData.document_type || 'Unknown Type'}`);
+      setWarning(`Document scanned successfully: ${ocrData.document_type || 'Legal Document'}`);
+      setTimeout(() => setWarning(''), 3000);
+
+    } catch (err) {
+      safeError('OCR upload failed:', err);
+      setError(err instanceof Error ? err.message : 'Failed to read document.');
+    } finally {
+      setLoading(false);
+      setStreamingStatus('');
+      // Reset file input
+      if (ocrFileInputRef.current) {
+        ocrFileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const removeEvidence = (index: number) => {
+    setEvidence(prev => prev.filter((_, i) => i !== index));
+    addToCaseLedger('other', `Document evidence removed`);
   };
 
 
@@ -679,12 +741,70 @@ export default function LegalInterface() {
               className="w-full h-40 p-4 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
             />
 
-            {/* Image Upload Disabled Notice */}
-            <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
-              <p className="text-xs text-amber-800">
-                <strong>Note:</strong> Image analysis is not currently supported. Please describe your document in the text box above.
+            {/* Document Upload - OCR Evidence */}
+            <div className="mt-4">
+              <label className="flex items-center gap-2 px-4 py-3 bg-slate-50 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors">
+                <Upload size={18} className="text-slate-600" />
+                <span className="text-sm font-medium text-slate-700">
+                  {loading && streamingStatus.includes('Scanning') ? 'Processing document...' : 'Upload Legal Document (OCR)'}
+                </span>
+                <input
+                  ref={ocrFileInputRef}
+                  type="file"
+                  accept="image/*,.pdf"
+                  onChange={handleOCRSubmit}
+                  disabled={loading}
+                  className="hidden"
+                />
+              </label>
+              <p className="text-xs text-slate-500 mt-2">
+                Upload summons, complaints, motions, or other legal documents. AI will extract case details automatically.
               </p>
             </div>
+
+            {/* Evidence Display */}
+            {evidence.length > 0 && (
+              <div className="mt-4">
+                <h3 className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                  <FolderOpen size={16} />
+                  Evidence Documents ({evidence.length})
+                </h3>
+                <div className="space-y-2">
+                  {evidence.map((doc, index) => (
+                    <div key={index} className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-indigo-900 text-sm">
+                            {doc.document_type || 'Legal Document'}
+                            {doc.case_number && <span className="ml-2 text-xs text-indigo-600">Case: {doc.case_number}</span>}
+                          </div>
+                          {doc.court_name && (
+                            <div className="text-xs text-indigo-700 mt-1">{doc.court_name}</div>
+                          )}
+                          {doc.parties && doc.parties.length > 0 && (
+                            <div className="text-xs text-indigo-600 mt-1">
+                              Parties: {doc.parties.join(', ')}
+                            </div>
+                          )}
+                          {doc.important_dates && doc.important_dates.length > 0 && (
+                            <div className="text-xs text-indigo-600 mt-1">
+                              Dates: {doc.important_dates.join(', ')}
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => removeEvidence(index)}
+                          className="text-red-600 hover:text-red-800 p-1"
+                          title="Remove evidence"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="md:w-64">

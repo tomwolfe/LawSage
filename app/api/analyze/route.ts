@@ -426,12 +426,12 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // GLM-4.7-flash is text-only - reject image uploads
+      // GLM-4.7-flash is text-only - images must be processed via /api/ocr endpoint first
       if (images && images.length > 0) {
         return NextResponse.json(
-          { 
-            type: "ModelError", 
-            detail: "Image analysis is not supported. GLM-4.7-flash is a text-only model. Please describe your document in the text input." 
+          {
+            type: "ModelError",
+            detail: "Direct image analysis is not supported in this endpoint. Please upload images to /api/ocr first to extract text, then include the extracted text in your analysis request."
           } satisfies StandardErrorResponse,
           { status: 400 }
         );
@@ -513,10 +513,11 @@ export async function POST(req: NextRequest) {
       // Prepare documents text for prompt
       let documentsText = "";
       if (documents && documents.length > 0) {
-        documentsText = "RELEVANT DOCUMENTS FROM VIRTUAL CASE FOLDER:\n\n";
+        documentsText = "RELEVANT DOCUMENTS FROM VIRTUAL CASE FOLDER (OCR-EXTRACTED EVIDENCE):\n\n";
         documents.forEach((doc, index) => {
-          documentsText += `Document ${index + 1}:\n${doc}\n\n`;
+          documentsText += `Document ${index + 1}: ${doc}\n\n`;
         });
+        documentsText += "CRITICAL: These are official court documents. Use them to fact-check the user's description.\n\n";
       }
 
       // Prepare the system prompt
@@ -527,6 +528,14 @@ IMPORTANT LIMITATIONS:
 - You do NOT have web search capabilities. Rely ONLY on the provided RESEARCH CONTEXT and your internal legal knowledge.
 - You do NOT support image analysis. All analysis is text-based.
 - For jurisdiction-specific questions, use the provided context and your training data for ${jurisdiction}.
+
+CRITICAL EVIDENCE HANDLING:
+You have been provided with OCR-extracted text from official documents in the 'documents' field.
+1. If the user's description conflicts with the OCR text (e.g., dates, case numbers, or facts), the OCR text is the source of truth.
+2. Explicitly reference documents using [Evidence X] notation in your strategy (e.g., "According to the Summons [Evidence 1], you were served on...").
+3. Use the Case Number found in documents to populate the Filing Template.
+4. Cross-reference the user's claims against the extracted evidence to identify any contradictions or inaccuracies.
+5. If evidence documents exist, your adversarial_strategy should specifically address how the opposition might use these documents against the user.
 
 ${exParteRulesText}
 
@@ -540,6 +549,8 @@ Return a SINGLE JSON response with all required sections as specified in the sch
       const userPrompt = `Jurisdiction: ${jurisdiction}
 
 Situation: ${user_input}
+
+${documents && documents.length > 0 ? `\nEVIDENCE DOCUMENTS PROVIDED: ${documents.length} document(s) have been uploaded. Cross-reference the user's claims against these official court documents. Identify any contradictions and use specific case details from the evidence in your analysis.\n` : ''}
 
 ${staticResponse ? `\nRESEARCH CONTEXT:\n${(staticResponse as { text: string }).text}` : ""}
 
