@@ -604,6 +604,7 @@ Do NOT use placeholders. Provide substantive content for all fields.`;
 
             let accumulatedJson = "";
             let firstTokenReceived = false;
+            let lineBuffer = ""; // Buffer for incomplete lines
 
             const reader = response.body?.getReader();
             if (!reader) {
@@ -615,8 +616,13 @@ Do NOT use placeholders. Provide substantive content for all fields.`;
               if (done) break;
 
               const chunk = decoder.decode(value, { stream: true });
-              // Parse SSE format (data: {...})
-              const lines = chunk.split('\n');
+              
+              // Add chunk to buffer and split by newlines
+              lineBuffer += chunk;
+              const lines = lineBuffer.split('\n');
+              
+              // Keep the last incomplete line in the buffer
+              lineBuffer = lines.pop() || "";
 
               for (const line of lines) {
                 const trimmedLine = line.trim();
@@ -630,7 +636,9 @@ Do NOT use placeholders. Provide substantive content for all fields.`;
                       throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
                     }
                     
-                    const content = data.choices?.[0]?.delta?.content || "";
+                    // GLM-4.7-flash may return reasoning_content alongside content
+                    const delta = data.choices?.[0]?.delta;
+                    const content = delta?.content || delta?.reasoning_content || "";
 
                     if (content) {
                       accumulatedJson += content;
@@ -656,6 +664,23 @@ Do NOT use placeholders. Provide substantive content for all fields.`;
                 } else if (trimmedLine && !trimmedLine.startsWith('data:')) {
                   // Log non-data lines for debugging (might contain error info)
                   safeWarn('Unexpected stream line format:', trimmedLine.substring(0, 100));
+                }
+              }
+            }
+
+            // Process any remaining line in the buffer
+            if (lineBuffer.trim()) {
+              const trimmedLine = lineBuffer.trim();
+              if (trimmedLine.startsWith('data: ') && trimmedLine !== 'data: [DONE]') {
+                try {
+                  const data = JSON.parse(trimmedLine.slice(6));
+                  const delta = data.choices?.[0]?.delta;
+                  const content = delta?.content || delta?.reasoning_content || "";
+                  if (content) {
+                    accumulatedJson += content;
+                  }
+                } catch (parseError) {
+                  safeWarn(`Failed to parse final GLM chunk. Raw line: ${trimmedLine.substring(0, 100)}`, parseError);
                 }
               }
             }
