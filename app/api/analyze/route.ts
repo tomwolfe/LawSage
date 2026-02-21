@@ -360,6 +360,16 @@ You MUST:
 2. PROCEDURAL ROADMAP: A step-by-step guide on what to do next, with estimated times and required documents.
 3. LOCAL LOGISTICS: Courthouse locations, filing fees, dress codes, and hours of operation.
 
+**CRITICAL: JSON KEY NAMING REQUIREMENTS**
+You MUST use EXACTLY these key names in your JSON response. DO NOT use synonyms or variations:
+- Use "roadmap" NOT "procedural_roadmap" or "next_steps" or "action_plan"
+- Use "citations" NOT "legal_citations" or "authorities" or "case_law"
+- Use "filing_template" NOT "motion_template" or "template" or "filing"
+- Use "local_logistics" NOT "logistics" or "court_info"
+- Use "procedural_checks" NOT "checks" or "compliance_checks"
+- Use "strategy" NOT "legal_strategy" or "analysis"
+- Use "adversarial_strategy" NOT "red_team" or "opposition_analysis"
+
 Your response MUST be in valid JSON format with the following structure:
 {
   "disclaimer": "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. This is legal information, not legal advice. Always consult with a qualified attorney.",
@@ -401,6 +411,9 @@ CRITICAL INSTRUCTIONS:
 4. Include at least 3 proper legal citations.
 5. Provide a detailed roadmap with at least 3 steps.
 6. MANDATORY: The 'adversarial_strategy' must NOT be empty or use generic placeholders. It must be a critical analysis of the specific facts provided by the user.
+7. CRITICAL: Use EXACT key names as specified above. The frontend will reject responses with alternative key names.
+8. CRITICAL: Each roadmap item MUST have both 'title' and 'description' fields - never omit these.
+9. CRITICAL: Each citation MUST have a 'text' field with the full citation string.
 `;
 
 export const runtime = 'nodejs'; // Use Node.js runtime for fs access

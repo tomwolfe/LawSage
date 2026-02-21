@@ -77,11 +77,11 @@ interface ResultDisplayProps {
 function calculateDeadlineFromRoadmap(roadmap: StrategyItem[] | undefined): { answerDue?: Date; daysRemaining?: number } | null {
   if (!roadmap || roadmap.length === 0) return null;
 
-  // Look for steps that mention "answer" or "deadline"
-  const answerStep = roadmap.find(step => 
-    step.title.toLowerCase().includes('answer') || 
-    step.description.toLowerCase().includes('answer') ||
-    step.title.toLowerCase().includes('deadline')
+  // Look for steps that mention "answer" or "deadline" - use safe optional chaining
+  const answerStep = roadmap.find(step =>
+    step?.title?.toLowerCase()?.includes('answer') ||
+    step?.description?.toLowerCase()?.includes('answer') ||
+    step?.title?.toLowerCase()?.includes('deadline')
   );
 
   if (!answerStep || !answerStep.estimated_time) return null;
@@ -120,10 +120,21 @@ function parseLegalOutput(text: string): { strategy: string; filings: string; st
   // Try to parse as structured JSON first
   try {
     const parsedRaw = JSON.parse(text);
-    // Handle procedural_roadmap vs roadmap
+    // Handle AI field naming variations with comprehensive fallbacks
     const parsed: StructuredLegalOutput = {
       ...parsedRaw,
-      roadmap: parsedRaw.roadmap || parsedRaw.procedural_roadmap || []
+      // Roadmap aliases: roadmap, procedural_roadmap, next_steps, action_plan
+      roadmap: parsedRaw.roadmap || parsedRaw.procedural_roadmap || parsedRaw.next_steps || parsedRaw.action_plan || [],
+      // Citations aliases: citations, legal_citations, authorities, case_law
+      citations: parsedRaw.citations || parsedRaw.legal_citations || parsedRaw.authorities || parsedRaw.case_law || [],
+      // Strategy aliases
+      strategy: parsedRaw.strategy || parsedRaw.legal_strategy || parsedRaw.analysis || '',
+      // Filing template aliases
+      filing_template: parsedRaw.filing_template || parsedRaw.motion_template || parsedRaw.filing || parsedRaw.template || '',
+      // Local logistics aliases
+      local_logistics: parsedRaw.local_logistics || parsedRaw.logistics || parsedRaw.court_info || {},
+      // Procedural checks aliases
+      procedural_checks: parsedRaw.procedural_checks || parsedRaw.checks || parsedRaw.compliance_checks || []
     };
 
     if (parsed.disclaimer && parsed.strategy && parsed.filing_template) {
@@ -139,8 +150,11 @@ function parseLegalOutput(text: string): { strategy: string; filings: string; st
       if (parsed.roadmap && parsed.roadmap.length > 0) {
         strategyText += "## Procedural Roadmap:\n";
         for (const item of parsed.roadmap) {
-          strategyText += `\n### ${item.step}. ${item.title}\n`;
-          strategyText += `${item.description}\n`;
+          const stepNum = item.step ?? 0;
+          const title = item.title || 'Step Pending';
+          const description = item.description || 'Details to be determined.';
+          strategyText += `\n### ${stepNum}. ${title}\n`;
+          strategyText += `${description}\n`;
           if (item.estimated_time) {
             strategyText += `*Estimated Time: ${item.estimated_time}*\n`;
           }
@@ -160,7 +174,8 @@ function parseLegalOutput(text: string): { strategy: string; filings: string; st
       if (parsed.citations && parsed.citations.length > 0) {
         strategyText += "\n## Legal Citations:\n";
         for (const citation of parsed.citations) {
-          strategyText += `- ${citation.text}`;
+          const citeText = citation.text || 'Citation unavailable';
+          strategyText += `- ${citeText}`;
           if (citation.source) {
             strategyText += ` (${citation.source})`;
           }
@@ -172,9 +187,34 @@ function parseLegalOutput(text: string): { strategy: string; filings: string; st
       }
 
       // Handle filing_template - it may be an object (structured motion) or string
-      const filingsContent = typeof parsed.filing_template === 'object' 
-        ? JSON.stringify(parsed.filing_template, null, 2)
-        : parsed.filing_template;
+      // Also handle case where AI nests JSON inside a string
+      let filingsContent = '';
+      if (typeof parsed.filing_template === 'object' && parsed.filing_template !== null) {
+        // Check if it's a LegalMotion schema object
+        if ('type' in parsed.filing_template && 'caseInfo' in parsed.filing_template) {
+          filingsContent = JSON.stringify(parsed.filing_template, null, 2);
+        } else {
+          // For other objects, try to extract text content or stringify
+          filingsContent = JSON.stringify(parsed.filing_template, null, 2);
+        }
+      } else if (typeof parsed.filing_template === 'string') {
+        // Check if the string itself contains JSON that needs parsing
+        const trimmedTemplate = parsed.filing_template.trim();
+        if (trimmedTemplate.startsWith('{') && trimmedTemplate.endsWith('}')) {
+          try {
+            const nestedJson = JSON.parse(trimmedTemplate);
+            filingsContent = typeof nestedJson === 'object' 
+              ? JSON.stringify(nestedJson, null, 2)
+              : trimmedTemplate;
+          } catch {
+            filingsContent = trimmedTemplate;
+          }
+        } else {
+          filingsContent = trimmedTemplate;
+        }
+      } else {
+        filingsContent = 'No filings generated.';
+      }
 
       return {
         strategy: strategyText,
@@ -1289,6 +1329,22 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                     <span>{copyStatus.filings ? "Copied!" : "Copy"}</span>
                   </button>
                   <button
+                    onClick={async () => {
+                      // Extract just the filing template from structured data
+                      const templateContent = structured?.filing_template 
+                        ? (typeof structured.filing_template === 'string' 
+                            ? structured.filing_template 
+                            : JSON.stringify(structured.filing_template, null, 2))
+                        : filingsText;
+                      await copyToClipboard(templateContent, 'filing-template');
+                    }}
+                    className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors"
+                    title={copyStatus['filing-template'] ? "Copied!" : "Copy filing template only"}
+                  >
+                    <FileText size={16} />
+                    <span>{copyStatus['filing-template'] ? "Copied!" : "Copy Template"}</span>
+                  </button>
+                  <button
                     onClick={downloadFilingsAsMarkdown}
                     className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors"
                   >
@@ -1312,6 +1368,10 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                 <div className="mt-8 bg-slate-900 rounded-xl p-6 text-slate-300 font-mono text-sm overflow-x-auto">
                   {filingsText === 'No filings generated.' ? (
                     <div className="text-slate-500 italic">No filings generated.</div>
+                  ) : typeof filingsText === 'object' ? (
+                    <pre className="whitespace-pre-wrap break-words">
+                      {JSON.stringify(filingsText, null, 2)}
+                    </pre>
                   ) : (
                     <div className="markdown-filings">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -1631,6 +1691,68 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
               ) : (
                 <div className="space-y-4">
                   <h4 className="font-semibold text-slate-700">Legal Sources</h4>
+                  
+                  {/* Quick Links to External Legal Research */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                    <h5 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                      <LinkIcon size={16} />
+                      External Legal Research Resources
+                    </h5>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                      <a
+                        href="https://www.courtlistener.com/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-3 bg-white border border-slate-200 rounded-lg hover:border-indigo-300 hover:shadow-sm transition-all group"
+                      >
+                        <div className="flex-1">
+                          <div className="font-semibold text-indigo-600 group-hover:text-indigo-700">CourtListener</div>
+                          <div className="text-slate-500 text-xs">Free legal database with case law, statutes, and court documents</div>
+                        </div>
+                        <LinkIcon size={14} className="text-slate-400" />
+                      </a>
+                      <a
+                        href="https://scholar.google.com/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-3 bg-white border border-slate-200 rounded-lg hover:border-indigo-300 hover:shadow-sm transition-all group"
+                      >
+                        <div className="flex-1">
+                          <div className="font-semibold text-indigo-600 group-hover:text-indigo-700">Google Scholar</div>
+                          <div className="text-slate-500 text-xs">Search case law and legal journals</div>
+                        </div>
+                        <LinkIcon size={14} className="text-slate-400" />
+                      </a>
+                      <a
+                        href="https://www.law.cornell.edu/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-3 bg-white border border-slate-200 rounded-lg hover:border-indigo-300 hover:shadow-sm transition-all group"
+                      >
+                        <div className="flex-1">
+                          <div className="font-semibold text-indigo-600 group-hover:text-indigo-700">Legal Information Institute</div>
+                          <div className="text-slate-500 text-xs">Free access to U.S. Code, Constitution, and legal encyclopedias</div>
+                        </div>
+                        <LinkIcon size={14} className="text-slate-400" />
+                      </a>
+                      <a
+                        href="https://www.uscourts.gov/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 p-3 bg-white border border-slate-200 rounded-lg hover:border-indigo-300 hover:shadow-sm transition-all group"
+                      >
+                        <div className="flex-1">
+                          <div className="font-semibold text-indigo-600 group-hover:text-indigo-700">U.S. Courts</div>
+                          <div className="text-slate-500 text-xs">Official federal court resources and forms</div>
+                        </div>
+                        <LinkIcon size={14} className="text-slate-400" />
+                      </a>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-3 italic">
+                      <strong>Important:</strong> Always verify AI-generated citations independently using official sources before relying on them in court filings.
+                    </p>
+                  </div>
+                  
                   {result.sources.length > 0 ? (
                     <div className="grid gap-4">
                       {result.sources.map((source, i) => (
