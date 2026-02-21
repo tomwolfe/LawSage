@@ -704,12 +704,15 @@ Do NOT use placeholders. Provide substantive content for all fields.`;
               if (accumulatedJson.length < 500) {
                 console.log(`[GLM Response] Content preview: ${accumulatedJson.substring(0, 200)}`);
               }
-              
+
               if (!accumulatedJson.trim()) {
                 throw new Error('Empty response from GLM API');
               }
-              
-              parsedOutput = JSON.parse(accumulatedJson) as LegalOutput;
+
+              // Strip markdown code block wrappers if present (common with GLM models)
+              const cleanedJson = accumulatedJson.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+
+              parsedOutput = JSON.parse(cleanedJson) as LegalOutput;
 
               // Validate structure
               const validation = validateLegalOutputStructure(parsedOutput);
