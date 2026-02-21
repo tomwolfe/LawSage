@@ -617,17 +617,24 @@ Do NOT use placeholders. Provide substantive content for all fields.`;
               const chunk = decoder.decode(value, { stream: true });
               // Parse SSE format (data: {...})
               const lines = chunk.split('\n');
-              
+
               for (const line of lines) {
                 const trimmedLine = line.trim();
                 if (trimmedLine.startsWith('data: ') && trimmedLine !== 'data: [DONE]') {
                   try {
                     const data = JSON.parse(trimmedLine.slice(6));
-                    const content = data.choices?.[0]?.delta?.content || "";
                     
+                    // Check for error in response
+                    if (data.error) {
+                      safeError('GLM API returned error in stream:', data.error);
+                      throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
+                    }
+                    
+                    const content = data.choices?.[0]?.delta?.content || "";
+
                     if (content) {
                       accumulatedJson += content;
-                      
+
                       if (!firstTokenReceived) {
                         firstTokenReceived = true;
                         controller.enqueue(encoder.encode(JSON.stringify({
@@ -643,17 +650,35 @@ Do NOT use placeholders. Provide substantive content for all fields.`;
                       }) + '\n'));
                     }
                   } catch (parseError) {
-                    // Skip malformed JSON chunks
-                    safeWarn('Failed to parse GLM chunk:', parseError);
+                    // Log the raw line that failed to parse for debugging
+                    safeWarn(`Failed to parse GLM chunk. Raw line: ${trimmedLine.substring(0, 100)}`, parseError);
                   }
+                } else if (trimmedLine && !trimmedLine.startsWith('data:')) {
+                  // Log non-data lines for debugging (might contain error info)
+                  safeWarn('Unexpected stream line format:', trimmedLine.substring(0, 100));
                 }
               }
             }
 
+            // Debug: log if no content was received
+            if (!accumulatedJson) {
+              safeError('No content received from GLM API. Check API key and quota.');
+            }
+
             // Process final accumulated text
             let parsedOutput: LegalOutput | null = null;
-            
+
             try {
+              // Debug: log what we received
+              safeLog(`Accumulated JSON length: ${accumulatedJson.length}`);
+              if (accumulatedJson.length < 500) {
+                safeLog(`Accumulated JSON content: ${accumulatedJson}`);
+              }
+              
+              if (!accumulatedJson.trim()) {
+                throw new Error('Empty response from GLM API');
+              }
+              
               parsedOutput = JSON.parse(accumulatedJson) as LegalOutput;
 
               // Validate structure
