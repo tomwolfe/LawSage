@@ -641,10 +641,8 @@ Do NOT use placeholders. Provide substantive content for all fields.`;
                     const delta = data.choices?.[0]?.delta;
                     const content = delta?.content || "";
 
-                    // Log reasoning_content separately for debugging (but don't accumulate it)
-                    if (delta?.reasoning_content) {
-                      safeLog('GLM reasoning:', delta.reasoning_content.substring(0, 100) + '...');
-                    }
+                    // Note: reasoning_content logging removed to reduce log noise
+                    // The model's chain-of-thought is streamed character-by-character which creates excessive logs
 
                     if (content) {
                       accumulatedJson += content;
@@ -685,10 +683,7 @@ Do NOT use placeholders. Provide substantive content for all fields.`;
                   if (content) {
                     accumulatedJson += content;
                   }
-                  // Log reasoning if present
-                  if (delta?.reasoning_content) {
-                    safeLog('GLM reasoning (final):', delta.reasoning_content.substring(0, 100) + '...');
-                  }
+                  // Note: reasoning_content logging removed to reduce log noise
                 } catch (parseError) {
                   safeWarn(`Failed to parse final GLM chunk. Raw line: ${trimmedLine.substring(0, 100)}`, parseError);
                 }
