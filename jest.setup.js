@@ -42,20 +42,5 @@ window.IntersectionObserver = jest.fn().mockImplementation(() => ({
   disconnect: jest.fn(),
 }));
 
-// Mock GoogleGenAI globally
-global.GoogleGenAI = class {
-  constructor(_options) {
-    this.apiKey = _options.apiKey;
-  }
-
-  getGenerativeModel(_options) {
-    return {
-      generateContent: jest.fn().mockResolvedValue({
-        response: {
-          text: () => '["query1", "query2", "query3"]'
-        }
-      }),
-      generateContentStream: jest.fn()
-    };
-  }
-};
+// Note: GoogleGenAI mock removed - application migrated to GLM (Zhipu AI)
+// GLM API calls use fetch() which is already mocked above

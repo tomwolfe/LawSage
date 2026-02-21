@@ -11,7 +11,6 @@ module.exports = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
     '^lib/(.*)$': '<rootDir>/lib/$1',
-    '^@google/genai$': '<rootDir>/__mocks__/@google/genai.js',
     '^.*/app/api/analyze/route$': '<rootDir>/__mocks__/app/api/analyze/route',
   },
   collectCoverageFrom: [

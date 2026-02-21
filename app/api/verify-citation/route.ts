@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
 import { safeLog, safeError, safeWarn } from '../../../lib/pii-redactor';
 
 interface VerifyCitationRequest {
@@ -16,8 +15,10 @@ interface VerifyCitationResponse {
   details?: string;
 }
 
+const GLM_API_URL = "https://api.z.ai/api/paas/v4/chat/completions";
+
 /**
- * Verify a legal citation using Google's grounding/search capabilities
+ * Verify a legal citation using GLM's search and reasoning capabilities
  * This endpoint checks if a citation is valid and relevant to the given jurisdiction
  */
 export async function POST(req: NextRequest) {
@@ -35,22 +36,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Get API key from header or environment
-    const apiKey = req.headers.get('x-gemini-api-key') || process.env.GEMINI_API_KEY || '';
+    // Get API key from environment variable (server-side only)
+    const apiKey = process.env.GLM_API_KEY;
 
     if (!apiKey) {
       return NextResponse.json(
         {
           error: 'API key required',
-          detail: 'Please provide your Gemini API key in Settings or set GEMINI_API_KEY environment variable',
+          detail: 'Please configure GLM_API_KEY environment variable',
         },
-        { status: 401 }
+        { status: 500 }
       );
     }
 
     safeLog(`Verifying citation: ${citation} for ${jurisdiction}`);
-
-    const client = new GoogleGenAI({ apiKey });
 
     // Build the verification prompt
     const prompt = `You are a legal citation verification expert. Your task is to verify if the following legal citation is:
@@ -61,7 +60,7 @@ Citation to verify: "${citation}"
 Jurisdiction: ${jurisdiction}
 Subject Matter: ${subject_matter || 'General legal matters'}
 
-Use your search and grounding capabilities to verify this citation. Check:
+Use your knowledge and reasoning capabilities to verify this citation. Consider:
 - Official government sources (.gov websites)
 - State legislature websites
 - Court databases
@@ -79,27 +78,40 @@ Return a JSON object with:
 If you cannot verify the citation with high confidence, set is_verified to false.
 Be conservative - only mark as verified if you find strong evidence.`;
 
-    const result = await client.models.generateContent({
-      model: 'gemini-2.5-flash-preview-09-2025',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: 'object',
-          properties: {
-            is_verified: { type: 'boolean' },
-            is_relevant: { type: 'boolean' },
-            verification_source: { type: 'string' },
-            status_message: { type: 'string' },
-            details: { type: 'string' },
-          },
-          required: ['is_verified', 'is_relevant', 'verification_source', 'status_message'],
-        },
+    const systemPrompt = `You are a legal citation verification expert. You must respond with ONLY a valid JSON object containing the verification results. Do not include any markdown formatting or additional text outside the JSON.`;
+
+    // Call GLM-4.7-flash
+    const response = await fetch(GLM_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
       },
+      body: JSON.stringify({
+        model: "glm-4.7-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.1,
+        max_tokens: 2048
+      })
     });
 
-    const responseText = result.text || '{}';
-    const verification: VerifyCitationResponse = JSON.parse(responseText);
+    if (!response.ok) {
+      const errorText = await response.text();
+      safeError(`GLM API error: ${response.status} - ${errorText}`);
+      throw new Error(`GLM API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const responseText = data.choices?.[0]?.message?.content || '{}';
+    
+    // Try to extract JSON from response (in case there's markdown formatting)
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    const jsonString = jsonMatch ? jsonMatch[0] : responseText;
+    
+    const verification: VerifyCitationResponse = JSON.parse(jsonString);
 
     safeLog(`Citation verification result for "${citation}": ${verification.is_verified ? 'VERIFIED' : 'NOT VERIFIED'}`);
 

@@ -14,29 +14,8 @@ export {};
 // Mock the fetch function to simulate API calls
 global.fetch = jest.fn();
 
-// Mock the Google Generative AI module
-jest.mock('@google/genai', () => ({
-  GoogleGenAI: jest.fn().mockImplementation(() => ({
-    getGenerativeModel: jest.fn().mockReturnValue({
-      generateContentStream: jest.fn().mockReturnValue({
-        [Symbol.asyncIterator]: () => {
-          const chunks = [{
-            text: () => '{"disclaimer":"test","strategy":"test","filing_template":"test template","citations":[],"sources":[],"procedural_roadmap":[],"local_logistics":{},"procedural_checks":[]}'
-          }];
-          let index = 0;
-          return {
-            next: () => {
-              if (index < chunks.length) {
-                return Promise.resolve({ done: false, value: chunks[index++] });
-              }
-              return Promise.resolve({ done: true, value: undefined });
-            }
-          };
-        }
-      })
-    })
-  }))
-}));
+// Note: @google/genai mock removed - application migrated to GLM (Zhipu AI)
+// GLM API calls use fetch() which is mocked above
 
 // Import the function after mocking dependencies
 import { POST as AnalyzePOST } from '../app/api/analyze/route';
