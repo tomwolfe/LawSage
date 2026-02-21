@@ -4,13 +4,24 @@
  */
 
 import { headers } from 'next/headers';
-import { safeLog, safeWarn } from './pii-redactor';
+import { safeLog, safeWarn, safeError } from './pii-redactor';
 import { RATE_LIMIT_CONFIG, simpleHash } from './rate-limiter-client';
 
 export { RATE_LIMIT_CONFIG };
 
 // In-memory store for development (when Vercel KV is not available)
 const memoryStore = new Map<string, { timestamps: number[]; expiresAt: number }>();
+
+// GLM API rate limit tracking (separate from user rate limiting)
+interface GLMRateLimitState {
+  remaining: number;
+  resetAt: number;
+  totalLimit: number;
+  consecutive429s: number;
+  backoffUntil?: number;
+}
+
+const glmRateLimitStore = new Map<string, GLMRateLimitState>();
 
 // Time-based salt for fingerprinting
 function getTimeBasedSalt(): string {
@@ -242,4 +253,162 @@ export async function withRateLimit<T extends Response>(
     statusText: response.statusText,
     headers: newHeaders,
   });
+}
+
+/**
+ * Check if GLM API call is allowed (separate from user rate limiting)
+ * Tracks GLM-specific rate limits to prevent hitting API limits
+ */
+export function checkGLMRateLimit(apiKeyHash: string): { allowed: boolean; remaining: number; resetAt: number; backoffMs?: number } {
+  const now = Date.now();
+  const state = glmRateLimitStore.get(apiKeyHash);
+
+  // Check if we're in backoff period
+  if (state?.backoffUntil && now < state.backoffUntil) {
+    const backoffMs = state.backoffUntil - now;
+    safeWarn(`GLM API backoff active: ${Math.ceil(backoffMs / 1000)}s remaining`);
+    return {
+      allowed: false,
+      remaining: 0,
+      resetAt: state.backoffUntil,
+      backoffMs,
+    };
+  }
+
+  // No state yet - allow with default limits
+  if (!state) {
+    glmRateLimitStore.set(apiKeyHash, {
+      remaining: 4, // Start with 4 remaining (after this request)
+      resetAt: now + 60000, // 1 minute default window
+      totalLimit: 5, // Default to 5 requests per minute
+      consecutive429s: 0,
+    });
+    return { allowed: true, remaining: 4, resetAt: now + 60000 };
+  }
+
+  // Check if window has reset
+  if (now >= state.resetAt) {
+    // Reset window
+    state.remaining = state.totalLimit - 1;
+    state.resetAt = now + 60000; // 1 minute window
+    state.consecutive429s = 0;
+    state.backoffUntil = undefined;
+    glmRateLimitStore.set(apiKeyHash, state);
+    return { allowed: true, remaining: state.remaining, resetAt: state.resetAt };
+  }
+
+  // Check if we have remaining calls
+  if (state.remaining > 0) {
+    state.remaining--;
+    glmRateLimitStore.set(apiKeyHash, state);
+    return { allowed: true, remaining: state.remaining, resetAt: state.resetAt };
+  }
+
+  // No remaining calls - block until reset
+  safeWarn('GLM API rate limit reached, blocking request');
+  return {
+    allowed: false,
+    remaining: 0,
+    resetAt: state.resetAt,
+    backoffMs: state.resetAt - now,
+  };
+}
+
+/**
+ * Update GLM rate limit state based on API response headers or errors
+ */
+export function updateGLMRateLimit(
+  apiKeyHash: string,
+  options: {
+    success?: boolean;
+    rateLimitHeaders?: {
+      remaining?: string;
+      limit?: string;
+      reset?: string;
+      retryAfter?: string;
+    };
+    is429?: boolean;
+  }
+): void {
+  const now = Date.now();
+  let state = glmRateLimitStore.get(apiKeyHash);
+
+  if (!state) {
+    state = {
+      remaining: 4,
+      resetAt: now + 60000,
+      totalLimit: 5,
+      consecutive429s: 0,
+    };
+  }
+
+  // Handle 429 Too Many Requests
+  if (options.is429) {
+    state.consecutive429s = (state.consecutive429s || 0) + 1;
+
+    // Calculate backoff: 10s, 30s, 60s, 120s (exponential with cap)
+    const backoffSeconds = Math.min(10 * Math.pow(3, state.consecutive429s - 1), 120);
+    state.backoffUntil = now + backoffSeconds * 1000;
+
+    // Parse retry-after header if available
+    if (options.rateLimitHeaders?.retryAfter) {
+      const retryAfter = parseInt(options.rateLimitHeaders.retryAfter, 10);
+      if (!isNaN(retryAfter)) {
+        state.backoffUntil = now + retryAfter * 1000;
+      }
+    }
+
+    state.remaining = 0;
+    safeWarn(`GLM API returned 429. Backoff: ${backoffSeconds}s (consecutive: ${state.consecutive429s})`);
+    glmRateLimitStore.set(apiKeyHash, state);
+    return;
+  }
+
+  // Handle successful response - update from headers if available
+  if (options.success && options.rateLimitHeaders) {
+    if (options.rateLimitHeaders.remaining) {
+      state.remaining = parseInt(options.rateLimitHeaders.remaining, 10);
+    }
+    if (options.rateLimitHeaders.limit) {
+      state.totalLimit = parseInt(options.rateLimitHeaders.limit, 10);
+    }
+    if (options.rateLimitHeaders.reset) {
+      const resetTimestamp = parseInt(options.rateLimitHeaders.reset, 10);
+      if (!isNaN(resetTimestamp)) {
+        state.resetAt = resetTimestamp * 1000; // Convert to ms
+      }
+    }
+
+    // Reset consecutive 429 counter on success
+    if (state.consecutive429s > 0) {
+      safeLog(`GLM API success - resetting consecutive 429 counter (${state.consecutive429s} -> 0)`);
+      state.consecutive429s = 0;
+      state.backoffUntil = undefined;
+    }
+
+    glmRateLimitStore.set(apiKeyHash, state);
+    return;
+  }
+
+  // Simple success without headers - just decrement
+  if (options.success) {
+    state.remaining = Math.max(0, state.remaining - 1);
+    glmRateLimitStore.set(apiKeyHash, state);
+  }
+}
+
+/**
+ * Get GLM API rate limit status for health checks
+ */
+export function getGLMRateLimitStatus(apiKeyHash: string): GLMRateLimitState | null {
+  return glmRateLimitStore.get(apiKeyHash) || null;
+}
+
+/**
+ * Calculate backoff delay with exponential backoff and jitter
+ */
+export function calculateBackoff(attempt: number, baseDelay = 1000, maxDelay = 30000): number {
+  const exponentialDelay = baseDelay * Math.pow(2, attempt);
+  const jitter = Math.random() * 0.3 * exponentialDelay; // Add up to 30% jitter
+  return Math.min(exponentialDelay + jitter, maxDelay);
 }

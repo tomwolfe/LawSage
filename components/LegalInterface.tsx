@@ -454,7 +454,20 @@ export default function LegalInterface() {
 
       if (!response.ok) {
         if (response.status === 429) {
-          setError('Rate limit exceeded. Please wait a few minutes before trying again.');
+          const errorData = await response.json().catch(() => ({}));
+          const retryAfter = errorData.retry_after || 60;
+          const waitMinutes = Math.ceil(retryAfter / 60);
+          
+          if (errorData.type === 'RateLimitError') {
+            // User hit their personal rate limit
+            setError(errorData.detail || 'Rate limit exceeded. Please wait a few minutes before trying again.');
+          } else {
+            // AI service rate limit
+            setError(
+              errorData.info || 
+              `AI service is temporarily busy. Please wait ${waitMinutes} minute(s) and try again.`
+            );
+          }
           return;
         } else if (response.status === 500) {
           setError('Server error. Please try again later.');
@@ -490,13 +503,25 @@ export default function LegalInterface() {
                     setStreamingStatus(selectedFiles.length > 0 ? 'Step 2/2: Analyzing documents and conducting legal research...' : 'Conducting legal research...');
                   } else if (message.message.includes('Regenerating')) {
                     setStreamingStatus(message.message);
+                  } else if (message.message.includes('retrying')) {
+                    // Show retry status from server
+                    setStreamingStatus(message.message);
                   } else {
                     setStreamingStatus(message.message);
                   }
                 } else if (message.type === 'complete') {
                   finalResult = message.result;
                 } else if (message.type === 'error') {
-                  throw new Error(message.error);
+                  // Handle streaming errors (including rate limits)
+                  const errorMessage = message.detail || 'Analysis failed';
+                  const retryAfter = message.retry_after;
+                  
+                  if (retryAfter) {
+                    const waitMinutes = Math.ceil(retryAfter / 60);
+                    throw new Error(`${errorMessage}. Please try again in ${waitMinutes} minute(s).`);
+                  } else {
+                    throw new Error(message.info || errorMessage);
+                  }
                 }
               } catch (parseError) {
                 safeWarn('Failed to parse stream chunk:', parseError);

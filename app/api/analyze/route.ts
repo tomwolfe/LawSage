@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getLegalLookupResponse, searchExParteRules } from '../../../src/utils/legal-lookup';
 import { safeLog, safeError, safeWarn, redactPII } from '../../../lib/pii-redactor';
-import { withRateLimit } from '../../../lib/rate-limiter';
+import { withRateLimit, checkGLMRateLimit, updateGLMRateLimit, calculateBackoff } from '../../../lib/rate-limiter';
 import { SafetyValidator } from '../../../lib/validation';
 
 // Define types
@@ -116,6 +116,28 @@ function parseJsonFromResponse(content: string): LegalOutput | null {
 // Use Node.js runtime (not edge) to allow 60s timeout on Vercel Hobby
 // Edge runtime has hard 25s limit that cannot be extended
 const GLM_ENDPOINT = 'https://api.z.ai/api/paas/v4/chat/completions';
+
+/**
+ * Generate SHA-256 hash of API key for rate limit tracking
+ */
+async function hashApiKey(apiKey: string): Promise<string> {
+  try {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(apiKey);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  } catch {
+    // Fallback to simple hash
+    let hash = 0;
+    for (let i = 0; i < apiKey.length; i++) {
+      const char = apiKey.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash;
+    }
+    return Math.abs(hash).toString(36);
+  }
+}
 
 export async function POST(req: NextRequest) {
   return withRateLimit(async () => {
@@ -264,6 +286,10 @@ Return a SINGLE JSON response with all required sections as specified in the sys
 
       // Create a streaming response that starts immediately (avoids 25s timeout)
       const encoder = new TextEncoder();
+      
+      // Hash API key for rate limit tracking
+      const apiKeyHash = await hashApiKey(apiKey);
+      
       const stream = new ReadableStream({
         async start(controller) {
           // Send initial status IMMEDIATELY to keep connection alive
@@ -272,49 +298,155 @@ Return a SINGLE JSON response with all required sections as specified in the sys
             message: 'Connecting to AI analysis engine...'
           }) + '\n'));
 
-          try {
-            // Now fetch from GLM - this happens INSIDE the stream
-            const glmResponse = await fetch(GLM_ENDPOINT, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`,
-              },
-              body: JSON.stringify({
-                model: 'glm-4.7-flash',
-                messages: [
-                  { role: 'system', content: systemInstruction },
-                  { role: 'user', content: userPrompt }
-                ],
-                temperature: 0.1,
-                response_format: { type: 'json_object' },
-                stream: true
-              }),
-            });
-
-            if (!glmResponse.ok) {
-              const errorData = await glmResponse.json().catch(() => ({}));
-              safeError('GLM API error:', errorData);
-              controller.enqueue(encoder.encode(JSON.stringify({
-                type: 'error',
-                detail: `GLM API failed: ${glmResponse.status}`
-              }) + '\n'));
-              controller.close();
-              return;
-            }
-
-            // Send progress update
+          // Check GLM API rate limit before making request
+          const glmRateLimit = checkGLMRateLimit(apiKeyHash);
+          if (!glmRateLimit.allowed) {
+            const waitTime = Math.ceil((glmRateLimit.resetAt - Date.now()) / 1000);
+            safeWarn(`GLM API rate limited. Wait time: ${waitTime}s`);
             controller.enqueue(encoder.encode(JSON.stringify({
-              type: 'status',
-              message: 'Analyzing case documents and conducting legal research...'
+              type: 'error',
+              detail: 'AI service is temporarily rate limited. Please wait and try again.',
+              retry_after: waitTime,
+              info: `Our AI service is experiencing high demand. Please try again in ${Math.ceil(waitTime / 60)} minute(s).`
             }) + '\n'));
+            controller.close();
+            return;
+          }
 
-            const reader = glmResponse.body?.getReader();
-            if (!reader) {
-              controller.close();
-              return;
+          // Retry logic with exponential backoff
+          const MAX_RETRIES = 3;
+          let attempt = 0;
+          let glmResponse: Response | null = null;
+          let lastError: Error | null = null;
+
+          while (attempt <= MAX_RETRIES) {
+            try {
+              glmResponse = await fetch(GLM_ENDPOINT, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${apiKey}`,
+                },
+                body: JSON.stringify({
+                  model: 'glm-4.7-flash',
+                  messages: [
+                    { role: 'system', content: systemInstruction },
+                    { role: 'user', content: userPrompt }
+                  ],
+                  temperature: 0.1,
+                  response_format: { type: 'json_object' },
+                  stream: true
+                }),
+              });
+
+              // Handle 429 Rate Limit
+              if (glmResponse.status === 429) {
+                const errorData = await glmResponse.json().catch(() => ({}));
+                const retryAfter = glmResponse.headers.get('Retry-After');
+                
+                updateGLMRateLimit(apiKeyHash, {
+                  is429: true,
+                  rateLimitHeaders: {
+                    retryAfter: retryAfter || undefined,
+                    remaining: glmResponse.headers.get('X-RateLimit-Remaining') || undefined,
+                    limit: glmResponse.headers.get('X-RateLimit-Limit') || undefined,
+                    reset: glmResponse.headers.get('X-RateLimit-Reset') || undefined,
+                  }
+                });
+
+                if (attempt >= MAX_RETRIES) {
+                  safeError(`GLM API rate limit exceeded after ${MAX_RETRIES} retries`);
+                  controller.enqueue(encoder.encode(JSON.stringify({
+                    type: 'error',
+                    detail: 'AI service is temporarily unavailable due to high demand',
+                    retry_after: retryAfter ? parseInt(retryAfter, 10) : 60,
+                    info: 'Please wait a moment and try again.'
+                  }) + '\n'));
+                  controller.close();
+                  return;
+                }
+
+                // Calculate backoff delay
+                const backoffDelay = calculateBackoff(attempt, 2000, 15000);
+                safeWarn(`GLM API returned 429. Retrying in ${Math.ceil(backoffDelay / 1000)}s (attempt ${attempt + 1}/${MAX_RETRIES})`);
+                
+                // Send progress update to client
+                controller.enqueue(encoder.encode(JSON.stringify({
+                  type: 'status',
+                  message: `AI service busy, retrying... (${attempt + 1}/${MAX_RETRIES})`
+                }) + '\n'));
+
+                await new Promise(resolve => setTimeout(resolve, backoffDelay));
+                attempt++;
+                continue;
+              }
+
+              // Handle other errors
+              if (!glmResponse.ok) {
+                const errorData = await glmResponse.json().catch(() => ({}));
+                safeError('GLM API error:', { status: glmResponse.status, ...errorData });
+                
+                updateGLMRateLimit(apiKeyHash, { success: false });
+                
+                controller.enqueue(encoder.encode(JSON.stringify({
+                  type: 'error',
+                  detail: `AI service error: ${glmResponse.status}`,
+                  info: errorData.message || 'Please try again later.'
+                }) + '\n'));
+                controller.close();
+                return;
+              }
+
+              // Success - update rate limit state
+              updateGLMRateLimit(apiKeyHash, {
+                success: true,
+                rateLimitHeaders: {
+                  remaining: glmResponse.headers.get('X-RateLimit-Remaining') || undefined,
+                  limit: glmResponse.headers.get('X-RateLimit-Limit') || undefined,
+                  reset: glmResponse.headers.get('X-RateLimit-Reset') || undefined,
+                }
+              });
+
+              break; // Exit retry loop on success
+
+            } catch (error) {
+              lastError = error as Error;
+              safeError(`GLM API request failed (attempt ${attempt + 1}):`, error);
+
+              if (attempt >= MAX_RETRIES) {
+                controller.enqueue(encoder.encode(JSON.stringify({
+                  type: 'error',
+                  detail: 'Failed to connect to AI service after multiple attempts',
+                  info: lastError?.message || 'Please try again later.'
+                }) + '\n'));
+                controller.close();
+                return;
+              }
+
+              const backoffDelay = calculateBackoff(attempt, 2000, 15000);
+              await new Promise(resolve => setTimeout(resolve, backoffDelay));
+              attempt++;
             }
+          }
 
+          if (!glmResponse || !glmResponse.body) {
+            controller.enqueue(encoder.encode(JSON.stringify({
+              type: 'error',
+              detail: 'AI service unavailable',
+              info: 'Please try again later.'
+            }) + '\n'));
+            controller.close();
+            return;
+          }
+
+          // Send progress update
+          controller.enqueue(encoder.encode(JSON.stringify({
+            type: 'status',
+            message: 'Analyzing case documents and conducting legal research...'
+          }) + '\n'));
+
+          try {
+            const reader = glmResponse.body.getReader();
             const decoder = new TextDecoder();
             let fullContent = '';
 
@@ -361,11 +493,12 @@ Return a SINGLE JSON response with all required sections as specified in the sys
                 parsed: parsedOutput
               }
             }) + '\n'));
-          } catch (error) {
-            safeError('Streaming error:', error);
+          } catch (streamError) {
+            safeError('Streaming error:', streamError);
             controller.enqueue(encoder.encode(JSON.stringify({
               type: 'error',
-              detail: 'Analysis failed'
+              detail: 'Analysis failed during streaming',
+              info: 'Please try again later.'
             }) + '\n'));
           } finally {
             controller.close();
