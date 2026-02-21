@@ -67,7 +67,6 @@ interface ResultDisplayProps {
   activeTab: 'strategy' | 'filings' | 'sources' | 'survival-guide' | 'opposition-view' | 'roadmap';
   setActiveTab: (tab: 'strategy' | 'filings' | 'sources' | 'survival-guide' | 'opposition-view' | 'roadmap') => void;
   jurisdiction: string;
-  apiKey?: string;
   addToCaseLedger: (eventType: 'complaint_filed' | 'answer_due' | 'motion_submitted' | 'discovery_served' | 'trial_date_set' | 'other', description: string, dueDate?: Date) => void;
   caseLedger: CaseLedgerEntry[];
 }
@@ -219,7 +218,7 @@ function parseLegalOutput(text: string): { strategy: string; filings: string; st
   };
 }
 
-export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdiction, apiKey, addToCaseLedger, caseLedger }: ResultDisplayProps) {
+export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdiction, addToCaseLedger, caseLedger }: ResultDisplayProps) {
   const [copyStatus, setCopyStatus] = useState<{[key: string]: boolean | string}>({ all: false, 'opposition-view': false, 'survival-guide': false });
   const [citationVerificationStatus, setCitationVerificationStatus] = useState<{[key: string]: {
     is_verified: boolean | undefined;
@@ -374,8 +373,8 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
   // Function to verify a citation
   const verifyCitation = async (citationText: string) => {
     try {
-      const currentApiKey = apiKey || localStorage.getItem('lawsage_gemini_api_key') || '';
-      return await verifyCitationWithCache(citationText, jurisdiction, undefined, currentApiKey);
+      // Citation verification now uses server-side API key only
+      return await verifyCitationWithCache(citationText, jurisdiction, undefined);
     } catch (error: unknown) {
       safeError('Error verifying citation:', error);
       const errorMessage = typeof error === 'object' && error !== null && 'message' in error

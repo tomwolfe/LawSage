@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Upload, Download, Save, FolderOpen, Info, Key } from 'lucide-react';
+import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Upload, Download, Save, FolderOpen, Info } from 'lucide-react';
 import { processImageForOCR } from '../src/utils/image-processor';
 import { updateUrlWithState, watchStateAndSyncToUrl, createVirtualCaseFolderState, restoreVirtualCaseFolderState, cleanupLocalStorage } from '../src/utils/state-sync';
 import { exportCaseFile, importCaseFile, saveCaseToLocalStorage } from '../src/utils/case-file-manager';
@@ -9,7 +9,6 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ResultDisplay from './ResultDisplay';
 import HistoryActions from './HistoryActions';
-import ApiKeyModal from './ApiKeyModal';
 import { checkClientSideRateLimit, generateClientFingerprint } from '../lib/rate-limiter-client';
 import { safeError, safeWarn } from '../lib/pii-redactor';
 
@@ -137,9 +136,6 @@ export default function LegalInterface() {
   const [caseLedger, setCaseLedger] = useState<CaseLedgerEntry[]>([]);
   const [streamingStatus, setStreamingStatus] = useState<string>('');
   const [rateLimitInfo, setRateLimitInfo] = useState<{ remaining: number; resetAt: Date | null } | null>(null);
-  const [apiKey, setApiKey] = useState<string>('');
-  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
-  const resumeAnalysisRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize state from URL fragment on component mount
@@ -242,14 +238,6 @@ export default function LegalInterface() {
     checkHealth();
   }, []);
 
-  // Initialize API key from localStorage
-  useEffect(() => {
-    const storedApiKey = localStorage.getItem('lawsage_gemini_api_key');
-    if (storedApiKey) {
-      setApiKey(storedApiKey);
-    }
-  }, []);
-
   // Load history from localStorage on component mount
   useEffect(() => {
     const savedHistory = localStorage.getItem('lawsage_history');
@@ -274,22 +262,6 @@ export default function LegalInterface() {
       }
     }
   }, []);
-
-  const handleApiKeySave = (key?: string) => {
-    if (key) {
-      setApiKey(key);
-    }
-    setShowApiKeyModal(false);
-    
-    // Resume analysis if it was interrupted for key entry
-    if (resumeAnalysisRef.current) {
-      resumeAnalysisRef.current = false;
-      // Use setTimeout to ensure the modal state is fully updated before starting fetch
-      setTimeout(() => {
-        handleSubmit();
-      }, 100);
-    }
-  };
 
   const handleVoice = () => {
     if (!('webkitSpeechRecognition' in window)) {
@@ -356,7 +328,10 @@ export default function LegalInterface() {
 
     setSelectedFiles(prev => [...prev, ...newFiles]);
     setPreviewUrls(prev => [...prev, ...newPreviewUrls]);
-    
+
+    // Add warning about image-to-text limitation
+    setWarning('Note: Images are converted to text for analysis. Ensure documents are clear and legible. For best results, describe the document content in your situation description.');
+
     // Reset file input so same file can be selected again
     if (e.target) {
       e.target.value = '';
@@ -410,15 +385,7 @@ export default function LegalInterface() {
     const clientRateLimit = checkClientSideRateLimit();
     if (!clientRateLimit.allowed) {
       const waitMinutes = Math.ceil((clientRateLimit.resetAt - Date.now()) / (1000 * 60));
-      setError(`Rate limit exceeded. You have used all 5 free requests in the last hour. Please wait ${waitMinutes} minutes or enter your own Gemini API key in Settings.`);
-      return;
-    }
-
-    // Check for API key if user is about to make a request
-    if (!apiKey) {
-      // Don't block, but prepare to resume
-      resumeAnalysisRef.current = true;
-      setShowApiKeyModal(true);
+      setError(`Rate limit exceeded. You have used all 5 free requests in the last hour. Please wait ${waitMinutes} minutes.`);
       return;
     }
 
@@ -440,8 +407,6 @@ export default function LegalInterface() {
     const timeoutId = setTimeout(() => controller.abort(), 120000); // Increased to 120s for multi-file processing
 
     try {
-      let isUsingFallbackKeyHeader = false;
-
       // UNIFIED MULTIMODAL: Process images directly in the analyze call
       const images: string[] = [];
       if (selectedFiles.length > 0) {
@@ -473,7 +438,6 @@ export default function LegalInterface() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Gemini-API-Key': apiKey,
           'X-Client-Fingerprint': generateClientFingerprint(),
         },
         body: JSON.stringify({
@@ -485,22 +449,15 @@ export default function LegalInterface() {
       });
 
       handleRateLimitInfo();
-      if (response.headers.get('x-using-fallback-key') === 'true') {
-        isUsingFallbackKeyHeader = true;
-      }
 
       clearTimeout(timeoutId);
 
       if (!response.ok) {
         if (response.status === 429) {
-          setError('Demo limit reached. Please enter your own free Gemini API key in Settings to continue instantly.');
-          setShowApiKeyModal(true);
+          setError('Rate limit exceeded. Please wait a few minutes before trying again.');
           return;
-        } else if (response.status === 401) {
-          setError('API key is missing or invalid. Please enter your Gemini API key.');
-          localStorage.removeItem('lawsage_gemini_api_key');
-          setApiKey('');
-          setShowApiKeyModal(true);
+        } else if (response.status === 500) {
+          setError('Server error. Please try again later.');
           return;
         } else {
           const errorData = await response.json();
@@ -515,7 +472,6 @@ export default function LegalInterface() {
 
         const decoder = new TextDecoder();
         let finalResult: LegalResult | null = null;
-        let resultIncludesFallbackKey = false;
 
         try {
           while (true) {
@@ -539,9 +495,6 @@ export default function LegalInterface() {
                   }
                 } else if (message.type === 'complete') {
                   finalResult = message.result;
-                  if (message.result && message.result.isUsingFallbackKey) {
-                    resultIncludesFallbackKey = true;
-                  }
                 } else if (message.type === 'error') {
                   throw new Error(message.error);
                 }
@@ -554,11 +507,6 @@ export default function LegalInterface() {
           if (finalResult) {
             setResult(finalResult);
             setActiveTab('strategy');
-
-            if (isUsingFallbackKeyHeader || resultIncludesFallbackKey) {
-              setWarning('You are using the limited public demo key. Please add your own free key for unlimited access.');
-              setTimeout(() => setShowApiKeyModal(true), 2000);
-            }
 
             const newHistoryItem: CaseHistoryItem = {
               id: Date.now().toString(),
@@ -704,24 +652,6 @@ export default function LegalInterface() {
 
   return (
     <div className="space-y-8">
-      {!apiKey && (
-        <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl flex items-center justify-between gap-3 text-orange-800 shadow-sm animate-pulse">
-          <div className="flex items-center gap-3">
-            <Key className="shrink-0" size={20} />
-            <div>
-              <p className="text-sm font-bold">Limited Demo Mode</p>
-              <p className="text-xs">Using public trial key. Access may be throttled. Add your own free key in settings for full speed.</p>
-            </div>
-          </div>
-          <button 
-            onClick={() => setShowApiKeyModal(true)}
-            className="px-3 py-1.5 bg-orange-600 text-white rounded-lg text-xs font-bold hover:bg-orange-700 transition-colors"
-          >
-            Add API Key
-          </button>
-        </div>
-      )}
-
       {backendUnreachable && (
         <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-3 text-amber-800 shadow-sm">
           <AlertCircle className="shrink-0" size={20} />
@@ -984,18 +914,10 @@ export default function LegalInterface() {
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           jurisdiction={jurisdiction}
-          apiKey={apiKey}
           addToCaseLedger={addToCaseLedger}
           caseLedger={caseLedger}
         />
       )}
-
-      {/* API Key Modal */}
-      <ApiKeyModal
-        isOpen={showApiKeyModal}
-        onClose={handleApiKeySave}
-        existingKey={apiKey}
-      />
     </div>
   );
 }
