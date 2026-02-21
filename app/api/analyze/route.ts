@@ -636,9 +636,15 @@ Do NOT use placeholders. Provide substantive content for all fields.`;
                       throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
                     }
                     
-                    // GLM-4.7-flash may return reasoning_content alongside content
+                    // GLM-4.7-flash returns reasoning_content (thinking) and content (actual response)
+                    // We only want the content field for the JSON response
                     const delta = data.choices?.[0]?.delta;
-                    const content = delta?.content || delta?.reasoning_content || "";
+                    const content = delta?.content || "";
+
+                    // Log reasoning_content separately for debugging (but don't accumulate it)
+                    if (delta?.reasoning_content) {
+                      safeLog('GLM reasoning:', delta.reasoning_content.substring(0, 100) + '...');
+                    }
 
                     if (content) {
                       accumulatedJson += content;
@@ -675,9 +681,13 @@ Do NOT use placeholders. Provide substantive content for all fields.`;
                 try {
                   const data = JSON.parse(trimmedLine.slice(6));
                   const delta = data.choices?.[0]?.delta;
-                  const content = delta?.content || delta?.reasoning_content || "";
+                  const content = delta?.content || "";
                   if (content) {
                     accumulatedJson += content;
+                  }
+                  // Log reasoning if present
+                  if (delta?.reasoning_content) {
+                    safeLog('GLM reasoning (final):', delta.reasoning_content.substring(0, 100) + '...');
                   }
                 } catch (parseError) {
                   safeWarn(`Failed to parse final GLM chunk. Raw line: ${trimmedLine.substring(0, 100)}`, parseError);
@@ -694,10 +704,10 @@ Do NOT use placeholders. Provide substantive content for all fields.`;
             let parsedOutput: LegalOutput | null = null;
 
             try {
-              // Debug: log what we received
-              safeLog(`Accumulated JSON length: ${accumulatedJson.length}`);
+              // Debug: log what we received (use console.log directly to avoid PII redaction of numbers)
+              console.log(`[GLM Response] Accumulated JSON length: ${accumulatedJson.length}`);
               if (accumulatedJson.length < 500) {
-                safeLog(`Accumulated JSON content: ${accumulatedJson}`);
+                console.log(`[GLM Response] Content preview: ${accumulatedJson.substring(0, 200)}`);
               }
               
               if (!accumulatedJson.trim()) {
