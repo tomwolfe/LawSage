@@ -113,8 +113,8 @@ function parseJsonFromResponse(content: string): LegalOutput | null {
   }
 }
 
-export const runtime = 'edge';
-
+// Use Node.js runtime (not edge) to allow 60s timeout on Vercel Hobby
+// Edge runtime has hard 25s limit that cannot be extended
 const GLM_ENDPOINT = 'https://api.z.ai/api/paas/v4/chat/completions';
 
 export async function POST(req: NextRequest) {
@@ -262,59 +262,61 @@ ${templateContent ? 'Use this template as a reference for formatting: ' + templa
 
 Return a SINGLE JSON response with all required sections as specified in the system instructions. Do NOT wrap in markdown code blocks.`;
 
-      // Enable streaming to avoid Vercel Hobby 25s timeout
-      const response = await fetch(GLM_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'glm-4.7-flash',
-          messages: [
-            { role: 'system', content: systemInstruction },
-            { role: 'user', content: userPrompt }
-          ],
-          temperature: 0.1,
-          response_format: { type: 'json_object' },
-          stream: true // Enable streaming
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        safeError('GLM API error:', errorData);
-        return NextResponse.json(
-          { type: 'ApiError', detail: `GLM API failed: ${response.status}` } satisfies StandardErrorResponse,
-          { status: response.status }
-        );
-      }
-
-      // Create a streaming response
+      // Create a streaming response that starts immediately (avoids 25s timeout)
       const encoder = new TextEncoder();
       const stream = new ReadableStream({
         async start(controller) {
-          // Send initial status to keep connection alive and show progress
+          // Send initial status IMMEDIATELY to keep connection alive
           controller.enqueue(encoder.encode(JSON.stringify({
             type: 'status',
             message: 'Connecting to AI analysis engine...'
           }) + '\n'));
 
-          const reader = response.body?.getReader();
-          if (!reader) {
-            controller.close();
-            return;
-          }
-
-          const decoder = new TextDecoder();
-          let fullContent = '';
-
           try {
-            // Send progress update as we start receiving data
+            // Now fetch from GLM - this happens INSIDE the stream
+            const glmResponse = await fetch(GLM_ENDPOINT, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+              },
+              body: JSON.stringify({
+                model: 'glm-4.7-flash',
+                messages: [
+                  { role: 'system', content: systemInstruction },
+                  { role: 'user', content: userPrompt }
+                ],
+                temperature: 0.1,
+                response_format: { type: 'json_object' },
+                stream: true
+              }),
+            });
+
+            if (!glmResponse.ok) {
+              const errorData = await glmResponse.json().catch(() => ({}));
+              safeError('GLM API error:', errorData);
+              controller.enqueue(encoder.encode(JSON.stringify({
+                type: 'error',
+                detail: `GLM API failed: ${glmResponse.status}`
+              }) + '\n'));
+              controller.close();
+              return;
+            }
+
+            // Send progress update
             controller.enqueue(encoder.encode(JSON.stringify({
               type: 'status',
               message: 'Analyzing case documents and conducting legal research...'
             }) + '\n'));
+
+            const reader = glmResponse.body?.getReader();
+            if (!reader) {
+              controller.close();
+              return;
+            }
+
+            const decoder = new TextDecoder();
+            let fullContent = '';
 
             while (true) {
               const { done, value } = await reader.read();
@@ -342,7 +344,7 @@ Return a SINGLE JSON response with all required sections as specified in the sys
 
             // Parse and validate the complete response
             const parsedOutput = parseJsonFromResponse(fullContent);
-            
+
             if (parsedOutput) {
               const validation = validateLegalOutputStructure(parsedOutput);
               if (!validation.valid) {
@@ -363,7 +365,7 @@ Return a SINGLE JSON response with all required sections as specified in the sys
             safeError('Streaming error:', error);
             controller.enqueue(encoder.encode(JSON.stringify({
               type: 'error',
-              detail: 'Streaming failed'
+              detail: 'Analysis failed'
             }) + '\n'));
           } finally {
             controller.close();
