@@ -1,0 +1,119 @@
+{
+  "jurisdiction": "Federal",
+  "state_code": "US",
+  "last_updated": "2025-01-15",
+  "filing_deadlines": {
+    "answer_to_complaint": {
+      "days": 21,
+      "description": "Answer must be served within 21 days after service of summons and complaint (FRCP § 12(a)(1)(A)(i))",
+      "statute": "Federal Rules of Civil Procedure § 12(a)(1)(A)(i)",
+      "exceptions": [
+        "Extended to 60 days for U.S. government defendants",
+        "Extended to 90 days for foreign government defendants",
+        "Waiver of service extends to 60 days from waiver request"
+      ]
+    },
+    "motion_to_dismiss": {
+      "days": 21,
+      "description": "Motion to Dismiss must be filed before answer, typically within 21 days of service (FRCP § 12(b))",
+      "statute": "Federal Rules of Civil Procedure § 12(b)",
+      "exceptions": [
+        "May be consolidated with answer",
+        "Extension by stipulation (up to 21 days) or court order"
+      ]
+    },
+    "discovery_deadlines": {
+      "interrogatories": {
+        "days": 30,
+        "description": "Response to interrogatories must be served within 30 days (FRCP § 33(b)(2))",
+        "statute": "Federal Rules of Civil Procedure § 33(b)(2)"
+      },
+      "requests_for_admission": {
+        "days": 30,
+        "description": "Response to requests for admission must be served within 30 days (FRCP § 36(a)(3))",
+        "statute": "Federal Rules of Civil Procedure § 36(a)(3)"
+      },
+      "deposition_notice": {
+        "days": 14,
+        "description": "Reasonable notice must be given for deposition (typically 14 days minimum)",
+        "statute": "Federal Rules of Civil Procedure § 30(b)(1)"
+      },
+      "initial_disclosure": {
+        "days": 14,
+        "description": "Initial disclosures due within 14 days after Rule 26(f) conference (FRCP § 26(a)(1)(C))",
+        "statute": "Federal Rules of Civil Procedure § 26(a)(1)(C)"
+      }
+    },
+    "motion_filing": {
+      "notice_period": 14,
+      "description": "Written motion and notice of hearing must be served at least 14 days before hearing (FRCP § 6(c)(1))",
+      "statute": "Federal Rules of Civil Procedure § 6(c)(1)",
+      "exceptions": [
+        "Extended by 3 days if served by mail",
+        "Extended by 3 days if served electronically",
+        "Local rules may specify different periods"
+      ]
+    },
+    "appeal_deadline": {
+      "days": 30,
+      "description": "Notice of Appeal must be filed within 30 days after entry of judgment (FRAP § 4(a)(1)(A))",
+      "statute": "Federal Rules of Appellate Procedure § 4(a)(1)(A)",
+      "exceptions": [
+        "Extended to 60 days if U.S. government is a party",
+        "Extension of up to 30 days may be granted for excusable neglect"
+      ]
+    }
+  },
+  "ex_parte_rules": {
+    "notice_period": {
+      "hours": 14,
+      "description": "Ex parte TRO may be issued without notice if specific showing is made (FRCP § 65(b)(1))",
+      "statute": "Federal Rules of Civil Procedure § 65(b)(1)"
+    },
+    "filing_time": {
+      "time": "Varies",
+      "description": "Ex parte applications heard at discretion of assigned judge",
+      "statute": "Local rules vary by district"
+    },
+    "requirements": [
+      "Verified complaint or affidavit showing immediate irreparable injury",
+      "Certificate of counsel detailing efforts to notify or reasons why notice should not be required",
+      "Proposed temporary restraining order",
+      "Security bond as required by FRCP § 65(c)"
+    ]
+  },
+  "service_rules": {
+    "substituted_service": {
+      "allowed": true,
+      "requirements": [
+        "Court order after showing personal service impracticable",
+        "Service as directed by court order",
+        "May include mail, email, or publication"
+      ],
+      "statute": "FRCP § 4(f)(3)"
+    },
+    "service_by_mail": {
+      "extension": 3,
+      "description": "Service by mail adds 3 days to response period (FRCP § 6(d))",
+      "statute": "Federal Rules of Civil Procedure § 6(d)"
+    },
+    "electronic_service": {
+      "extension": 3,
+      "description": "Electronic service adds 3 days to response period (FRCP § 6(d))",
+      "statute": "Federal Rules of Civil Procedure § 6(d)"
+    }
+  },
+  "court_fees": {
+    "first_paper_filing": 402,
+    "motion_filing": 0,
+    "appearance_fee": 0,
+    "fee_waiver_available": true,
+    "fee_waiver_form": "Application to Proceed In Forma Pauperis (AO 240)"
+  },
+  "local_rules_urls": {
+    "federal_rules": "https://www.uscourts.gov/rules-policies/current-rules-practice-procedure",
+    "supreme_court": "https://www.supremecourt.gov/ctrules/2019RulesofPractice.pdf",
+    "recap_court_listener": "https://www.courtlistener.com/recap/",
+    "uscourts_locator": "https://www.uscourts.gov/court-locator"
+  }
+}

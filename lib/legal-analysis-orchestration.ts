@@ -1,9 +1,16 @@
 /**
- * Search Orchestration Module
- * Implements deterministic multi-step legal research:
- * 1. Generate specific search queries based on case facts
- * 2. Execute searches via GLM for legal analysis
- * 3. Inject retrieved snippets as context for final analysis
+ * Legal Analysis Orchestration Module
+ * 
+ * NOTE: This module performs AI-based legal analysis using GLM's internal knowledge.
+ * It does NOT perform actual web searches or access external legal databases.
+ * 
+ * Purpose:
+ * 1. Generate specific legal research queries based on case facts
+ * 2. Execute analysis via GLM API for legal information
+ * 3. Format results as context for final legal analysis
+ * 
+ * LIMITATION: All analysis is based on GLM's training data, not real-time legal research.
+ * For authoritative legal research, consult official sources (courtlistener.com, .gov sites).
  */
 
 import { safeLog, safeError, safeWarn } from './pii-redactor';

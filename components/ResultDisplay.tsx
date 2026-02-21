@@ -497,6 +497,63 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
     URL.revokeObjectURL(url);
   };
 
+  /**
+   * Generate professional PDF using server-side rendering
+   * Creates court-ready pleading paper format
+   */
+  const handleGeneratePdf = async () => {
+    try {
+      const contentToExport = strategyText || result.text;
+      
+      // Show loading state
+      const loadingMsg = document.createElement('div');
+      loadingMsg.textContent = 'Generating professional PDF...';
+      loadingMsg.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#1e40af;color:white;padding:20px 40px;border-radius:8px;font-size:16px;z-index:9999;box-shadow:0 4px 6px rgba(0,0,0,0.1);';
+      document.body.appendChild(loadingMsg);
+
+      const response = await fetch('/api/generate-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: 'Legal Analysis & Strategy',
+          content: contentToExport,
+          court: `${jurisdiction} Superior Court`,
+          usePleadingPaper: true,
+          metadata: {
+            author: 'LawSage Legal Assistant',
+            subject: 'Legal Analysis',
+            keywords: 'legal, analysis, strategy, court filing'
+          }
+        })
+      });
+
+      document.body.removeChild(loadingMsg);
+
+      if (!response.ok) {
+        throw new Error('PDF generation failed');
+      }
+
+      // Download the PDF
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `legal-analysis-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF. Please try again or use the browser print option.');
+      // Fallback to browser print
+      window.print();
+    }
+  };
+
   // Helper function to create a California-style pleading header
   const createCaliforniaFilingHeader = async (
     docx: any, // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -1428,13 +1485,47 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
             <div className="space-y-6">
               <div className="flex justify-between items-center">
                 <h3 className="font-bold text-slate-800">Citations & Verification</h3>
-                <button
-                  onClick={handleExportToWord}
-                  className="p-2 bg-indigo-600 text-white rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors hover:bg-indigo-700"
-                >
-                  <FileDown size={16} />
-                  Export to Word
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleGeneratePdf}
+                    className="p-2 bg-emerald-600 text-white rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors hover:bg-emerald-700"
+                    title="Generate professional PDF with pleading paper format"
+                  >
+                    <FileText size={16} />
+                    Generate PDF
+                  </button>
+                  <button
+                    onClick={handleExportToWord}
+                    className="p-2 bg-indigo-600 text-white rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors hover:bg-indigo-700"
+                  >
+                    <FileDown size={16} />
+                    Export to Word
+                  </button>
+                </div>
+              </div>
+
+              {/* Citation Verification Disclaimer */}
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
+                  <div>
+                    <h4 className="font-semibold text-amber-800 text-sm">Important Notice: Citation Verification</h4>
+                    <p className="text-sm text-amber-700 mt-1">
+                      Citation verification is performed using AI analysis, <strong>not</strong> direct lookup of legal databases. 
+                      While the system attempts to validate citations against known legal principles, it cannot guarantee accuracy. 
+                      <strong>Always verify critical citations independently</strong> through official sources such as:
+                    </p>
+                    <ul className="text-sm text-amber-700 mt-2 list-disc list-inside space-y-1">
+                      <li>CourtListener (courtlistener.com)</li>
+                      <li>Google Scholar (scholar.google.com)</li>
+                      <li>Official court websites (.gov domains)</li>
+                      <li>Legal Information Institute (law.cornell.edu)</li>
+                    </ul>
+                    <p className="text-xs text-amber-600 mt-2 italic">
+                      Hallucinated citations have occurred in AI-generated legal documents. Professional verification is essential before filing.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* Display structured citations if available */}

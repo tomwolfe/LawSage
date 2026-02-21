@@ -1,0 +1,108 @@
+{
+  "jurisdiction": "Florida",
+  "state_code": "FL",
+  "last_updated": "2025-01-15",
+  "filing_deadlines": {
+    "answer_to_complaint": {
+      "days": 20,
+      "description": "Answer must be served within 20 days after service of process (Fla. R. Civ. P. § 1.140)",
+      "statute": "Florida Rules of Civil Procedure § 1.140",
+      "exceptions": [
+        "Extended to 60 days for U.S. Marshal service",
+        "Extended when service is by publication"
+      ]
+    },
+    "motion_to_dismiss": {
+      "days": 20,
+      "description": "Motion to Dismiss must be filed within 20 days after service of process, before filing answer",
+      "statute": "Florida Rules of Civil Procedure § 1.140(b)",
+      "exceptions": [
+        "May be filed with answer if no prior opportunity",
+        "Extension may be granted by court"
+      ]
+    },
+    "discovery_deadlines": {
+      "interrogatories": {
+        "days": 30,
+        "description": "Response to interrogatories must be served within 30 days (Fla. R. Civ. P. § 1.340)",
+        "statute": "Florida Rules of Civil Procedure § 1.340"
+      },
+      "requests_for_admission": {
+        "days": 30,
+        "description": "Response to requests for admission must be served within 30 days (Fla. R. Civ. P. § 1.370)",
+        "statute": "Florida Rules of Civil Procedure § 1.370"
+      },
+      "deposition_notice": {
+        "days": 10,
+        "description": "Notice of deposition must be served at least 10 days before deposition (Fla. R. Civ. P. § 1.310)",
+        "statute": "Florida Rules of Civil Procedure § 1.310"
+      }
+    },
+    "motion_filing": {
+      "notice_period": 5,
+      "description": "Notice of hearing on motion must be served at least 5 days before hearing (Fla. R. Civ. P. § 1.090)",
+      "statute": "Florida Rules of Civil Procedure § 1.090",
+      "exceptions": [
+        "Extended by 3 days if served by mail",
+        "Extended by 2 days if served electronically"
+      ]
+    },
+    "appeal_deadline": {
+      "days": 30,
+      "description": "Notice of Appeal must be filed within 30 days of rendition of order or judgment (Fla. R. App. P. § 9.110)",
+      "statute": "Florida Rules of Appellate Procedure § 9.110"
+    }
+  },
+  "ex_parte_rules": {
+    "notice_period": {
+      "hours": 24,
+      "description": "Ex parte motions require reasonable notice unless immediate irreparable harm is shown",
+      "statute": "Florida Rules of Civil Procedure § 1.610"
+    },
+    "filing_time": {
+      "time": "9:00 AM",
+      "description": "Ex parte motions typically heard at morning calendar",
+      "statute": "Local rules vary by circuit"
+    },
+    "requirements": [
+      "Verified complaint or affidavit showing specific facts",
+      "Certificate of good faith effort to notify or explanation why notice should not be required",
+      "Proposed injunction or order",
+      "Security/bond if injunction is granted"
+    ]
+  },
+  "service_rules": {
+    "substituted_service": {
+      "allowed": true,
+      "requirements": [
+        "Affidavit showing diligent search and inquiry",
+        "Service on person 15 years or older at dwelling",
+        "Mailing copy to defendant's last known address"
+      ],
+      "statute": "Fla. Stat. § 48.031"
+    },
+    "service_by_mail": {
+      "extension": 5,
+      "description": "Service by mail extends response time by 5 days (Fla. R. Civ. P. § 1.080)",
+      "statute": "Florida Rules of Civil Procedure § 1.080"
+    },
+    "electronic_service": {
+      "extension": 2,
+      "description": "Electronic service extends response time by 2 days (Fla. R. Civ. P. § 1.080)",
+      "statute": "Florida Rules of Civil Procedure § 1.080"
+    }
+  },
+  "court_fees": {
+    "first_paper_filing": 401,
+    "motion_filing": 0,
+    "appearance_fee": 0,
+    "fee_waiver_available": true,
+    "fee_waiver_form": "Application for Determination of Civil Indigent Status"
+  },
+  "local_rules_urls": {
+    "state_courts": "https://www.floridasupremecourt.org/Information/Florida-Rules-of-Court",
+    "miami_dade": "https://www.jud11.flcourts.org/local-rules/",
+    "broward": "https://www.jud17.flcourts.org/local-rules/",
+    "orange_county": "https://www.ninthcircuit.org/local-rules"
+  }
+}

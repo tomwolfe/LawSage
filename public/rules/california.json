@@ -1,0 +1,107 @@
+{
+  "jurisdiction": "California",
+  "state_code": "CA",
+  "last_updated": "2025-01-15",
+  "filing_deadlines": {
+    "answer_to_complaint": {
+      "days": 30,
+      "description": "Answer to Complaint must be filed within 30 days after service of summons (CCP § 412.20)",
+      "statute": "California Code of Civil Procedure § 412.20",
+      "exceptions": [
+        "Extended to 60 days if defendant is served outside California",
+        "Extended to 90 days if defendant is served outside the United States"
+      ]
+    },
+    "motion_to_dismiss": {
+      "days": 60,
+      "description": "Demurrer or Motion to Dismiss must be filed within 60 days of appearance or before filing answer, whichever is earlier",
+      "statute": "California Code of Civil Procedure § 430.40",
+      "exceptions": [
+        "May be filed with answer if no prior opportunity to demur"
+      ]
+    },
+    "discovery_deadlines": {
+      "interrogatories": {
+        "days": 30,
+        "description": "Response to Form Interrogatories and Request for Production must be served within 30 days (CCP § 2030.260)",
+        "statute": "California Code of Civil Procedure § 2030.260"
+      },
+      "requests_for_admission": {
+        "days": 30,
+        "description": "Response to Requests for Admission must be served within 30 days (CCP § 2033.250)",
+        "statute": "California Code of Civil Procedure § 2033.250"
+      },
+      "deposition_notice": {
+        "days": 10,
+        "description": "Notice of deposition must be served at least 10 days before deposition date (CCP § 2025.270)",
+        "statute": "California Code of Civil Procedure § 2025.270"
+      }
+    },
+    "motion_filing": {
+      "notice_period": 16,
+      "description": "Notice of motion must be served at least 16 court days before hearing (CCP § 1005)",
+      "statute": "California Code of Civil Procedure § 1005",
+      "exceptions": [
+        "Extended by 5 days if served by mail",
+        "Extended by 2 days if served electronically"
+      ]
+    },
+    "appeal_deadline": {
+      "days": 60,
+      "description": "Notice of Appeal must be filed within 60 days after service of Notice of Entry of Judgment (CRC 8.104)",
+      "statute": "California Rules of Court, Rule 8.104"
+    }
+  },
+  "ex_parte_rules": {
+    "notice_period": {
+      "hours": 24,
+      "description": "Ex parte applications require at least 24 hours notice to opposing counsel (CRC 3.1203)",
+      "statute": "California Rules of Court, Rule 3.1203"
+    },
+    "filing_time": {
+      "time": "10:00 AM",
+      "description": "Ex parte applications must be filed by 10:00 AM on the day before the hearing",
+      "statute": "Local Rules may vary by county"
+    },
+    "requirements": [
+      "Declaration explaining ex parte relief",
+      "Declaration of efforts to notify opposing counsel",
+      "Proof of service on opposing counsel",
+      "Proposed order"
+    ]
+  },
+  "service_rules": {
+    "substituted_service": {
+      "allowed": true,
+      "requirements": [
+        "Leave of court after showing of due diligence",
+        "Service on competent adult at home or workplace",
+        "Mailing copy to defendant's last known address"
+      ],
+      "statute": "CCP § 415.20(b)"
+    },
+    "service_by_mail": {
+      "extension": 5,
+      "description": "Service by mail extends response time by 5 calendar days",
+      "statute": "CCP § 1013"
+    },
+    "electronic_service": {
+      "extension": 2,
+      "description": "Electronic service extends response time by 2 calendar days",
+      "statute": "CCP § 1010.6"
+    }
+  },
+  "court_fees": {
+    "first_paper_filing": 435,
+    "motion_filing": 60,
+    "appearance_fee": 25,
+    "fee_waiver_available": true,
+    "fee_waiver_form": "FW-001"
+  },
+  "local_rules_urls": {
+    "state_courts": "https://www.courts.ca.gov/rules.htm",
+    "los_angeles": "https://www.lacourt.org/localrules/localrules.aspx",
+    "san_francisco": "https://www.sfsuperiorcourt.org/local-rules",
+    "san_diego": "https://www.sdcourt.ca.gov/sdcourt/generalinformation/rulesandlocalforms"
+  }
+}

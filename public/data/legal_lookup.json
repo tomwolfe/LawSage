@@ -134,6 +134,20 @@
       "rule": "Local Rule 9.1 - Notice must be given by 10:00 AM the court day before the hearing."
     },
     {
+      "id": 6,
+      "courthouse": "San Diego Superior Court",
+      "jurisdiction": "California",
+      "notice_time": "10:00 AM",
+      "rule": "Local Rule 2.6.3 - Ex parte applications must be filed by 10:00 AM the day before hearing."
+    },
+    {
+      "id": 7,
+      "courthouse": "Orange County Superior Court",
+      "jurisdiction": "California",
+      "notice_time": "9:00 AM",
+      "rule": "Local Rule 370 - Ex parte applications must be filed by 9:00 AM the day before hearing."
+    },
+    {
       "id": 3,
       "courthouse": "New York County Supreme Court",
       "jurisdiction": "New York",
@@ -141,11 +155,116 @@
       "rule": "CPLR 2214 - Order to Show Cause (OSC) is usually required for ex parte relief."
     },
     {
+      "id": 8,
+      "courthouse": "Kings County Supreme Court",
+      "jurisdiction": "New York",
+      "notice_time": "9:30 AM",
+      "rule": "Part 39 Rules - Ex parte applications heard during morning motion session."
+    },
+    {
+      "id": 9,
+      "courthouse": "Queens County Supreme Court",
+      "jurisdiction": "New York",
+      "notice_time": "9:30 AM",
+      "rule": "Part 39 Rules - Order to Show Cause required for ex parte relief."
+    },
+    {
       "id": 4,
       "courthouse": "Harris County District Court",
       "jurisdiction": "Texas",
       "notice_time": "Reasonable Notice",
       "rule": "Rule 680 - No TRO shall be granted without notice unless it clearly appears from specific facts that immediate and irreparable injury will result."
+    },
+    {
+      "id": 10,
+      "courthouse": "Dallas County District Court",
+      "jurisdiction": "Texas",
+      "notice_time": "9:00 AM",
+      "rule": "Local Rule 3.2 - Ex parte applications heard at morning docket call."
+    },
+    {
+      "id": 11,
+      "courthouse": "Travis County District Court",
+      "jurisdiction": "Texas",
+      "notice_time": "8:30 AM",
+      "rule": "Local Rule 4.1 - TRO applications heard at 8:30 AM docket."
+    },
+    {
+      "id": 12,
+      "courthouse": "Miami-Dade Circuit Court",
+      "jurisdiction": "Florida",
+      "notice_time": "9:00 AM",
+      "rule": "Administrative Order 2020-15 - Ex parte motions heard at 9:00 AM calendar."
+    },
+    {
+      "id": 13,
+      "courthouse": "Broward County Circuit Court",
+      "jurisdiction": "Florida",
+      "notice_time": "9:00 AM",
+      "rule": "Local Rule 3.050 - Ex parte applications require 24 hours notice."
+    },
+    {
+      "id": 14,
+      "courthouse": "Cook County Circuit Court",
+      "jurisdiction": "Illinois",
+      "notice_time": "9:30 AM",
+      "rule": "Local Rule 13.4 - Emergency motions heard at 9:30 AM call."
+    },
+    {
+      "id": 15,
+      "courthouse": "Los Angeles Superior Court",
+      "jurisdiction": "California",
+      "notice_time": "8:30 AM",
+      "rule": "Local Rule 3.202 - Ex parte applications in Family Law heard at 8:30 AM."
+    },
+    {
+      "id": 16,
+      "courthouse": "Philadelphia Court of Common Pleas",
+      "jurisdiction": "Pennsylvania",
+      "notice_time": "9:00 AM",
+      "rule": "Local Rule 208.1 - Emergency ex parte applications heard at 9:00 AM."
+    },
+    {
+      "id": 17,
+      "courthouse": "Maricopa County Superior Court",
+      "jurisdiction": "Arizona",
+      "notice_time": "10:00 AM",
+      "rule": "Local Rule 6.2 - Ex parte applications require 24 hours notice."
+    },
+    {
+      "id": 18,
+      "courthouse": "King County Superior Court",
+      "jurisdiction": "Washington",
+      "notice_time": "9:00 AM",
+      "rule": "Local Civil Rule 7(b) - Ex parte applications heard at 9:00 AM calendar."
+    },
+    {
+      "id": 19,
+      "courthouse": "Fulton County Superior Court",
+      "jurisdiction": "Georgia",
+      "notice_time": "9:00 AM",
+      "rule": "Local Rule 6.3 - Emergency ex parte motions require 24 hours notice."
+    },
+    {
+      "id": 20,
+      "courthouse": "Central District of California (Federal)",
+      "jurisdiction": "Federal",
+      "notice_time": "Varies",
+      "rule": "Local Rule 7-13 - Ex parte applications require written request and supporting memorandum."
+    },
+    {
+      "id": 21,
+      "courthouse": "Southern District of New York (Federal)",
+      "jurisdiction": "Federal",
+      "notice_time": "Varies",
+      "rule": "Individual Judge Rules - Ex parte applications handled per individual judge's practice."
+    },
+    {
+      "id": 22,
+      "courthouse": "Northern District of Texas (Federal)",
+      "jurisdiction": "Federal",
+      "notice_time": "Varies",
+      "rule": "Local Rule 7.3 - Emergency ex parte applications require motion and supporting affidavit."
     }
   ]
 }

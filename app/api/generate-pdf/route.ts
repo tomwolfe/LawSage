@@ -1,0 +1,357 @@
+import { NextRequest, NextResponse } from 'next/server';
+import PDFDocument from 'pdfkit';
+import { Readable } from 'stream';
+import type PDFDocumentType from 'pdfkit';
+
+interface GeneratePdfRequest {
+  title: string;
+  content: string;
+  court?: string;
+  caseNumber?: string;
+  parties?: {
+    plaintiff: string;
+    defendant: string;
+  };
+  usePleadingPaper?: boolean;
+  metadata?: {
+    author?: string;
+    subject?: string;
+    keywords?: string;
+  };
+}
+
+type PDFDoc = InstanceType<typeof PDFDocument>;
+
+/**
+ * Convert a Readable stream to a Buffer
+ */
+function streamToBuffer(stream: Readable): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
+    stream.on('error', reject);
+    stream.on('end', () => resolve(Buffer.concat(chunks)));
+  });
+}
+
+/**
+ * Draw California-style pleading paper line numbers
+ */
+function drawPleadingLineNumbers(doc: PDFDoc, startY: number, endY: number) {
+  // Left margin for line numbers
+  const leftMargin = 35;
+  
+  // Draw vertical red line
+  doc.strokeColor('#cc0000')
+    .lineWidth(2)
+    .moveTo(65, startY)
+    .lineTo(65, endY)
+    .stroke();
+  
+  // Draw line numbers (1-28 per page per California rules)
+  doc.fontSize(10)
+    .fillColor('#666666')
+    .text('', leftMargin, startY, {
+      align: 'right',
+      width: 25,
+      lineGap: 24,
+      continued: true
+    });
+  
+  // Add line numbers manually
+  for (let i = 1; i <= 28; i++) {
+    const y = startY + (i - 1) * 24;
+    doc.text(i.toString(), leftMargin, y - 5, {
+      align: 'right',
+      width: 25
+    });
+  }
+}
+
+/**
+ * Draw court caption box
+ */
+function drawCourtCaption(doc: PDFDoc, court: string, caseNumber: string, parties: any, yPosition: number) {
+  const pageWidth = doc.page.width;
+  const margin = 72; // 1 inch
+  
+  // Court name
+  doc.fontSize(14)
+    .font('Helvetica-Bold')
+    .text(court || 'SUPERIOR COURT OF CALIFORNIA', margin + 100, yPosition, {
+      align: 'center',
+      width: pageWidth - margin * 2 - 100
+    });
+  
+  // Case number
+  yPosition += 40;
+  doc.fontSize(10)
+    .font('Helvetica')
+    .text(`Case No.: ${caseNumber || '[To be assigned]'}`, margin + 100, yPosition, {
+      align: 'right',
+      width: pageWidth - margin * 2 - 100
+    });
+  
+  // Parties
+  yPosition += 30;
+  doc.fontSize(11)
+    .font('Helvetica-Bold')
+    .text(parties?.plaintiff || 'Plaintiff', margin + 100, yPosition, {
+      align: 'left',
+      width: pageWidth - margin * 2 - 100
+    });
+  
+  yPosition += 20;
+  doc.fontSize(10)
+    .font('Helvetica')
+    .text('vs.', margin + 100, yPosition, {
+      align: 'left',
+      width: pageWidth - margin * 2 - 100
+    });
+  
+  yPosition += 20;
+  doc.fontSize(11)
+    .font('Helvetica-Bold')
+    .text(parties?.defendant || 'Defendant', margin + 100, yPosition, {
+      align: 'left',
+      width: pageWidth - margin * 2 - 100
+    });
+  
+  return yPosition + 40;
+}
+
+/**
+ * Generate a professional legal PDF document
+ * Supports California-style pleading paper format
+ */
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json() as GeneratePdfRequest;
+    const {
+      title,
+      content,
+      court,
+      caseNumber,
+      parties,
+      usePleadingPaper = true,
+      metadata
+    } = body;
+
+    if (!title || !content) {
+      return NextResponse.json(
+        { error: 'Missing required fields', detail: 'title and content are required' },
+        { status: 400 }
+      );
+    }
+
+    // Create PDF document
+    const doc = new PDFDocument({
+      size: 'LETTER',
+      margins: {
+        top: 72,
+        bottom: 72,
+        left: usePleadingPaper ? 90 : 72,
+        right: 72
+      }
+    });
+
+    // Add metadata
+    if (metadata) {
+      doc.info.Title = title;
+      if (metadata.author) doc.info.Author = metadata.author;
+      if (metadata.subject) doc.info.Subject = metadata.subject;
+      if (metadata.keywords) doc.info.Keywords = metadata.keywords;
+    }
+
+    const chunks: Buffer[] = [];
+    doc.on('data', (chunk) => chunks.push(chunk));
+
+    const pageWidth = doc.page.width;
+    const pageHeight = doc.page.height;
+    const margin = usePleadingPaper ? 90 : 72;
+    let yPosition = 72;
+
+    // Draw pleading paper elements if requested
+    if (usePleadingPaper) {
+      // Draw line numbers on first page
+      drawPleadingLineNumbers(doc, 72, pageHeight - 72);
+      
+      // Draw court caption
+      if (court || caseNumber || parties) {
+        yPosition = drawCourtCaption(doc, court || '', caseNumber || '', parties, yPosition);
+      }
+    }
+
+    // Document title
+    doc.fontSize(16)
+      .font('Helvetica-Bold')
+      .text(title, margin, yPosition, {
+        align: 'center',
+        width: pageWidth - margin * 2
+      });
+    
+    yPosition += 40;
+
+    // Process content (markdown-like to PDF)
+    doc.fontSize(12)
+      .font('Helvetica')
+      .fillColor('#000000');
+
+    // Split content into lines and process
+    const lines = content.split('\n');
+    let currentY = yPosition;
+    const lineHeight = 18;
+    const maxLinesPerPage = usePleadingPaper ? 28 : 40;
+    let lineCount = 0;
+
+    for (const line of lines) {
+      // Check if we need a new page
+      if (lineCount >= maxLinesPerPage - 2) {
+        doc.addPage();
+        lineCount = 0;
+        currentY = 72;
+        
+        // Draw line numbers on new page
+        if (usePleadingPaper) {
+          drawPleadingLineNumbers(doc, 72, pageHeight - 72);
+        }
+      }
+
+      // Handle headings (lines starting with #)
+      if (line.startsWith('###')) {
+        doc.fontSize(12)
+          .font('Helvetica-Bold')
+          .text(line.replace(/^###\s*/, ''), margin, currentY, {
+            width: pageWidth - margin * 2
+          });
+        currentY += lineHeight + 6;
+        lineCount += 2;
+        doc.fontSize(12).font('Helvetica');
+      } else if (line.startsWith('##')) {
+        doc.fontSize(14)
+          .font('Helvetica-Bold')
+          .text(line.replace(/^##\s*/, ''), margin, currentY, {
+            width: pageWidth - margin * 2
+          });
+        currentY += lineHeight + 8;
+        lineCount += 2;
+        doc.fontSize(12).font('Helvetica');
+      } else if (line.startsWith('#')) {
+        doc.fontSize(16)
+          .font('Helvetica-Bold')
+          .text(line.replace(/^#\s*/, ''), margin, currentY, {
+            width: pageWidth - margin * 2
+          });
+        currentY += lineHeight + 10;
+        lineCount += 2;
+        doc.fontSize(12).font('Helvetica');
+      } else if (line.startsWith('- ') || line.startsWith('• ')) {
+        // Bullet points
+        doc.fontSize(12)
+          .font('Helvetica')
+          .text('• ' + line.replace(/^[-•]\s*/, ''), margin + 10, currentY, {
+            width: pageWidth - margin * 2 - 10
+          });
+        currentY += lineHeight;
+        lineCount++;
+      } else if (line.trim() === '') {
+        // Empty line
+        currentY += lineHeight;
+        lineCount++;
+      } else {
+        // Regular text
+        doc.fontSize(12)
+          .font('Helvetica')
+          .text(line, margin, currentY, {
+            width: pageWidth - margin * 2,
+            align: 'left'
+          });
+        currentY += lineHeight;
+        lineCount++;
+      }
+    }
+
+    // Add signature block if pleading paper
+    if (usePleadingPaper) {
+      // Check if we need a new page for signature
+      if (lineCount > maxLinesPerPage - 6) {
+        doc.addPage();
+        if (usePleadingPaper) {
+          drawPleadingLineNumbers(doc, 72, pageHeight - 72);
+        }
+        currentY = 72;
+      }
+
+      currentY += 20;
+      
+      // Signature line
+      doc.fontSize(12)
+        .font('Helvetica')
+        .text('_'.repeat(50), margin, currentY, {
+          width: pageWidth - margin * 2
+        });
+      currentY += 20;
+      
+      // Attorney name placeholder
+      doc.fontSize(12)
+        .font('Helvetica')
+        .text('Attorney for [Party Name]', margin, currentY, {
+          width: pageWidth - margin * 2
+        });
+      currentY += 30;
+      
+      // Date
+      const today = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+      doc.fontSize(12)
+        .text(`Dated: ${today}`, margin, currentY, {
+          width: pageWidth - margin * 2
+        });
+    }
+
+    // Finalize PDF
+    doc.end();
+
+    const pdfBuffer = Buffer.concat(chunks);
+
+    // Return PDF as response
+    return new NextResponse(pdfBuffer, {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf"`,
+        'Content-Length': pdfBuffer.length.toString()
+      }
+    });
+
+  } catch (error) {
+    console.error('PDF generation error:', error);
+    
+    return NextResponse.json(
+      {
+        error: 'PDF generation failed',
+        detail: error instanceof Error ? error.message : 'Unknown error occurred'
+      },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * GET endpoint for health check
+ */
+export async function GET() {
+  return NextResponse.json({
+    status: 'ok',
+    message: 'PDF generation endpoint is running',
+    features: [
+      'California-style pleading paper',
+      'Court caption formatting',
+      'Markdown-like content parsing',
+      'Automatic pagination',
+      'Signature blocks'
+    ]
+  });
+}
