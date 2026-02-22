@@ -78,21 +78,51 @@ export function decompressStateFromUrlFragment(fragment: string): unknown {
 }
 
 /**
- * Save state to localStorage with a session ID
+ * Completely purges all saved session snapshots to free up space
+ */
+function purgeAllSessions(): void {
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith(LS_PREFIX)) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach(k => localStorage.removeItem(k));
+}
+
+/**
+ * Save state to localStorage, reusing the existing session ID if possible
  */
 export function saveStateToLocalStorage(state: unknown): string {
   try {
-    const sessionId = generateSessionId();
+    // Try to get the existing session ID from the URL hash first
+    let sessionId = window.location.hash.substring(1);
+    
+    // If the hash isn't a session ID, generate a new one
+    if (!sessionId.startsWith('session_')) {
+      sessionId = generateSessionId();
+    }
+    
     const key = `${LS_PREFIX}${sessionId}`;
     
     // Compress and store
     const compressed = compressStateToUrlFragment(state);
-    localStorage.setItem(key, compressed);
     
-    // Store session ID reference
+    try {
+      localStorage.setItem(key, compressed);
+    } catch (e) {
+      // If quota exceeded, clear OLD lawsage keys and try one more time
+      if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+        console.warn('LocalStorage quota exceeded, purging old sessions...');
+        purgeAllSessions(); 
+        localStorage.setItem(key, compressed);
+      } else {
+        throw e;
+      }
+    }
+    
     localStorage.setItem(CURRENT_SESSION_KEY, sessionId);
-    
-    safeLog(`State saved to localStorage with session ID: ${sessionId}`);
     return sessionId;
   } catch (error) {
     safeError('Error saving state to localStorage:', error);
@@ -159,25 +189,28 @@ export function cleanupLocalStorage(): void {
 }
 
 /**
- * Updates the URL hash with the compressed state
- * HYBRID MODE: If state is too large, saves to localStorage and uses session ID in URL
- * @param state The state to compress and store in the URL
+ * Updates the URL hash - Reuses current session ID to prevent storage bloat
  */
 export function updateUrlWithState(state: unknown): void {
   try {
     const useLocalStorage = shouldUseLocalStorage(state);
+    const currentHash = window.location.hash.substring(1);
     
     if (useLocalStorage) {
-      // Save to localStorage and use session ID in URL
+      // Re-uses existing ID if we are already in a localStorage session
       const sessionId = saveStateToLocalStorage(state);
-      const newUrl = `${window.location.pathname}${window.location.search}#${sessionId}`;
-      window.history.replaceState({}, '', newUrl);
-      safeLog('State too large for URL, saved to localStorage');
+      
+      // Only update the URL if the ID changed (prevents unnecessary history entries)
+      if (currentHash !== sessionId) {
+        const newUrl = `${window.location.pathname}${window.location.search}#${sessionId}`;
+        window.history.replaceState({}, '', newUrl);
+      }
     } else {
-      // Use URL hash directly
       const compressedState = compressStateToUrlFragment(state);
-      const newUrl = `${window.location.pathname}${window.location.search}#${compressedState}`;
-      window.history.replaceState({}, '', newUrl);
+      if (currentHash !== compressedState) {
+        const newUrl = `${window.location.pathname}${window.location.search}#${compressedState}`;
+        window.history.replaceState({}, '', newUrl);
+      }
     }
   } catch (error) {
     safeError('Error updating URL with state:', error);
@@ -213,12 +246,20 @@ export function getStateFromUrl(): unknown {
 
 /**
  * Enhanced state synchronization that handles Virtual Case Folder metadata and summaries
+ * History is excluded from the synced state since it's stored separately in localStorage
  * @param caseFolder The Virtual Case Folder state to sync
  * @param analysisResult The analysis result to sync
  * @param ledger The case ledger containing chronological case events
  * @returns A combined state object with both case folder, analysis result, and ledger
  */
 export function createVirtualCaseFolderState(caseFolder: unknown, analysisResult: unknown, ledger?: unknown[]): Record<string, unknown> {
+  // Create a copy of caseFolder without history to keep the sync payload small
+  let caseFolderWithoutHistory: Record<string, unknown> = {};
+  if (caseFolder && typeof caseFolder === 'object') {
+    const { history, ...folderWithoutHistory } = caseFolder as Record<string, unknown>;
+    caseFolderWithoutHistory = folderWithoutHistory;
+  }
+
   // Deeper compression for document summaries and results
   const compressResult = (res: unknown): Record<string, unknown> | unknown => {
     if (!res || typeof res !== 'object' || !('text' in res)) return res;
@@ -230,26 +271,8 @@ export function createVirtualCaseFolderState(caseFolder: unknown, analysisResult
     };
   };
 
-  let history: Record<string, unknown>[] = [];
-  if (caseFolder && typeof caseFolder === 'object' && 'history' in caseFolder) {
-    const folderWithHistory = caseFolder as Record<string, unknown>;
-    const historyArray = folderWithHistory.history as unknown[];
-    history = historyArray?.map((item: unknown) => {
-      const itemRecord = item as Record<string, unknown>;
-      const itemResult = itemRecord.result as unknown;
-      return {
-        ...itemRecord,
-        result: compressResult(itemResult)
-      };
-    }) || [];
-  }
-
-  const caseFolderRecord = caseFolder as Record<string, unknown>;
   const result: Record<string, unknown> = {
-    caseFolder: {
-      ...caseFolderRecord,
-      history
-    },
+    caseFolder: caseFolderWithoutHistory, // History is excluded here!
     analysisResult: compressResult(analysisResult),
     ledger: ledger || [],
     timestamp: Date.now(),
