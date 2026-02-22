@@ -10,8 +10,7 @@
     "lint": "eslint",
     "test": "jest",
     "validate": "node scripts/validate.js",
-    "update-legal-data": "node scripts/update-legal-data.js",
-    "prepare": "husky || true"
+    "update-legal-data": "node scripts/update-legal-data.js"
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.19",
