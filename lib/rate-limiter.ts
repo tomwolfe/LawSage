@@ -1,5 +1,5 @@
 /**
- * Server-side rate limiter using Vercel KV (Redis-compatible) or in-memory fallback
+ * Server-side rate limiter using Upstash Redis or in-memory fallback
  * Implements sliding window rate limiting to prevent API abuse
  */
 
@@ -9,7 +9,7 @@ import { RATE_LIMIT_CONFIG, simpleHash } from './rate-limiter-client';
 
 export { RATE_LIMIT_CONFIG };
 
-// In-memory store for development (when Vercel KV is not available)
+// In-memory store for development/fallback (when Upstash Redis is not available)
 const memoryStore = new Map<string, { timestamps: number[]; expiresAt: number }>();
 
 // Time-based salt for fingerprinting
@@ -19,18 +19,18 @@ function getTimeBasedSalt(): string {
 }
 
 /**
- * Get Vercel KV client if available, otherwise use in-memory fallback
+ * Check if Upstash Redis is available
  */
-async function getKVClient() {
+async function isRedisAvailable(): Promise<boolean> {
   try {
-    const kvModule = await import('@vercel/kv').catch(() => null);
-    if (kvModule && kvModule.kv) {
-      return kvModule.kv as any;
-    }
-    return null;
+    const { getRedisClient } = await import('./redis');
+    const client = getRedisClient();
+    if (!client) return false;
+    await client.ping();
+    return true;
   } catch {
-    safeLog('Vercel KV not available, using in-memory rate limiting');
-    return null;
+    safeLog('Upstash Redis not available, using in-memory rate limiting');
+    return false;
   }
 }
 
@@ -96,11 +96,11 @@ export async function checkRateLimit(): Promise<{ allowed: boolean; remaining: n
   const windowStart = now - RATE_LIMIT_CONFIG.windowMs;
 
   try {
-    const kv = await getKVClient();
+    const useRedis = await isRedisAvailable();
 
-    if (kv) {
-      const timestamps = await kv.zrangebyscore(key, windowStart, now);
-      const requestCount = timestamps.length;
+    if (useRedis) {
+      const { redis } = await import('./redis');
+      const requestCount = await redis.zcount(key, windowStart, now);
       const remaining = Math.max(0, RATE_LIMIT_CONFIG.maxRequests - requestCount);
       const resetAt = now + RATE_LIMIT_CONFIG.windowMs;
 
@@ -109,8 +109,8 @@ export async function checkRateLimit(): Promise<{ allowed: boolean; remaining: n
         return { allowed: false, remaining: 0, resetAt };
       }
 
-      await kv.zadd(key, { score: now, member: `${now}-${Math.random()}` });
-      await kv.expire(key, Math.ceil(RATE_LIMIT_CONFIG.windowMs / 1000) + 60);
+      await redis.zadd(key, { score: now, member: `${now}-${Math.random()}` });
+      await redis.expire(key, Math.ceil(RATE_LIMIT_CONFIG.windowMs / 1000) + 60);
 
       safeLog(`Rate limit check passed for client: ${clientId.substring(0, 8)}... (${remaining} remaining)`);
       return { allowed: true, remaining: remaining - 1, resetAt };
@@ -161,11 +161,11 @@ export async function getRateLimitStatus(): Promise<{ remaining: number; resetAt
   const windowStart = now - RATE_LIMIT_CONFIG.windowMs;
 
   try {
-    const kv = await getKVClient();
+    const useRedis = await isRedisAvailable();
 
-    if (kv) {
-      const timestamps = await kv.zrangebyscore(key, windowStart, now);
-      const requestCount = timestamps.length;
+    if (useRedis) {
+      const { redis } = await import('./redis');
+      const requestCount = await redis.zcount(key, windowStart, now);
       const remaining = Math.max(0, RATE_LIMIT_CONFIG.maxRequests - requestCount);
 
       return {

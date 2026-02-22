@@ -8,8 +8,8 @@ export const RATE_LIMIT = {
   WINDOW_MS: 60 * 60 * 1000, // 1 hour window
   MAX_REQUESTS: 5, // Max 5 requests per window (client-side default)
   SERVER_MAX_REQUESTS: 10, // Server-side limit (can be adjusted based on tier)
-  KEY_PREFIX: 'ratelimit:',
-  KV_KEY_PREFIX: 'lawsage:ratelimit:', // Vercel KV key prefix
+  KEY_PREFIX: 'lawsage:v1:ratelimit:client:',
+  KV_KEY_PREFIX: 'lawsage:v1:ratelimit:', // Upstash Redis key prefix for shared instance
 } as const;
 
 // API Configuration

@@ -1,14 +1,14 @@
 /**
  * Next.js Proxy for Server-Side Rate Limiting
  *
- * This proxy enforces rate limiting at the edge using Vercel KV
+ * This proxy enforces rate limiting at the edge using Upstash Redis
  * before requests reach API routes.
  *
  * Security: Moves trust boundary from client to server
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { kv } from '@vercel/kv';
+import { redis } from './lib/redis';
 import { RATE_LIMIT, SESSION } from './config/constants';
 
 /**
@@ -52,7 +52,7 @@ function getClientIdentifier(request: NextRequest): string {
 }
 
 /**
- * Check rate limit using Vercel KV
+ * Check rate limit using Upstash Redis
  * Returns rate limit status and whether request should be allowed
  */
 async function checkRateLimit(
@@ -66,17 +66,17 @@ async function checkRateLimit(
   const kvKey = `${RATE_LIMIT.KV_KEY_PREFIX}${clientKey}`;
   const now = Date.now();
   const windowStart = now - RATE_LIMIT.WINDOW_MS;
-  
+
   try {
-    // Use KV's sorted set to track request timestamps
+    // Use Redis sorted set to track request timestamps
     // Remove old entries outside the window
-    await kv.zremrangebyscore(kvKey, '-inf', windowStart);
-    
+    await redis.zremrangebyscore(kvKey, '-inf', windowStart);
+
     // Count current requests in window
-    const requestCount = await kv.zcard(kvKey);
+    const requestCount = await redis.zcard(kvKey);
     const remaining = Math.max(0, RATE_LIMIT.SERVER_MAX_REQUESTS - requestCount);
     const resetAt = now + RATE_LIMIT.WINDOW_MS;
-    
+
     if (requestCount >= RATE_LIMIT.SERVER_MAX_REQUESTS) {
       return {
         allowed: false,
@@ -85,16 +85,16 @@ async function checkRateLimit(
         limit: RATE_LIMIT.SERVER_MAX_REQUESTS,
       };
     }
-    
+
     // Add current request timestamp
-    await kv.zadd(kvKey, {
+    await redis.zadd(kvKey, {
       score: now,
       member: `${now}-${Math.random()}`,
     });
-    
+
     // Set expiry on the key (cleanup safety net)
-    await kv.expire(kvKey, Math.ceil(RATE_LIMIT.WINDOW_MS / 1000) + 60);
-    
+    await redis.expire(kvKey, Math.ceil(RATE_LIMIT.WINDOW_MS / 1000) + 60);
+
     return {
       allowed: true,
       remaining: remaining - 1,
@@ -102,9 +102,9 @@ async function checkRateLimit(
       limit: RATE_LIMIT.SERVER_MAX_REQUESTS,
     };
   } catch (error) {
-    // KV unavailable or error - fail open with warning
-    console.warn('[RateLimiter] KV error, failing open:', error instanceof Error ? error.message : error);
-    
+    // Redis unavailable or error - fail open with warning
+    console.warn('[RateLimiter] Redis error, failing open:', error instanceof Error ? error.message : error);
+
     // Return permissive response but mark as degraded
     return {
       allowed: true,
