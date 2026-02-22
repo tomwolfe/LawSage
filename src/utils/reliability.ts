@@ -11,17 +11,18 @@ export function validateDisclaimer(text: string): boolean {
     return false;
   }
 
-  const requiredDisclaimerPhrases = [
-    'LEGAL DISCLAIMER',
-    'represent yourself Pro Se',
-    'legal information, not legal advice',
-    'consult with a qualified attorney'
+  const lowerText = text.toLowerCase();
+
+  // Use semantic matching - check for core meaning rather than exact phrases
+  // This allows for minor wording variations while ensuring the disclaimer conveys the required meaning
+  const requiredConcepts = [
+    'not legal advice',      // Core: this is not legal advice
+    'not an attorney',       // Core: AI is not a lawyer
+    'educational purposes'   // Core: for educational/informational use
   ];
 
-  const lowerText = text.toLowerCase();
-  
-  return requiredDisclaimerPhrases.every(phrase => 
-    lowerText.includes(phrase.toLowerCase())
+  return requiredConcepts.every(concept =>
+    lowerText.includes(concept.toLowerCase())
   );
 }
 

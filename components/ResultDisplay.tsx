@@ -1568,7 +1568,12 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                     <h3 className="font-bold text-lg text-purple-800 mb-4">Procedural Checks</h3>
                     <ul className="list-disc pl-5 space-y-2">
                       {structured.procedural_checks.map((check, index) => (
-                        <li key={index} className="text-slate-700">{check}</li>
+                        <li key={index} className="text-slate-700">
+                          {/* DEFENSIVE RENDER: Handle objects returned by AI */}
+                          {typeof check === 'object' && check !== null 
+                            ? (check as any).check || (check as any).description || JSON.stringify(check)
+                            : String(check)}
+                        </li>
                       ))}
                     </ul>
                   </div>

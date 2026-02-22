@@ -564,7 +564,12 @@ Situation: ${safeInput}
 
 ${documents && documents.length > 0 ? `\nEVIDENCE DOCUMENTS PROVIDED: ${documents.length} document(s) have been uploaded. Cross-reference the user's claims against these official court documents. Identify any contradictions and use specific case details from the evidence in your analysis.\n` : ''}
 
-${staticResponse ? `\nRESEARCH CONTEXT:\n${(staticResponse as { text: string }).text}` : ""}
+${staticResponse ? `
+MANDATORY RESEARCH CONTEXT (Source of Truth - YOU MUST USE THESE STATUTES):
+${(staticResponse as { text: string }).text}
+
+CRITICAL: You MUST use the statute numbers provided in the RESEARCH CONTEXT above. If the context mentions Wis. Stat. § 823.01, do NOT use other numbers for nuisance. This is a mandatory source priority rule.
+` : ""}
 
 Return a COMPLETE JSON response with ALL required fields:
 - disclaimer
@@ -576,8 +581,12 @@ Return a COMPLETE JSON response with ALL required fields:
 - local_logistics
 - procedural_checks
 
-CRITICAL: You are under oath to provide substantive, non-placeholder content for every field. Failure to provide a real roadmap will result in a system error.
-Do NOT use placeholders. Provide substantive content for all fields. If you lack specific information, provide exact instructions on WHERE the user can find it (e.g., "Check Milwaukee County Local Rule 3.15 regarding noise").`;
+CRITICAL INSTRUCTIONS:
+1. You MUST use the statute numbers provided in the RESEARCH CONTEXT above. If the context mentions Wis. Stat. § 823.01, do NOT use other numbers for nuisance.
+2. "Step Pending" is a CRITICAL FAILURE. If you do not have a specific local rule, provide a general procedural requirement for ${jurisdiction} (e.g., "File in the County Clerk's office").
+3. Ensure "procedural_checks" is strictly an ARRAY OF STRINGS, not objects.
+4. You are under oath to provide substantive, non-placeholder content for every field.
+5. Do NOT use placeholders. Provide substantive content for all fields. If you lack specific information, provide exact instructions on WHERE the user can find it (e.g., "Check Milwaukee County Local Rule 3.15 regarding noise").`;
 
       const encoder = new TextEncoder();
       const decoder = new TextDecoder();

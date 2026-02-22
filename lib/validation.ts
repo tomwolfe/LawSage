@@ -281,14 +281,37 @@ export class ResponseValidator {
 
     const hasCitations = citationCount >= 3;
 
-    // Check for Roadmap/Next Steps
+    // 1. BLACKLIST PLACEHOLDERS - Force fail if placeholders detected
+    const lower = content.toLowerCase();
+    const placeholders = [
+      "step pending", 
+      "details to be determined", 
+      "citation unavailable", 
+      "to be assigned",
+      "to be determined",
+      "analysis pending",
+      "not available",
+      "none provided",
+      "placeholder"
+    ];
+    const hasPlaceholders = placeholders.some(p => lower.includes(p));
+    if (hasPlaceholders) {
+      return false; // Force a retry/fail state
+    }
+
+    // 2. Structural Integrity - Check for Roadmap/Next Steps
     const roadmapKeywords = ["Next Steps", "Roadmap", "Procedural Roadmap", "What to do next", "Step-by-step", "ROADMAP:", "NEXT STEPS:"];
-    const hasRoadmap = roadmapKeywords.some(kw => content.toLowerCase().includes(kw.toLowerCase()));
+    const hasRoadmapKeyword = roadmapKeywords.some(kw => lower.includes(kw.toLowerCase()));
+    
+    // Additional check: ensure roadmap has actual content, not just the keyword
+    const roadmapSectionMatch = content.match(/(?:roadmap|next steps|procedural roadmap)[:\s]*([\s\S]*?)(?=\n\n|\#\#|$)/i);
+    const roadmapContent = roadmapSectionMatch ? roadmapSectionMatch[1] : "";
+    const hasRoadmap = hasRoadmapKeyword && roadmapContent.length > 50 && !roadmapContent.toLowerCase().includes("step pending");
 
     // Check for Adversarial Strategy
     const adversarialKeywords = ["Adversarial Strategy", "Opposition View", "Red-Team Analysis", "Opposition arguments", "OPPOSITION VIEW (RED-TEAM ANALYSIS)"];
     const hasAdversarialHeader = adversarialKeywords.some(kw => content.toLowerCase().includes(kw.toLowerCase()));
-    
+
     // Check if the adversarial strategy is actually content and not a placeholder
     const placeholderPatterns = [
       /no strategy provided/i,
@@ -298,7 +321,7 @@ export class ResponseValidator {
       /placeholder/i,
       /analysis pending/i
     ];
-    
+
     // Find the adversarial strategy section content
     let adversarialContent = "";
     const lowerContent = content.toLowerCase();
@@ -311,7 +334,7 @@ export class ResponseValidator {
         break;
       }
     }
-    
+
     const isPlaceholder = placeholderPatterns.some(pattern => pattern.test(adversarialContent));
     const hasAdversarial = hasAdversarialHeader && adversarialContent.length > 50 && !isPlaceholder;
 
@@ -319,7 +342,10 @@ export class ResponseValidator {
     const proceduralKeywords = ["Procedural Checks", "Local Rules of Court", "Procedural technicality", "COURTHOUSE INFORMATION & LOCAL LOGISTICS"];
     const hasProcedural = proceduralKeywords.some(kw => content.toLowerCase().includes(kw.toLowerCase()));
 
-    return hasCitations && hasRoadmap && hasAdversarial && hasProcedural;
+    // 3. Quality Citation Check (already computed above)
+    const hasValidCitations = citationCount >= 3;
+
+    return hasValidCitations && hasRoadmap && hasAdversarial && hasProcedural;
   }
   
   // Additional validation methods to match the Python implementation
