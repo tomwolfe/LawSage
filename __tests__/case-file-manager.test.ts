@@ -32,7 +32,8 @@ describe('Case File Manager', () => {
     activeTab: 'strategy',
     history: [],
     selectedHistoryItem: null,
-    backendUnreachable: false
+    backendUnreachable: false,
+    evidence: []
   };
 
   const mockResult: LegalResult = {

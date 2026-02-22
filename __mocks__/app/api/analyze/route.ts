@@ -11,13 +11,18 @@ interface NextRequest {
   };
 }
 
+interface AnalyzeRequest {
+  user_input: string;
+  jurisdiction: string;
+}
+
 // interface NextResponse {  // Removed unused interface
 //   json: (data: unknown) => unknown;
 // }
 
 export async function POST(_req: NextRequest): Promise<unknown> {
   // Mock implementation that returns a predictable response
-  const requestData = await _req.json();
+  const requestData = await _req.json() as AnalyzeRequest;
 
   // Return a mock response similar to the real API
   // For different test cases, return different content

@@ -3,7 +3,8 @@ import {
   validateMotionForDiscovery,
   validateLegalMotion,
   MotionToDismiss,
-  MotionForDiscovery
+  MotionForDiscovery,
+  LegalMotion
 } from '../lib/schemas/motions';
 
 describe('Motion Schemas Validation', () => {
@@ -50,20 +51,28 @@ describe('Motion Schemas Validation', () => {
     });
 
     it('should fail validation for MotionToDismiss without required fields', () => {
-      const invalidMotion: Partial<MotionToDismiss> = {
+      const invalidMotion: MotionToDismiss = {
         id: '',
         title: '',
-        type: 'motion_to_dismiss',
+        description: '',
+        filedDate: '',
+        status: 'draft',
+        filingParty: '',
+        opposingParty: '',
         caseInfo: {
           caseNumber: '',
           courtName: '',
           jurisdiction: ''
         },
+        legalAuthority: [],
+        factualBasis: '',
+        reliefRequested: '',
         signatureBlock: {
           attorneyName: '',
           attorneyBarNumber: '',
           date: ''
         },
+        type: 'motion_to_dismiss',
         grounds: {
           lackOfSubjectMatterJurisdiction: false,
           lackOfPersonalJurisdiction: false,
@@ -72,7 +81,9 @@ describe('Motion Schemas Validation', () => {
           failureToStateClaim: false,
           statuteOfLimitations: false,
           other: false
-        }
+        },
+        dismissalFacts: '',
+        anticipatedOpposition: ''
       };
 
       const result = validateMotionToDismiss(invalidMotion);
@@ -132,24 +143,36 @@ describe('Motion Schemas Validation', () => {
     });
 
     it('should fail validation for MotionForDiscovery without required fields', () => {
-      const invalidMotion: Partial<MotionForDiscovery> = {
+      const invalidMotion: MotionForDiscovery = {
         id: '',
         title: '',
-        type: 'motion_for_discovery',
+        description: '',
+        filedDate: '',
+        status: 'draft',
+        filingParty: '',
+        opposingParty: '',
         caseInfo: {
           caseNumber: '',
           courtName: '',
           jurisdiction: ''
         },
+        legalAuthority: [],
+        factualBasis: '',
+        reliefRequested: '',
         signatureBlock: {
           attorneyName: '',
           attorneyBarNumber: '',
           date: ''
         },
+        type: 'motion_for_discovery',
         discoveryType: 'requests_for_production',
         discoveryRequests: [],
         protectiveOrderRequested: false,
-        proposedTimeline: {}
+        proposedTimeline: {
+          start: '',
+          end: '',
+          deadlines: []
+        }
       };
 
       const result = validateMotionForDiscovery(invalidMotion);
@@ -204,9 +227,29 @@ describe('Motion Schemas Validation', () => {
     });
 
     it('should return error for unknown motion type', () => {
-      const unknownMotion: { type: string } = {
-        type: 'unknown_motion_type'
-      };
+      const unknownMotion: LegalMotion = {
+        id: '',
+        title: '',
+        description: '',
+        filedDate: '',
+        status: 'draft',
+        filingParty: '',
+        opposingParty: '',
+        caseInfo: {
+          caseNumber: '',
+          courtName: '',
+          jurisdiction: ''
+        },
+        legalAuthority: [],
+        factualBasis: '',
+        reliefRequested: '',
+        signatureBlock: {
+          attorneyName: '',
+          attorneyBarNumber: '',
+          date: ''
+        },
+        type: 'motion_to_dismiss'
+      } as unknown as LegalMotion;
 
       const result = validateLegalMotion(unknownMotion);
       expect(result.isValid).toBe(false);
