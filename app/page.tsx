@@ -1,17 +1,28 @@
+'use client';
+
+import { useState } from 'react';
 import SettingsModal from '@/components/SettingsModal';
 import LegalInterface from '@/components/LegalInterface';
+import InformedConsentModal from '@/components/InformedConsentModal';
 import { ShieldCheck, Scale, FileSearch } from 'lucide-react';
 import ClientPortal from '@/components/ClientPortal';
 
 export default function Home() {
+  const [consentAccepted, setConsentAccepted] = useState(false);
+
   return (
     <div className="space-y-12 pb-20">
+      <InformedConsentModal 
+        isOpen={!consentAccepted}
+        onAccept={() => setConsentAccepted(true)}
+      />
+      
       <div className="text-center space-y-4 pt-4">
         <h1 className="text-4xl md:text-6xl font-extrabold text-slate-900 tracking-tight">
-          The Universal <span className="text-indigo-600">Public Defender</span>
+          The <span className="text-indigo-600">Pro Se Architect</span>
         </h1>
         <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-          Democratizing legal access. Input your situation, and our AI will analyze statutes, 
+          Democratizing legal access. Input your situation, and our AI will analyze statutes,
           provide a roadmap, and generate court-admissible filings.
         </p>
         

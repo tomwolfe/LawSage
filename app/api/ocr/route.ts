@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { safeLog, safeError, safeWarn } from '../../../lib/pii-redactor';
 import { validateOCRResult } from '../../../lib/schemas/legal-output';
-import fs from 'fs';
+import { readFile, access } from 'fs/promises';
 import path from 'path';
 
 interface StandardErrorResponse {
@@ -149,20 +149,21 @@ export async function POST(req: NextRequest) {
     let calculatedDeadline: { date: string; daysRemaining: number; rule: string } | undefined;
 
     try {
-      // Load jurisdiction-specific rules from public/rules/*.json
+      // Load jurisdiction-specific rules from public/rules/*.json (async file access)
       const rulesPath = path.join(process.cwd(), 'public', 'rules', `${jurisdiction.toLowerCase()}.json`);
-      if (fs.existsSync(rulesPath)) {
-        const rulesRaw = fs.readFileSync(rulesPath, 'utf8');
+      try {
+        await access(rulesPath);
+        const rulesRaw = await readFile(rulesPath, 'utf8');
         const rules = JSON.parse(rulesRaw);
-        
+
         const docType = ocrData.document_type?.toLowerCase() || '';
         const filingDeadlines = rules.filing_deadlines;
-        
+
         if (filingDeadlines) {
           const now = new Date();
           let daysToAdd = 0;
           let ruleDescription = '';
-          
+
           // Summons → Answer deadline (30 days from service)
           if (docType.includes('summons')) {
             if (filingDeadlines.answer_to_complaint) {
@@ -191,7 +192,7 @@ export async function POST(req: NextRequest) {
               ruleDescription = 'Discovery response deadline (30 days)';
             }
           }
-          
+
           if (daysToAdd > 0) {
             const deadlineDate = new Date(now.getTime() + daysToAdd * 24 * 60 * 60 * 1000);
             calculatedDeadline = {
@@ -201,6 +202,9 @@ export async function POST(req: NextRequest) {
             };
           }
         }
+      } catch (accessError) {
+        // File doesn't exist or can't be read - continue without deadline
+        safeWarn('Rules file not accessible:', accessError);
       }
     } catch (ruleError) {
       safeWarn('Failed to calculate deadline from rules:', ruleError);

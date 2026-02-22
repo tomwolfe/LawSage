@@ -559,8 +559,8 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
     // Export the document
     const docxModule = await import('docx');
     const { Packer } = docxModule;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const blob = await Packer.toBlob(doc as any);
+    // docx Packer.toBlob accepts a Document object - we cast to unknown first to bypass strict type checking
+    const blob = await Packer.toBlob(doc as unknown as Parameters<typeof Packer.toBlob>[0]);
     const url = URL.createObjectURL(blob);
 
     // Create a download link
@@ -632,25 +632,26 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
 
   // Helper function to create a California-style pleading header
   const createCaliforniaFilingHeader = async (
-    docx: any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    docxModule: typeof import('docx'),
     caseInfo: { attorneyName?: string; barNumber?: string; firmName?: string; partyName?: string; courtName?: string; caseNumber?: string; plaintiff?: string; defendant?: string; documentTitle?: string }
-  ): Promise<any[]> => { // eslint-disable-line @typescript-eslint/no-explicit-any
-    const { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType } = docx;
-    const newParagraph = (options: { text?: string; children?: any[] /* eslint-disable-line @typescript-eslint/no-explicit-any */; alignment?: string }) => {
+  ): Promise<unknown[]> => {
+    const { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType } = docxModule;
+    
+    const newParagraph = (options: { text?: string; children?: unknown[]; alignment?: string }) => {
       if (options.children) {
         return new Paragraph({
-          children: options.children,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          alignment: options.alignment as any
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        }) as any;
+          children: options.children as import('docx').ParagraphChild[],
+          alignment: options.alignment === 'center' ? AlignmentType.CENTER : 
+                     options.alignment === 'right' ? AlignmentType.RIGHT : 
+                     options.alignment === 'justified' ? AlignmentType.BOTH : 
+                     AlignmentType.LEFT
+        });
       }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return new Paragraph({ text: options.text || "" }) as any;
+      return new Paragraph({ text: options.text || '' });
     };
 
     const newTextRun = (options: { text?: string; bold?: boolean }) => {
-      return new TextRun({ text: options.text || "", bold: options.bold || false }) as unknown; // eslint-disable-line @typescript-eslint/no-explicit-any
+      return new TextRun({ text: options.text || '', bold: options.bold || false });
     };
 
     return [
@@ -1216,11 +1217,18 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                   onClick={() => copyToClipboard(displayStrategyText, 'strategy')}
                   className="absolute top-0 right-0 p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors z-10"
                   title={copyStatus.strategy ? "Copied!" : "Copy to clipboard"}
+                  aria-label="Copy strategy to clipboard"
                 >
                   <Copy size={16} />
                   <span>{copyStatus.strategy ? "Copied!" : "Copy"}</span>
                 </button>
-                <div className="prose max-w-none prose-slate mt-8">
+                <div 
+                  className="prose max-w-none prose-slate mt-8"
+                  role="region"
+                  aria-label="Legal strategy analysis"
+                  aria-live="polite"
+                  aria-busy={!!streamingPreview?.strategy && !structured?.strategy}
+                >
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {displayStrategyText}
                   </ReactMarkdown>
@@ -1238,11 +1246,17 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                   onClick={() => copyToClipboard(adversarialText, 'opposition-view')}
                   className="absolute top-0 right-0 p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors z-10"
                   title={copyStatus['opposition-view'] ? "Copied!" : "Copy to clipboard"}
+                  aria-label="Copy opposition view to clipboard"
                 >
                   <Copy size={16} />
                   <span>{copyStatus['opposition-view'] ? "Copied!" : "Copy"}</span>
                 </button>
-                <div className="prose max-w-none prose-slate mt-8">
+                <div 
+                  className="prose max-w-none prose-slate mt-8"
+                  role="region"
+                  aria-label="Opposition view and red-team analysis"
+                  aria-live="polite"
+                >
                   <h2 className="text-red-600 font-bold">Opposition View (Red-Team Analysis)</h2>
                   <p className="text-red-600 mb-4">This section presents potential challenges and counterarguments to your case:</p>
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -1570,8 +1584,8 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                       {structured.procedural_checks.map((check, index) => (
                         <li key={index} className="text-slate-700">
                           {/* DEFENSIVE RENDER: Handle objects returned by AI */}
-                          {typeof check === 'object' && check !== null 
-                            ? (check as any).check || (check as any).description || JSON.stringify(check)
+                          {typeof check === 'object' && check !== null
+                            ? String((check as Record<string, unknown>).check || (check as Record<string, unknown>).description || JSON.stringify(check))
                             : String(check)}
                         </li>
                       ))}

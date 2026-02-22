@@ -1,26 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import PDFDocument from 'pdfkit';
 import { Readable } from 'stream';
-import type PDFDocumentType from 'pdfkit';
-
-interface GeneratePdfRequest {
-  title: string;
-  content: string;
-  court?: string;
-  caseNumber?: string;
-  parties?: {
-    plaintiff: string;
-    defendant: string;
-  };
-  usePleadingPaper?: boolean;
-  metadata?: {
-    author?: string;
-    subject?: string;
-    keywords?: string;
-  };
-}
-
-type PDFDoc = InstanceType<typeof PDFDocument>;
+import type { PDFDoc, GeneratePdfRequest, CourtCaption } from '../../../types/legal-docs';
 
 /**
  * Convert a Readable stream to a Buffer
@@ -71,10 +52,10 @@ function drawPleadingLineNumbers(doc: PDFDoc, startY: number, endY: number) {
 /**
  * Draw court caption box
  */
-function drawCourtCaption(doc: PDFDoc, court: string, caseNumber: string, parties: any, yPosition: number) {
+function drawCourtCaption(doc: PDFDoc, court: string, caseNumber: string, parties: { plaintiff?: string; defendant?: string } | undefined, yPosition: number): number {
   const pageWidth = doc.page.width;
   const margin = 72; // 1 inch
-  
+
   // Court name
   doc.fontSize(14)
     .font('Helvetica-Bold')
@@ -82,7 +63,7 @@ function drawCourtCaption(doc: PDFDoc, court: string, caseNumber: string, partie
       align: 'center',
       width: pageWidth - margin * 2 - 100
     });
-  
+
   // Case number
   yPosition += 40;
   doc.fontSize(10)
@@ -91,7 +72,7 @@ function drawCourtCaption(doc: PDFDoc, court: string, caseNumber: string, partie
       align: 'right',
       width: pageWidth - margin * 2 - 100
     });
-  
+
   // Parties
   yPosition += 30;
   doc.fontSize(11)
@@ -100,7 +81,7 @@ function drawCourtCaption(doc: PDFDoc, court: string, caseNumber: string, partie
       align: 'left',
       width: pageWidth - margin * 2 - 100
     });
-  
+
   yPosition += 20;
   doc.fontSize(10)
     .font('Helvetica')
@@ -108,7 +89,7 @@ function drawCourtCaption(doc: PDFDoc, court: string, caseNumber: string, partie
       align: 'left',
       width: pageWidth - margin * 2 - 100
     });
-  
+
   yPosition += 20;
   doc.fontSize(11)
     .font('Helvetica-Bold')
@@ -116,7 +97,7 @@ function drawCourtCaption(doc: PDFDoc, court: string, caseNumber: string, partie
       align: 'left',
       width: pageWidth - margin * 2 - 100
     });
-  
+
   return yPosition + 40;
 }
 

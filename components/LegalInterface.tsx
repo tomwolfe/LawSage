@@ -776,13 +776,19 @@ export default function LegalInterface() {
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
         <div className="flex flex-col md:flex-row gap-4 mb-4">
           <div className="flex-1">
-            <label className="block text-sm font-semibold text-slate-700 mb-2">Your Situation</label>
+            <label htmlFor="situation-input" className="block text-sm font-semibold text-slate-700 mb-2">Your Situation</label>
             <textarea
+              id="situation-input"
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
               placeholder="Tell your story. Describe what happened and what you need help with..."
               className="w-full h-40 p-4 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+              aria-label="Describe your legal situation"
+              aria-describedby="situation-help"
             />
+            <p id="situation-help" className="sr-only">
+              Provide detailed information about your legal situation. The more details you provide, the better the analysis.
+            </p>
 
             {/* Document Upload - OCR Evidence */}
             <div className="mt-4">
@@ -851,11 +857,13 @@ export default function LegalInterface() {
           </div>
 
           <div className="md:w-64">
-            <label className="block text-sm font-semibold text-slate-700 mb-2">Jurisdiction</label>
+            <label htmlFor="jurisdiction-select" className="block text-sm font-semibold text-slate-700 mb-2">Jurisdiction</label>
             <select
+              id="jurisdiction-select"
               value={jurisdiction}
               onChange={(e) => setJurisdiction(e.target.value)}
               className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+              aria-label="Select your legal jurisdiction"
             >
               {US_STATES.map(state => (
                 <option key={state} value={state}>{state}</option>

@@ -142,11 +142,14 @@ export async function checkRateLimit(): Promise<{ allowed: boolean; remaining: n
       return { allowed: true, remaining: remaining - 1, resetAt };
     }
   } catch (error) {
-    safeWarn('Rate limit check failed, allowing request:', error);
+    // FAIL-CLOSED: Security-critical fix for DDoS protection
+    // In production, failing closed prevents serverless function exhaustion
+    // and API abuse when Redis is unavailable.
+    safeWarn('Rate limit service unavailable - FAILING CLOSED:', error);
     return {
-      allowed: true,
-      remaining: RATE_LIMIT_CONFIG.maxRequests - 1,
-      resetAt: now + RATE_LIMIT_CONFIG.windowMs
+      allowed: false,
+      remaining: 0,
+      resetAt: now + 60000 // 1 minute cooldown
     };
   }
 }
@@ -192,10 +195,11 @@ export async function getRateLimitStatus(): Promise<{ remaining: number; resetAt
       };
     }
   } catch (error) {
-    safeWarn('Failed to get rate limit status:', error);
+    // FAIL-CLOSED: Return zero remaining on error to prevent abuse
+    safeWarn('Rate limit status check failed - FAILING CLOSED:', error);
     return {
-      remaining: RATE_LIMIT_CONFIG.maxRequests,
-      resetAt: now + RATE_LIMIT_CONFIG.windowMs,
+      remaining: 0,
+      resetAt: now + 60000,
       limit: RATE_LIMIT_CONFIG.maxRequests,
     };
   }

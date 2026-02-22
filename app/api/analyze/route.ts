@@ -3,7 +3,7 @@ import { SafetyValidator } from '../../../lib/validation';
 import { safeLog, safeError, safeWarn, redactPII } from '../../../lib/pii-redactor';
 import { withRateLimit } from '../../../lib/rate-limiter';
 import { getLegalLookupResponse, searchExParteRules } from '../../../src/utils/legal-lookup';
-import fs from 'fs';
+import { readFile } from 'fs/promises';
 import path from 'path';
 
 // Define types
@@ -495,16 +495,16 @@ export async function POST(req: NextRequest) {
       }
 
       try {
-        // Read manifest directly from filesystem
+        // Read manifest directly from filesystem (async to avoid blocking event loop)
         const manifestPath = path.join(process.cwd(), 'public', 'templates', 'manifest.json');
-        const manifestRaw = fs.readFileSync(manifestPath, 'utf8');
+        const manifestRaw = await readFile(manifestPath, 'utf8');
         const manifest = JSON.parse(manifestRaw);
         const templates = manifest.templates || [];
         const { template: bestMatch } = findBestTemplate(user_input, templates);
 
         if (bestMatch) {
           const templatePath = path.join(process.cwd(), 'public', bestMatch.templatePath);
-          templateContent = fs.readFileSync(templatePath, 'utf8');
+          templateContent = await readFile(templatePath, 'utf8');
           safeLog(`Using template: ${bestMatch.title}`);
         } else {
           templateContent = GENERIC_MOTION_TEMPLATE;
@@ -533,7 +533,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Prepare the system prompt
-      const systemPrompt = `You are LawSage, a Public Defender AI helping pro se litigants.
+      const systemPrompt = `You are LawSage, a Pro Se Architect AI helping self-represented litigants.
 Your response MUST be a single, valid JSON object matching the schema provided in the user message.
 
 IMPORTANT LIMITATIONS:

@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "LawSage - The Universal Public Defender",
+  title: "LawSage - The Pro Se Architect",
   description: "Legal democratization platform for the people.",
 };
 
