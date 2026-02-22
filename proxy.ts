@@ -1,9 +1,9 @@
 /**
- * Next.js Middleware for Server-Side Rate Limiting
- * 
- * This middleware enforces rate limiting at the edge using Vercel KV
+ * Next.js Proxy for Server-Side Rate Limiting
+ *
+ * This proxy enforces rate limiting at the edge using Vercel KV
  * before requests reach API routes.
- * 
+ *
  * Security: Moves trust boundary from client to server
  */
 
@@ -116,9 +116,9 @@ async function checkRateLimit(
 }
 
 /**
- * Middleware function - runs on every request
+ * Proxy function - runs on every request
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // Only apply rate limiting to API routes
   const { pathname } = request.nextUrl;
   
@@ -176,7 +176,7 @@ export async function middleware(request: NextRequest) {
 }
 
 /**
- * Configure which routes the middleware runs on
+ * Configure which routes the proxy runs on
  */
 export const config = {
   matcher: [
