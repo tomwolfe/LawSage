@@ -1,31 +1,108 @@
 {
-  "state": "New York",
+  "jurisdiction": "New York",
+  "state_code": "NY",
+  "last_updated": "2025-01-15",
   "filing_deadlines": {
-    "complaint": "3 years for personal injury, 6 years for contract disputes",
-    "answer_to_complaint": "20 days from service of summons and complaint",
-    "motion_to_dismiss": "May be filed with or after answer",
+    "answer_to_complaint": {
+      "days": 20,
+      "description": "Answer must be served within 20 days after service of summons (CPLR § 320)",
+      "statute": "New York Civil Practice Law and Rules § 320",
+      "exceptions": [
+        "Extended to 30 days if summons is served by mail",
+        "Extended when served outside the state"
+      ]
+    },
+    "motion_to_dismiss": {
+      "days": 60,
+      "description": "Motion to Dismiss must be made before serving answer or within 60 days of service of summons",
+      "statute": "CPLR § 3211",
+      "exceptions": [
+        "May be consolidated with answer",
+        "Extension may be granted by stipulation or court order"
+      ]
+    },
     "discovery_deadlines": {
-      "depositions": "Must be noticed at least 7 days before the deposition date",
-      "disclosures": "Automatic disclosures required within 120 days of appearance",
-      "requests_for_admission": "30 days to respond",
-      "interrogatories": "30 days to respond",
-      "production_requests": "30 days to respond"
+      "interrogatories": {
+        "days": 20,
+        "description": "Response to interrogatories must be served within 20 days (CPLR § 3130)",
+        "statute": "CPLR § 3130"
+      },
+      "requests_for_admission": {
+        "days": 20,
+        "description": "Response to requests for admission must be served within 20 days",
+        "statute": "CPLR § 3123"
+      },
+      "deposition_notice": {
+        "days": 20,
+        "description": "Notice of examination must be served at least 20 days before deposition",
+        "statute": "CPLR § 3107"
+      }
     },
-    "trial_deadlines": "Depends on court docket, typically 12-24 months",
-    "appeal_deadlines": "30 days from notice of entry of judgment"
-  },
-  "court_procedures": {
-    "mandatory_arbitration": "Cases under $50,000 may be subject to mandatory arbitration",
-    "case_management_conferences": "Scheduled within 60 days of filing",
-    "pre_trial_conferences": "Scheduled 45 days before trial"
-  },
-  "filing_requirements": {
-    "fee_schedule": {
-      "filing_fee": "$210-405 depending on county and case type",
-      "service_fee": "$15-35 per service",
-      "miscellaneous_fees": "Varies by county and specific requirements"
+    "motion_filing": {
+      "notice_period": 8,
+      "description": "Notice of motion must be served at least 8 days before hearing (CPLR § 2214)",
+      "statute": "CPLR § 2214",
+      "exceptions": [
+        "Extended by 3 days if served by mail",
+        "Order to show cause may have shorter notice"
+      ]
     },
-    "document_format": "14-point font minimum for signatures, standard legal formatting",
-    "page_limits": "Limited by local rules, typically 10-25 pages for motions"
+    "appeal_deadline": {
+      "days": 30,
+      "description": "Notice of Appeal must be filed within 30 days after service of order or judgment with notice of entry (CPLR § 5513)",
+      "statute": "CPLR § 5513"
+    }
+  },
+  "ex_parte_rules": {
+    "notice_period": {
+      "hours": 1,
+      "description": "Ex parte applications may be made without notice in emergency situations",
+      "statute": "CPLR § 5701"
+    },
+    "filing_time": {
+      "time": "9:30 AM",
+      "description": "Ex parte applications typically heard during morning motion sessions",
+      "statute": "Local rules vary by county"
+    },
+    "requirements": [
+      "Affidavit showing immediate and irreparable injury",
+      "Affidavit of efforts to notify or explanation why notice should not be required",
+      "Proposed order",
+      "Request for expedited hearing if applicable"
+    ]
+  },
+  "service_rules": {
+    "substituted_service": {
+      "allowed": true,
+      "requirements": [
+        "Due diligence showing personal service cannot be made",
+        "Service on person of suitable age and discretion at actual place of business or dwelling",
+        "Mailing copy to defendant's last known address within 10 days"
+      ],
+      "statute": "CPLR § 308(2)"
+    },
+    "service_by_mail": {
+      "extension": 5,
+      "description": "Service by mail extends response time by 5 days (CPLR § 2103)",
+      "statute": "CPLR § 2103"
+    },
+    "electronic_service": {
+      "extension": 1,
+      "description": "Electronic service extends response time by 1 day",
+      "statute": "CPLR § 2103"
+    }
+  },
+  "court_fees": {
+    "first_paper_filing": 210,
+    "motion_filing": 45,
+    "appearance_fee": 0,
+    "fee_waiver_available": true,
+    "fee_waiver_form": "Poor Person Order Application"
+  },
+  "local_rules_urls": {
+    "state_courts": "https://www.nycourts.gov/rules/",
+    "new_york_county": "https://www.nycourts.gov/courts/1jd/supctmanh/Rules/",
+    "kings_county": "https://www.nycourts.gov/courts/2jd/kings/civilrules.shtml",
+    "queens_county": "https://www.nycourts.gov/courts/2jd/queens/civilrules.shtml"
   }
 }

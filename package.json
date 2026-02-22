@@ -2,13 +2,16 @@
   "name": "lawsage",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "test": "jest",
-    "update-legal-data": "node scripts/update-legal-data.js"
+    "validate": "node scripts/validate.js",
+    "update-legal-data": "node scripts/update-legal-data.js",
+    "prepare": "husky || true"
   },
   "dependencies": {
     "@tailwindcss/typography": "^0.5.19",

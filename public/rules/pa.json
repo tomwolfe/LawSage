@@ -1,31 +1,108 @@
 {
-  "state": "Pennsylvania",
+  "jurisdiction": "Pennsylvania",
+  "state_code": "PA",
+  "last_updated": "2025-01-15",
   "filing_deadlines": {
-    "complaint": "2 years for personal injury, 4 years for contract disputes",
-    "answer_to_complaint": "20 days from service of process",
-    "motion_to_dismiss": "20 days from service of process or within 21 days after answer",
+    "answer_to_complaint": {
+      "days": 20,
+      "description": "Answer must be filed within 20 days after service of original process (Pa.R.C.P. § 1026)",
+      "statute": "Pennsylvania Rules of Civil Procedure § 1026",
+      "exceptions": [
+        "Extended to 30 days if service is by mail",
+        "Extended when service is outside Pennsylvania"
+      ]
+    },
+    "motion_to_dismiss": {
+      "days": 20,
+      "description": "Preliminary objections must be filed within 20 days after service of complaint",
+      "statute": "Pennsylvania Rules of Civil Procedure § 1028",
+      "exceptions": [
+        "May be filed with leave of court after deadline",
+        "Must be filed before answer to preserve defenses"
+      ]
+    },
     "discovery_deadlines": {
-      "depositions": "Must be noticed at least 5 days before the deposition date",
-      "disclosures": "Automatic disclosures required within 30 days of service",
-      "requests_for_admission": "30 days to respond",
-      "interrogatories": "30 days to respond",
-      "production_requests": "30 days to respond"
+      "interrogatories": {
+        "days": 30,
+        "description": "Response to interrogatories must be served within 30 days (Pa.R.C.P. § 4007)",
+        "statute": "Pennsylvania Rules of Civil Procedure § 4007"
+      },
+      "requests_for_admission": {
+        "days": 30,
+        "description": "Response to requests for admission must be served within 30 days (Pa.R.C.P. § 4014)",
+        "statute": "Pennsylvania Rules of Civil Procedure § 4014"
+      },
+      "deposition_notice": {
+        "days": 10,
+        "description": "Notice of deposition must be served at least 10 days before deposition",
+        "statute": "Pennsylvania Rules of Civil Procedure § 4007.1"
+      }
     },
-    "trial_deadlines": "Depends on court docket, typically 12-18 months",
-    "appeal_deadlines": "30 days from entry of final judgment"
-  },
-  "court_procedures": {
-    "mandatory_arbitration": "Cases under $50,000 may be subject to mandatory arbitration",
-    "case_management_conferences": "Scheduled within 30 days of filing",
-    "pre_trial_conferences": "Scheduled 30 days before trial"
-  },
-  "filing_requirements": {
-    "fee_schedule": {
-      "filing_fee": "$150-300 depending on county",
-      "service_fee": "$20-40 per service",
-      "miscellaneous_fees": "Varies by county and specific requirements"
+    "motion_filing": {
+      "notice_period": 5,
+      "description": "Notice of motion must be served at least 5 days before hearing",
+      "statute": "Pennsylvania Rules of Civil Procedure § 208.3",
+      "exceptions": [
+        "Extended by 3 days if served by mail",
+        "Emergency motions may be heard on shorter notice"
+      ]
     },
-    "document_format": "12-point font, double-spaced, standard margins",
-    "page_limits": "Limited by local rules, typically 10-15 pages for motions"
+    "appeal_deadline": {
+      "days": 30,
+      "description": "Notice of Appeal must be filed within 30 days after entry of order (Pa.R.A.P. § 903)",
+      "statute": "Pennsylvania Rules of Appellate Procedure § 903"
+    }
+  },
+  "ex_parte_rules": {
+    "notice_period": {
+      "hours": 24,
+      "description": "Ex parte applications require reasonable notice unless immediate irreparable harm is shown",
+      "statute": "Pennsylvania Rules of Civil Procedure § 1531"
+    },
+    "filing_time": {
+      "time": "9:00 AM",
+      "description": "Ex parte applications typically heard at morning motion session",
+      "statute": "Local rules vary by county"
+    },
+    "requirements": [
+      "Verified complaint or affidavit showing specific facts",
+      "Certificate of good faith effort to notify or explanation why notice should not be required",
+      "Proposed order or injunction",
+      "Security/bond if injunction is granted"
+    ]
+  },
+  "service_rules": {
+    "substituted_service": {
+      "allowed": true,
+      "requirements": [
+        "Affidavit showing diligent search and inquiry",
+        "Service on adult member of household at residence",
+        "Mailing copy to defendant's last known address"
+      ],
+      "statute": "Pa.R.C.P. § 402(a)(2)"
+    },
+    "service_by_mail": {
+      "extension": 3,
+      "description": "Service by mail extends response time by 3 days (Pa.R.C.P. § 1011)",
+      "statute": "Pennsylvania Rules of Civil Procedure § 1011"
+    },
+    "electronic_service": {
+      "extension": 1,
+      "description": "Electronic service extends response time by 1 day",
+      "statute": "Pennsylvania Rules of Civil Procedure § 1011"
+    }
+  },
+  "court_fees": {
+    "first_paper_filing": 213,
+    "motion_filing": 0,
+    "appearance_fee": 0,
+    "fee_waiver_available": true,
+    "fee_waiver_form": "Petition to Proceed In Forma Pauperis"
+  },
+  "local_rules_urls": {
+    "state_courts": "https://www.pacourts.us/courts/supreme-court/rules-of-civil-procedure",
+    "philadelphia": "https://courts.phila.gov/rules",
+    "allegheny": "https://www.alleghenycourt.us/rules/",
+    "pennsylvania_supreme": "https://www.pacourts.us/courts/supreme-court"
   }
 }

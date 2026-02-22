@@ -1,15 +1,30 @@
 /**
  * Client-side rate limiting and fingerprinting utilities
  * These are safe to use in React Client Components
+ * 
+ * DEPRECATED: This module provides client-side rate limiting only.
+ * Server-side rate limiting is enforced in middleware.ts using Vercel KV.
+ * Client-side limits are for UI feedback only and should not be trusted.
+ * 
+ * Security Note: Trust boundary is now at the server (middleware.ts).
+ * Client-side checks are purely informational.
  */
 
 import { safeLog, safeWarn } from './pii-redactor';
+import { RATE_LIMIT } from '../config/constants';
 
-// Shared rate limit configuration
+// Re-export for backward compatibility (deprecated)
 export const RATE_LIMIT_CONFIG = {
-  windowMs: 60 * 60 * 1000, // 1 hour window
-  maxRequests: 5, // Max 5 requests per window
-  keyPrefix: 'ratelimit:',
+  windowMs: RATE_LIMIT.WINDOW_MS,
+  maxRequests: RATE_LIMIT.MAX_REQUESTS,
+  keyPrefix: RATE_LIMIT.KEY_PREFIX,
+};
+
+// Use constants from config internally
+const CLIENT_RATE_LIMIT_CONFIG = {
+  windowMs: RATE_LIMIT.WINDOW_MS,
+  maxRequests: RATE_LIMIT.MAX_REQUESTS,
+  keyPrefix: RATE_LIMIT.KEY_PREFIX,
 };
 
 /**
@@ -72,48 +87,49 @@ export function getClientSideRateLimitKey(): string {
 
 /**
  * Check rate limit on client-side (localStorage-based)
+ * DEPRECATED: For UI feedback only. Server-side rate limiting in middleware.ts is authoritative.
  */
 export function checkClientSideRateLimit(): { allowed: boolean; remaining: number; resetAt: number } {
   try {
     if (typeof localStorage === 'undefined') {
-      return { allowed: true, remaining: RATE_LIMIT_CONFIG.maxRequests - 1, resetAt: Date.now() + RATE_LIMIT_CONFIG.windowMs };
+      return { allowed: true, remaining: CLIENT_RATE_LIMIT_CONFIG.maxRequests - 1, resetAt: Date.now() + CLIENT_RATE_LIMIT_CONFIG.windowMs };
     }
 
     const key = getClientSideRateLimitKey();
     const now = Date.now();
     const stored = localStorage.getItem(key);
-    
+
     if (!stored) {
       // No previous requests, allow
-      const resetAt = now + RATE_LIMIT_CONFIG.windowMs;
+      const resetAt = now + CLIENT_RATE_LIMIT_CONFIG.windowMs;
       localStorage.setItem(key, JSON.stringify({
         timestamps: [now],
         expiresAt: resetAt + 60000, // 1 minute buffer
       }));
-      return { allowed: true, remaining: RATE_LIMIT_CONFIG.maxRequests - 1, resetAt };
+      return { allowed: true, remaining: CLIENT_RATE_LIMIT_CONFIG.maxRequests - 1, resetAt };
     }
 
     const data = JSON.parse(stored) as { timestamps: number[]; expiresAt: number };
-    
+
     // Check if data has expired
     if (data.expiresAt < now) {
       // Reset window
-      const resetAt = now + RATE_LIMIT_CONFIG.windowMs;
+      const resetAt = now + CLIENT_RATE_LIMIT_CONFIG.windowMs;
       localStorage.setItem(key, JSON.stringify({
         timestamps: [now],
         expiresAt: resetAt + 60000,
       }));
-      return { allowed: true, remaining: RATE_LIMIT_CONFIG.maxRequests - 1, resetAt };
+      return { allowed: true, remaining: CLIENT_RATE_LIMIT_CONFIG.maxRequests - 1, resetAt };
     }
 
     // Filter timestamps within current window
-    const windowStart = now - RATE_LIMIT_CONFIG.windowMs;
+    const windowStart = now - CLIENT_RATE_LIMIT_CONFIG.windowMs;
     const validTimestamps = data.timestamps.filter(ts => ts > windowStart);
     const requestCount = validTimestamps.length;
-    const remaining = Math.max(0, RATE_LIMIT_CONFIG.maxRequests - requestCount);
-    const resetAt = now + RATE_LIMIT_CONFIG.windowMs;
+    const remaining = Math.max(0, CLIENT_RATE_LIMIT_CONFIG.maxRequests - requestCount);
+    const resetAt = now + CLIENT_RATE_LIMIT_CONFIG.windowMs;
 
-    if (requestCount >= RATE_LIMIT_CONFIG.maxRequests) {
+    if (requestCount >= CLIENT_RATE_LIMIT_CONFIG.maxRequests) {
       return { allowed: false, remaining: 0, resetAt };
     }
 
@@ -127,42 +143,43 @@ export function checkClientSideRateLimit(): { allowed: boolean; remaining: numbe
     return { allowed: true, remaining: remaining - 1, resetAt };
   } catch (error) {
     safeWarn('Client-side rate limit check failed, allowing request:', error);
-    // Fail open
-    return { allowed: true, remaining: RATE_LIMIT_CONFIG.maxRequests - 1, resetAt: Date.now() + RATE_LIMIT_CONFIG.windowMs };
+    // Fail open - server will enforce limits
+    return { allowed: true, remaining: CLIENT_RATE_LIMIT_CONFIG.maxRequests - 1, resetAt: Date.now() + CLIENT_RATE_LIMIT_CONFIG.windowMs };
   }
 }
 
 /**
  * Get client-side rate limit status without consuming a request
+ * DEPRECATED: For UI feedback only. Server-side rate limiting in middleware.ts is authoritative.
  */
 export function getClientSideRateLimitStatus(): { remaining: number; resetAt: number; limit: number } {
   try {
     if (typeof localStorage === 'undefined') {
-      return { remaining: RATE_LIMIT_CONFIG.maxRequests, resetAt: Date.now() + RATE_LIMIT_CONFIG.windowMs, limit: RATE_LIMIT_CONFIG.maxRequests };
+      return { remaining: CLIENT_RATE_LIMIT_CONFIG.maxRequests, resetAt: Date.now() + CLIENT_RATE_LIMIT_CONFIG.windowMs, limit: CLIENT_RATE_LIMIT_CONFIG.maxRequests };
     }
 
     const key = getClientSideRateLimitKey();
     const now = Date.now();
     const stored = localStorage.getItem(key);
-    
+
     if (!stored) {
-      return { remaining: RATE_LIMIT_CONFIG.maxRequests, resetAt: now + RATE_LIMIT_CONFIG.windowMs, limit: RATE_LIMIT_CONFIG.maxRequests };
+      return { remaining: CLIENT_RATE_LIMIT_CONFIG.maxRequests, resetAt: now + CLIENT_RATE_LIMIT_CONFIG.windowMs, limit: CLIENT_RATE_LIMIT_CONFIG.maxRequests };
     }
 
     const data = JSON.parse(stored) as { timestamps: number[]; expiresAt: number };
-    
+
     if (data.expiresAt < now) {
-      return { remaining: RATE_LIMIT_CONFIG.maxRequests, resetAt: now + RATE_LIMIT_CONFIG.windowMs, limit: RATE_LIMIT_CONFIG.maxRequests };
+      return { remaining: CLIENT_RATE_LIMIT_CONFIG.maxRequests, resetAt: now + CLIENT_RATE_LIMIT_CONFIG.windowMs, limit: CLIENT_RATE_LIMIT_CONFIG.maxRequests };
     }
 
-    const windowStart = now - RATE_LIMIT_CONFIG.windowMs;
+    const windowStart = now - CLIENT_RATE_LIMIT_CONFIG.windowMs;
     const validTimestamps = data.timestamps.filter(ts => ts > windowStart);
     const requestCount = validTimestamps.length;
-    const remaining = Math.max(0, RATE_LIMIT_CONFIG.maxRequests - requestCount);
+    const remaining = Math.max(0, CLIENT_RATE_LIMIT_CONFIG.maxRequests - requestCount);
 
-    return { remaining, resetAt: now + RATE_LIMIT_CONFIG.windowMs, limit: RATE_LIMIT_CONFIG.maxRequests };
+    return { remaining, resetAt: now + CLIENT_RATE_LIMIT_CONFIG.windowMs, limit: CLIENT_RATE_LIMIT_CONFIG.maxRequests };
   } catch (error) {
     safeWarn('Failed to get client-side rate limit status:', error);
-    return { remaining: RATE_LIMIT_CONFIG.maxRequests, resetAt: Date.now() + RATE_LIMIT_CONFIG.windowMs, limit: RATE_LIMIT_CONFIG.maxRequests };
+    return { remaining: CLIENT_RATE_LIMIT_CONFIG.maxRequests, resetAt: Date.now() + CLIENT_RATE_LIMIT_CONFIG.windowMs, limit: CLIENT_RATE_LIMIT_CONFIG.maxRequests };
   }
 }
