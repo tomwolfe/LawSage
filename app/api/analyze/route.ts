@@ -8,6 +8,36 @@ import templateManifest from '../../../public/templates/manifest.json';
 
 export const runtime = 'edge';
 
+/**
+ * Repairs truncated JSON strings caused by token limits or streaming interruptions.
+ * Handles unclosed strings, braces, and brackets.
+ */
+function repairTruncatedJSON(jsonString: string): string {
+  let cleaned = jsonString.trim();
+  
+  // Remove markdown code block wrappers if present
+  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+  // Fix unclosed strings: count quotes (ignoring escaped ones)
+  const matches = cleaned.match(/"/g);
+  if (matches && matches.length % 2 !== 0) {
+    // We have an odd number of quotes, meaning the last one is open
+    cleaned += '"'; 
+  }
+
+  // Count braces and brackets
+  const openBraces = (cleaned.match(/\{/g) || []).length;
+  const closeBraces = (cleaned.match(/\}/g) || []).length;
+  const openBuckets = (cleaned.match(/\[/g) || []).length;
+  const closeBuckets = (cleaned.match(/\]/g) || []).length;
+
+  // Close unclosed structures in reverse order
+  for (let i = 0; i < openBuckets - closeBuckets; i++) cleaned += ']';
+  for (let i = 0; i < openBraces - closeBraces; i++) cleaned += '}';
+
+  return cleaned;
+}
+
 interface LegalRequest {
   user_input: string;
   jurisdiction: string;
@@ -291,6 +321,12 @@ STRICT OPERATIONAL CONSTRAINTS:
 2. LEGAL ACCURACY: Use Wis. Stat. Chapter 823 for Nuisance. Do not use 895.48 for noise.
 3. CITATION MINIMUM: You must provide 3-5 real citations.
 4. CHAIN OF THOUGHT: Before generating the JSON, mentally verify if the statute actually exists for that topic.
+
+STRICT BREVITY CONSTRAINTS FOR VERCEL HOBBY TIER:
+5. CONCISE STRATEGY: Keep 'strategy' and 'adversarial_strategy' to 2-3 concise paragraphs each (max 400 words total).
+6. TEMPLATE LIMIT: In 'filing_template', provide core structure and essential allegations only. Do NOT exceed 800 words.
+7. FOCUSED ROADMAP: Limit roadmap to 3-5 essential steps. Keep each step description under 100 words.
+8. TOKEN BUDGET: You have a limited token budget. Prioritize substance over verbosity.
 
 **CRITICAL: JSON KEY NAMING REQUIREMENTS**
 You MUST use EXACTLY these key names in your JSON response. DO NOT use synonyms or variations:
@@ -675,7 +711,7 @@ CRITICAL INSTRUCTIONS:
                 tools: [legalAnalysisTool],
                 tool_choice: tool_choice,
                 temperature: 0.2,
-                max_tokens: 4096,
+                max_tokens: 3500,
                 stream: true
               }),
               signal: abortController.signal
@@ -805,9 +841,21 @@ CRITICAL INSTRUCTIONS:
                 throw new Error('Empty response from GLM API');
               }
 
-              const cleanedJson = accumulatedToolArgs.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+              // First attempt: repair and parse
+              const cleanedJson = repairTruncatedJSON(accumulatedToolArgs);
 
-              parsedOutput = JSON.parse(cleanedJson) as LegalOutput;
+              try {
+                parsedOutput = JSON.parse(cleanedJson) as LegalOutput;
+              } catch (repairError) {
+                // If repair fails, try the partial JSON parser as fallback
+                safeWarn("JSON repair failed, attempting partial parse:", repairError);
+                const { parsePartialJSON } = await import('../../../lib/streaming-json-parser');
+                parsedOutput = parsePartialJSON<LegalOutput>(accumulatedToolArgs);
+                
+                if (!parsedOutput) {
+                  throw new Error("Could not recover any usable data from AI response");
+                }
+              }
 
               const validation = validateLegalOutputStructure(parsedOutput);
 
