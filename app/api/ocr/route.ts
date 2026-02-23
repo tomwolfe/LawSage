@@ -3,6 +3,8 @@ import { safeLog, safeError, safeWarn } from '../../../lib/pii-redactor';
 import { validateOCRResult } from '../../../lib/schemas/legal-output';
 import { readFile, access } from 'fs/promises';
 import path from 'path';
+import crypto from 'crypto';
+import { redis, KEY_PREFIX } from '../../../lib/redis';
 
 interface StandardErrorResponse {
   type: string;
@@ -12,6 +14,13 @@ interface StandardErrorResponse {
 interface OCRRequest {
   image: string; // base64 encoded image
 }
+
+/**
+ * OCR Cache TTL - 7 days
+ * OCR results are cached to avoid re-processing identical documents
+ * and to stay within Vercel Hobby tier rate limits
+ */
+const OCR_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
 export const runtime = 'nodejs'; // Use Node.js runtime for fs access to rules files
 
@@ -37,6 +46,22 @@ export async function POST(req: NextRequest) {
         } satisfies StandardErrorResponse,
         { status: 400 }
       );
+    }
+
+    // Generate cache key from image hash (SHA-256 of first 10KB for performance)
+    const imageHash = crypto.createHash('sha256').update(image.substring(0, 10000)).digest('hex');
+    const cacheKey = `${KEY_PREFIX}ocr:${imageHash}`;
+
+    // Check cache first - avoid re-processing identical documents
+    try {
+      const cachedResult = await redis.get(cacheKey);
+      if (cachedResult) {
+        safeLog(`OCR cache hit for image hash: ${imageHash.substring(0, 16)}...`);
+        return NextResponse.json(cachedResult as Record<string, unknown>);
+      }
+    } catch (cacheError) {
+      // Cache unavailable - continue without caching
+      safeWarn('Redis cache unavailable, proceeding without caching:', cacheError);
     }
 
     const apiKey = process.env.GLM_API_KEY;
@@ -212,12 +237,21 @@ export async function POST(req: NextRequest) {
     }
 
     safeLog('OCR processing successful');
-    
+
     // Return OCR data with calculated deadline if available
-    const responseData = calculatedDeadline 
+    const responseData = calculatedDeadline
       ? { ...ocrData, calculated_deadline: calculatedDeadline }
       : ocrData;
-    
+
+    // Cache the result for future requests
+    try {
+      await redis.set(cacheKey, responseData, { ex: OCR_CACHE_TTL_SECONDS });
+      safeLog(`OCR result cached with TTL: ${OCR_CACHE_TTL_SECONDS}s`);
+    } catch (cacheError) {
+      safeWarn('Failed to cache OCR result:', cacheError);
+      // Don't fail the request if caching fails
+    }
+
     return NextResponse.json(responseData);
   } catch (error: unknown) {
     safeError("Error in OCR API route:", error);

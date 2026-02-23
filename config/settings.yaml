@@ -1,2 +1,28 @@
+# LawSage Configuration
+# This file documents the current model and feature configuration
+
 model:
-  id: "gemini-2.5-flash-preview-09-2025"
+  # Primary analysis model (GLM via Zhipu AI)
+  id: "glm-4.7-flash"
+  # Alternative model for testing (commented out)
+  # id: "gemini-2.5-flash-preview-09-2025"
+  
+features:
+  # RAG (Retrieval Augmented Generation) using Upstash Vector
+  vector_search: true
+  # OCR with Redis caching
+  ocr_caching: true
+  # Case encryption for privacy
+  case_encryption: true
+  # Pleading paper PDF generation
+  pleading_paper_pdf: true
+  # Strength meter visualization
+  strength_meter: true
+  # Counter-measure analysis in roadmap
+  counter_measures: true
+
+runtime:
+  # API routes use Node.js runtime for fs access
+  # Edge runtime used where possible for better performance
+  api: "nodejs"
+  vector_search: "edge"

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import PDFDocument from 'pdfkit';
 import { Readable } from 'stream';
 import type { PDFDoc, GeneratePdfRequest, CourtCaption } from '../../../types/legal-docs';
+import { generatePleadingPaperTemplate, paginateText, calculateLineCount } from '../../../lib/pleading-paper-template';
 
 /**
  * Convert a Readable stream to a Buffer

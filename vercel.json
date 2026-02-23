@@ -2,6 +2,12 @@
   "functions": {
     "app/api/**/*": {
       "maxDuration": 60
+    },
+    "app/api/vector/**/*": {
+      "maxDuration": 30
+    },
+    "app/api/ocr": {
+      "maxDuration": 60
     }
   },
   "headers": [
@@ -34,7 +40,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.z.ai https://www.courtlistener.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.z.ai https://www.courtlistener.com https://upstash109159.usw11.upstash.io; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         }
       ]
     },
@@ -59,7 +65,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.z.ai https://www.courtlistener.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://api.z.ai https://www.courtlistener.com https://upstash109159.usw11.upstash.io; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
         }
       ]
     }

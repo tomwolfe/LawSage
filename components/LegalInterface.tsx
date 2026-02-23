@@ -932,6 +932,7 @@ export default function LegalInterface() {
           addToCaseLedger={addToCaseLedger}
           caseLedger={caseLedger}
           streamingPreview={streamingPreview}
+          documents={evidence.map(e => e.extracted_text).filter(Boolean)}
         />
       )}
     </div>

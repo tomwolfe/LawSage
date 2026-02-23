@@ -11,6 +11,8 @@ import { LegalMotion, MotionToDismiss, MotionForDiscovery, validateLegalMotion }
 import { verifyCitationWithCache } from '../src/utils/citation-cache';
 import { safeError } from '../lib/pii-redactor';
 import { CaseLedgerEntry } from './LegalInterface';
+import { StrengthMeter } from './StrengthMeter';
+import { motion, AnimatePresence } from 'framer-motion';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -71,6 +73,7 @@ interface ResultDisplayProps {
   addToCaseLedger: (eventType: 'complaint_filed' | 'answer_due' | 'motion_submitted' | 'discovery_served' | 'trial_date_set' | 'other', description: string, dueDate?: Date) => void;
   caseLedger: CaseLedgerEntry[];
   streamingPreview?: { strategy?: string; roadmap?: string } | null;
+  documents?: string[]; // OCR-extracted evidence documents
 }
 
 // Helper function to calculate deadline from roadmap
@@ -272,7 +275,7 @@ ${String(f.body || f.description || 'Filing content generation failed.')}
   };
 }
 
-export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdiction, apiKey, addToCaseLedger, caseLedger, streamingPreview }: ResultDisplayProps) {
+export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdiction, apiKey, addToCaseLedger, caseLedger, streamingPreview, documents }: ResultDisplayProps) {
   const [copyStatus, setCopyStatus] = useState<{[key: string]: boolean | string}>({ all: false, 'opposition-view': false, 'survival-guide': false });
   const [citationVerificationStatus, setCitationVerificationStatus] = useState<{[key: string]: {
     is_verified: boolean | undefined;
@@ -1204,15 +1207,32 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
       </div>
 
       <div className="flex-1 p-6 overflow-y-auto">
-        {(() => {
-          if (activeTab === 'strategy') {
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+          >
+            {(() => {
+              if (activeTab === 'strategy') {
             // Use streaming preview if available and no complete result yet
             const displayStrategyText = streamingPreview?.strategy && !structured?.strategy
               ? `## Strategy (Streaming Preview)\n\n${streamingPreview.strategy}\n\n_More content being generated..._`
               : strategyText;
-              
+
             return (
               <div className="relative">
+                {/* Strength Meter - Visual case assessment */}
+                <StrengthMeter
+                  documents={documents}
+                  citations={structured?.citations || []}
+                  roadmapLength={structured?.roadmap?.length || 0}
+                  hasAdversarialStrategy={!!structured?.adversarial_strategy}
+                  jurisdiction={jurisdiction}
+                />
+
                 <button
                   onClick={() => copyToClipboard(displayStrategyText, 'strategy')}
                   className="absolute top-0 right-0 p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg flex items-center gap-1 text-sm font-semibold transition-colors z-10"
@@ -1222,7 +1242,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                   <Copy size={16} />
                   <span>{copyStatus.strategy ? "Copied!" : "Copy"}</span>
                 </button>
-                <div 
+                <div
                   className="prose max-w-none prose-slate mt-8"
                   role="region"
                   aria-label="Legal strategy analysis"
@@ -1841,6 +1861,8 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
             </div>
           );
         })()}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       {/* Validation Summary - appears at the bottom of all tabs */}

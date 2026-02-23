@@ -5,6 +5,7 @@ import { withRateLimit } from '../../../lib/rate-limiter';
 import { getLegalLookupResponse, searchExParteRules } from '../../../src/utils/legal-lookup';
 import { readFile } from 'fs/promises';
 import path from 'path';
+import { searchLegalRules, isVectorConfigured } from '../../../lib/vector';
 
 // Define types
 interface LegalRequest {
@@ -30,7 +31,14 @@ interface LegalOutput {
   disclaimer?: string;
   strategy?: string;
   adversarial_strategy?: string;
-  roadmap?: Array<{ step: number; title: string; description: string; estimated_time?: string; required_documents?: string[] }>;
+  roadmap?: Array<{ 
+    step: number; 
+    title: string; 
+    description: string; 
+    estimated_time?: string; 
+    required_documents?: string[];
+    counter_measure?: string; // Counter-measure for expected opposition response
+  }>;
   filing_template?: string;
   citations?: Array<{ text: string; source?: string; url?: string }>;
   local_logistics?: Record<string, unknown>;
@@ -413,7 +421,7 @@ CRITICAL INSTRUCTIONS:
 10. CRITICAL: You are under oath to provide substantive, non-placeholder content for every field. Failure to provide a real roadmap will result in a system error.
 `;
 
-export const runtime = 'nodejs'; // Use Node.js runtime for fs access
+export const runtime = 'nodejs'; // Use Node.js runtime for fs access to template files
 
 const GLM_API_URL = "https://api.z.ai/api/paas/v4/chat/completions";
 
@@ -470,12 +478,44 @@ export async function POST(req: NextRequest) {
         safeLog(`Processing request for jurisdiction: ${jurisdiction}`);
       }
 
-      // Static grounding layer - check common procedural questions first (saves API calls)
-      const staticResponse = await getLegalLookupResponse(`${user_input} ${jurisdiction}`);
+      // === ENHANCED RAG LAYER: Vector Search + Static Grounding ===
+      // Priority 1: Vector search for semantic similarity (if configured)
+      // Priority 2: Static JSON lookup for common procedural questions
+      let researchContext = "";
+      let vectorResultsCount = 0;
 
-      if (staticResponse) {
-        safeLog('Static grounding match found, returning cached response');
-        return NextResponse.json(staticResponse);
+      // Try vector search first (falls back gracefully if not configured)
+      if (isVectorConfigured()) {
+        try {
+          const vectorResults = await searchLegalRules(`${user_input} ${jurisdiction}`, {
+            jurisdiction: jurisdiction !== 'Federal' ? jurisdiction : undefined,
+            topK: 5,
+            threshold: 40,
+          });
+
+          if (vectorResults.length > 0) {
+            vectorResultsCount = vectorResults.length;
+            researchContext = "RELEVANT LEGAL RULES (Vector Search Results):\n\n";
+            vectorResults.forEach((result, index) => {
+              researchContext += `[Source ${index + 1}] ${result.metadata.rule_number} - ${result.metadata.title}\n`;
+              researchContext += `  ${result.metadata.description}\n`;
+              researchContext += `  Jurisdiction: ${result.metadata.jurisdiction}\n`;
+              researchContext += `  Similarity Score: ${Math.round(result.score)}%\n\n`;
+            });
+            safeLog(`Vector RAG: Found ${vectorResultsCount} relevant rules`);
+          }
+        } catch (vectorError) {
+          safeWarn('Vector search failed, falling back to static lookup:', vectorError);
+        }
+      }
+
+      // Fallback to static JSON lookup if vector search returned no results
+      if (!researchContext) {
+        const staticResponse = await getLegalLookupResponse(`${user_input} ${jurisdiction}`);
+        if (staticResponse) {
+          safeLog('Static grounding match found');
+          researchContext = `MANDATORY RESEARCH CONTEXT:\n${(staticResponse as { text: string }).text}\n`;
+        }
       }
 
       // Template injection - use fs.readFileSync instead of fetch to avoid network round-trips
@@ -564,29 +604,29 @@ Situation: ${safeInput}
 
 ${documents && documents.length > 0 ? `\nEVIDENCE DOCUMENTS PROVIDED: ${documents.length} document(s) have been uploaded. Cross-reference the user's claims against these official court documents. Identify any contradictions and use specific case details from the evidence in your analysis.\n` : ''}
 
-${staticResponse ? `
-MANDATORY RESEARCH CONTEXT (Source of Truth - YOU MUST USE THESE STATUTES):
-${(staticResponse as { text: string }).text}
+${researchContext ? `
+${researchContext}
 
-CRITICAL: You MUST use the statute numbers provided in the RESEARCH CONTEXT above. If the context mentions Wis. Stat. § 823.01, do NOT use other numbers for nuisance. This is a mandatory source priority rule.
+CRITICAL: You MUST use the statute numbers and legal rules provided in the RESEARCH CONTEXT above. This is verified legal data from Upstash Vector (RAG). If the context mentions Wis. Stat. § 823.01, do NOT use other numbers for nuisance. This is a mandatory source priority rule.
 ` : ""}
 
 Return a COMPLETE JSON response with ALL required fields:
 - disclaimer
 - strategy
-- adversarial_strategy (detailed red-team analysis)
-- roadmap (at least 3 steps)
+- adversarial_strategy (detailed red-team analysis with COUNTER-MEASURES for each step)
+- roadmap (at least 3 steps, each with a "counter_measure" sub-field explaining expected opposition response)
 - filing_template
 - citations (at least 3)
 - local_logistics
 - procedural_checks
 
 CRITICAL INSTRUCTIONS:
-1. You MUST use the statute numbers provided in the RESEARCH CONTEXT above. If the context mentions Wis. Stat. § 823.01, do NOT use other numbers for nuisance.
+1. You MUST use the statute numbers provided in the RESEARCH CONTEXT above. This is verified legal data from RAG (Retrieval Augmented Generation).
 2. "Step Pending" is a CRITICAL FAILURE. If you do not have a specific local rule, provide a general procedural requirement for ${jurisdiction} (e.g., "File in the County Clerk's office").
 3. Ensure "procedural_checks" is strictly an ARRAY OF STRINGS, not objects.
 4. You are under oath to provide substantive, non-placeholder content for every field.
-5. Do NOT use placeholders. Provide substantive content for all fields. If you lack specific information, provide exact instructions on WHERE the user can find it (e.g., "Check Milwaukee County Local Rule 3.15 regarding noise").`;
+5. Do NOT use placeholders. Provide substantive content for all fields. If you lack specific information, provide exact instructions on WHERE the user can find it (e.g., "Check Milwaukee County Local Rule 3.15 regarding noise").
+6. MANDATORY: For each roadmap step, include a "counter_measure" field that explains how the opposition will likely respond and how to prepare for that counter-move.`;
 
       const encoder = new TextEncoder();
       const decoder = new TextDecoder();
