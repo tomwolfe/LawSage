@@ -27,6 +27,7 @@ import { safeLog, safeError, safeWarn } from '../../../lib/pii-redactor';
 export const runtime = 'nodejs';
 
 type PDFDoc = InstanceType<typeof PDFDocumentType>;
+type PDFDocument = PDFDoc;
 
 /**
  * Supported Proof of Service forms by jurisdiction
