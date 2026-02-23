@@ -104,11 +104,11 @@ const RATE_LIMIT_INFO = {
 function validateUserInput(input: string): { valid: boolean; warning?: string } {
   const trimmed = input.trim();
 
-  // Check minimum length
-  if (trimmed.length < 10) {
+  // Check minimum length - 50 characters required for meaningful legal analysis
+  if (trimmed.length < 50) {
     return {
       valid: false,
-      warning: 'Please provide more details about your legal situation (at least 10 characters).'
+      warning: 'Please provide more details (at least 50 characters) so the AI can find specific statutes for your case.'
     };
   }
 

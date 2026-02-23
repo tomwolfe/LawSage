@@ -3,16 +3,15 @@ import { SafetyValidator } from '../../../lib/validation';
 import { safeLog, safeError, safeWarn, redactPII } from '../../../lib/pii-redactor';
 import { withRateLimit } from '../../../lib/rate-limiter';
 import { getLegalLookupResponse, searchExParteRules } from '../../../src/utils/legal-lookup';
-import { readFile } from 'fs/promises';
-import path from 'path';
 import { searchLegalRules, isVectorConfigured } from '../../../lib/vector';
+import templateManifest from '../../../public/templates/manifest.json';
 
-// Define types
+export const runtime = 'edge';
+
 interface LegalRequest {
   user_input: string;
   jurisdiction: string;
   documents?: string[];
-  images?: string[]; // Base64 encoded images (will be rejected - GLM is text-only)
 }
 
 interface StandardErrorResponse {
@@ -31,13 +30,13 @@ interface LegalOutput {
   disclaimer?: string;
   strategy?: string;
   adversarial_strategy?: string;
-  roadmap?: Array<{ 
-    step: number; 
-    title: string; 
-    description: string; 
-    estimated_time?: string; 
+  roadmap?: Array<{
+    step: number;
+    title: string;
+    description: string;
+    estimated_time?: string;
     required_documents?: string[];
-    counter_measure?: string; // Counter-measure for expected opposition response
+    counter_measure?: string;
   }>;
   filing_template?: string;
   citations?: Array<{ text: string; source?: string; url?: string }>;
@@ -51,15 +50,10 @@ interface ValidationResult {
   missingFields?: string[];
 }
 
-/**
- * Validate the AI output structure and content
- * Returns validation result with specific error details
- */
 function validateLegalOutputStructure(output: LegalOutput): ValidationResult {
   const errors: string[] = [];
   const missingFields: string[] = [];
 
-  // Check required fields
   if (!output.disclaimer) {
     missingFields.push('disclaimer');
     errors.push('Missing required disclaimer');
@@ -107,45 +101,6 @@ function validateLegalOutputStructure(output: LegalOutput): ValidationResult {
   };
 }
 
-/**
- * Generate a retry prompt that focuses on fixing specific validation errors
- */
-function generateRetryPrompt(
-  originalPrompt: string,
-  validationResult: ValidationResult,
-  accumulatedText: string
-): string {
-  const errors = validationResult.errors || [];
-  let aggressiveInstructions = "";
-
-  if (errors.some(e => e.includes('citations'))) {
-    aggressiveInstructions += "\n- CRITICAL FAILURE: You failed the citation count. You MUST provide at least 3+ verified legal citations in the requested JSON format.";
-  }
-
-  if (errors.some(e => e.includes('adversarial_strategy'))) {
-    aggressiveInstructions += "\n- CRITICAL FAILURE: Missing or generic adversarial strategy. You MUST provide a detailed red-team analysis of the specific legal weaknesses in this case.";
-  }
-
-  return `Your previous response was incomplete or malformed.
-
-Validation failed because: ${validationResult.errors?.join('; ')}.
-${aggressiveInstructions}
-
-Please regenerate the COMPLETE JSON response. Ensure ALL fields are present and substantial. Combine your previous analysis with the fixes requested above.
-
-Original context:
-${originalPrompt.substring(0, 800)}
-
-Previous (partial) response:
-${accumulatedText.substring(0, 1500)}
-
-Provide a COMPLETE JSON response that includes ALL required fields. This is your final chance to comply with the structural hardening requirements. Do not use placeholders.`;
-}
-
-/**
- * Calculate keyword overlap score between user input and template keywords.
- * Prioritizes exact legal term matches over semantic similarity.
- */
 function keywordOverlapScore(userInput: string, templateKeywords: string[]): number {
   if (!templateKeywords || templateKeywords.length === 0) return 0;
 
@@ -164,10 +119,6 @@ function keywordOverlapScore(userInput: string, templateKeywords: string[]): num
   return matchedKeywords / templateKeywords.length;
 }
 
-/**
- * Check if user input contains emergency keywords.
- * Emergency keywords force high-priority template matching.
- */
 function hasEmergencyKeywords(userInput: string): boolean {
   const emergencyKeywords = [
     "eviction", "lockout", "changed locks", "locked out",
@@ -180,15 +131,12 @@ function hasEmergencyKeywords(userInput: string): boolean {
   return emergencyKeywords.some(keyword => userInputLower.includes(keyword));
 }
 
-// Simple cosine similarity function for template matching
 function cosineSimilarity(text1: string, text2: string): number {
   if (!text1 || !text2) return 0;
 
-  // Tokenize and normalize the texts
   const tokens1 = text1.toLowerCase().split(/\W+/).filter(Boolean);
   const tokens2 = text2.toLowerCase().split(/\W+/).filter(Boolean);
 
-  // Create term frequency maps
   const freqMap1 = new Map<string, number>();
   const freqMap2 = new Map<string, number>();
 
@@ -200,10 +148,8 @@ function cosineSimilarity(text1: string, text2: string): number {
     freqMap2.set(token, (freqMap2.get(token) || 0) + 1);
   }
 
-  // Get all unique terms
   const allTerms = new Set([...tokens1, ...tokens2]);
 
-  // Create vectors
   const vec1: number[] = [];
   const vec2: number[] = [];
 
@@ -212,13 +158,11 @@ function cosineSimilarity(text1: string, text2: string): number {
     vec2.push(freqMap2.get(term) || 0);
   }
 
-  // Calculate dot product
   let dotProduct = 0;
   for (let i = 0; i < vec1.length; i++) {
     dotProduct += vec1[i] * vec2[i];
   }
 
-  // Calculate magnitudes
   const magnitude1 = Math.sqrt(vec1.reduce((sum, val) => sum + val * val, 0));
   const magnitude2 = Math.sqrt(vec2.reduce((sum, val) => sum + val * val, 0));
 
@@ -227,12 +171,7 @@ function cosineSimilarity(text1: string, text2: string): number {
   return dotProduct / (magnitude1 * magnitude2);
 }
 
-/**
- * Find the best matching template using enhanced keyword overlap prioritization.
- * Emergency keywords (eviction, lockout) force high-priority template matching.
- */
 function findBestTemplate(userInput: string, templates: Template[]): { template: Template | null, isEmergency: boolean } {
-  // Check for emergency keywords - force lockout template if detected
   if (hasEmergencyKeywords(userInput)) {
     for (const template of templates) {
       const templateTitle = template.title?.toLowerCase() || '';
@@ -248,7 +187,6 @@ function findBestTemplate(userInput: string, templates: Template[]): { template:
   let bestMatch = null;
   let highestSimilarity = 0;
 
-  // Legal keyword boost list
   const legalBoostKeywords = [
     'motion', 'complaint', 'answer', 'discovery', 'subpoena',
     'eviction', 'unlawful detainer', 'foreclosure', 'bankruptcy',
@@ -257,27 +195,21 @@ function findBestTemplate(userInput: string, templates: Template[]): { template:
   ];
 
   for (const template of templates) {
-    // Calculate keyword overlap score (prioritized)
     const templateKeywords = template.keywords || [];
     const keywordScore = keywordOverlapScore(userInput, templateKeywords);
 
-    // Calculate similarity with title
     const titleSimilarity = cosineSimilarity(userInput.toLowerCase(), template.title?.toLowerCase() || '');
-
-    // Calculate similarity with description
     const descSimilarity = cosineSimilarity(userInput.toLowerCase(), template.description?.toLowerCase() || '');
 
-    // Boost score if template title contains legal keywords that match user input
     let titleBoost = 0;
     const templateTitle = template.title?.toLowerCase() || '';
     for (const legalKeyword of legalBoostKeywords) {
       if (userInput.toLowerCase().includes(legalKeyword) && templateTitle.includes(legalKeyword)) {
-        titleBoost = 0.2; // 20% boost for legal keyword match
+        titleBoost = 0.2;
         break;
       }
     }
 
-    // Weighted combination: keyword overlap (50%), title (30%), description (20%)
     const combinedSimilarity = (keywordScore * 0.5) + (titleSimilarity * 0.3) + (descSimilarity * 0.2) + titleBoost;
 
     if (combinedSimilarity > highestSimilarity) {
@@ -292,9 +224,6 @@ function findBestTemplate(userInput: string, templates: Template[]): { template:
   };
 }
 
-/**
- * Generic fallback template when no specific match is found.
- */
 const GENERIC_MOTION_TEMPLATE = `# GENERIC MOTION TEMPLATE
 
 ## CAPTION
@@ -353,13 +282,12 @@ _______________________
 **Note:** This is a generic template. Please consult your local court rules and consider seeking legal advice for your specific situation.
 `;
 
-// System instruction for the model
 const SYSTEM_INSTRUCTION = `
 You are LawSage, a specialized Pro Se Legal Architect.
 Your task is to generate high-fidelity legal analysis.
 
 STRICT OPERATIONAL CONSTRAINTS:
-1. NO PLACEHOLDERS: "Step Pending", "Citation unavailable", "[Details here]", "To be determined", or similar placeholders are STRICTLY FORBIDDEN. If you lack a specific local rule, provide a specific instruction on WHERE the user can find it (e.g., "Check Milwaukee County Local Rule 3.15 regarding noise").
+1. NO PLACEHOLDERS: "Step Pending", "Citation unavailable", "[Details here]", "To be determined", or similar placeholders are STRICTLY FORBIDDEN.
 2. LEGAL ACCURACY: Use Wis. Stat. Chapter 823 for Nuisance. Do not use 895.48 for noise.
 3. CITATION MINIMUM: You must provide 3-5 real citations.
 4. CHAIN OF THOUGHT: Before generating the JSON, mentally verify if the statute actually exists for that topic.
@@ -378,7 +306,7 @@ Your response MUST be in valid JSON format with the following structure:
 {
   "disclaimer": "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. This is legal information, not legal advice. Always consult with a qualified attorney.",
   "strategy": "Your primary legal strategy and analysis here",
-  "adversarial_strategy": "A DETAILED red-team analysis of the user's case. Identify specific weaknesses and how the opposition will likely counter each of the user's main points. This section is MANDATORY and must be substantial.",
+  "adversarial_strategy": "A DETAILED red-team analysis of the user's case. Identify specific weaknesses and how the opposition will likely counter each of the user's main points.",
   "roadmap": [
     {
       "step": 1,
@@ -388,7 +316,7 @@ Your response MUST be in valid JSON format with the following structure:
       "required_documents": ["List of documents needed"]
     }
   ],
-  "filing_template": "A comprehensive template that includes TWO distinct sections:\\n(A) The Civil Complaint (grounded in relevant statutes). MANDATORY: When citing statutes, explicitly mention the statutory penalty structure where applicable.\\n(B) The Ex Parte Application for TRO/OSC.\\nInclude explicit placeholders for required Judicial Council forms like CM-010, MC-030, and CIV-100.",
+  "filing_template": "A comprehensive template that includes TWO distinct sections:\\n(A) The Civil Complaint (grounded in relevant statutes).\\n(B) The Ex Parte Application for TRO/OSC.",
   "citations": [
     {
       "text": "12 U.S.C. § 345",
@@ -402,7 +330,7 @@ Your response MUST be in valid JSON format with the following structure:
     "filing_fees": "Specific filing fees for this case type (e.g., $435 for Civil, or fee waiver info)",
     "dress_code": "Courthouse dress code requirements",
     "parking_info": "Parking information near courthouse",
-    "hours_of_operation": "Courthouse hours of operation (Note: 10:00 AM rule for Ex Parte notice in many jurisdictions)",
+    "hours_of_operation": "Courthouse hours of operation",
     "local_rules_url": "URL to local rules of court"
   },
   "procedural_checks": ["Results of procedural technicality checks against Local Rules of Court"]
@@ -414,27 +342,21 @@ CRITICAL INSTRUCTIONS:
 3. Return ALL requested information in a single JSON response.
 4. Include at least 3 proper legal citations.
 5. Provide a detailed roadmap with at least 3 steps.
-6. MANDATORY: The 'adversarial_strategy' must NOT be empty or use generic placeholders. It must be a critical analysis of the specific facts provided by the user.
-7. CRITICAL: Use EXACT key names as specified above. The frontend will reject responses with alternative key names.
-8. CRITICAL: Each roadmap item MUST have both 'title' and 'description' fields - never omit these.
+6. MANDATORY: The 'adversarial_strategy' must NOT be empty or use generic placeholders.
+7. CRITICAL: Use EXACT key names as specified above.
+8. CRITICAL: Each roadmap item MUST have both 'title' and 'description' fields.
 9. CRITICAL: Each citation MUST have a 'text' field with the full citation string.
-10. CRITICAL: You are under oath to provide substantive, non-placeholder content for every field. Failure to provide a real roadmap will result in a system error.
+10. CRITICAL: You are under oath to provide substantive, non-placeholder content for every field.
 `;
 
-export const runtime = 'nodejs'; // Use Node.js runtime for fs access to template files
-
 const GLM_API_URL = "https://api.z.ai/api/paas/v4/chat/completions";
-
-// Get model from environment variable with fallback
 const ANALYSIS_MODEL = process.env.NEXT_PUBLIC_DEFAULT_MODEL || "glm-4.7-flash";
 
 export async function POST(req: NextRequest) {
-  // Wrap handler with rate limiting
   return withRateLimit(async () => {
     try {
-      const { user_input, jurisdiction, documents, images }: LegalRequest = await req.json();
+      const { user_input, jurisdiction, documents }: LegalRequest = await req.json();
 
-      // Validate inputs
       if (!user_input?.trim()) {
         return NextResponse.json(
           { type: "ValidationError", detail: "User input is required." } satisfies StandardErrorResponse,
@@ -449,18 +371,6 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // GLM-4.7-flash is text-only - images must be processed via /api/ocr endpoint first
-      if (images && images.length > 0) {
-        return NextResponse.json(
-          {
-            type: "ModelError",
-            detail: "Direct image analysis is not supported in this endpoint. Please upload images to /api/ocr first to extract text, then include the extracted text in your analysis request."
-          } satisfies StandardErrorResponse,
-          { status: 400 }
-        );
-      }
-
-      // Get API key from environment variable (server-side only)
       const apiKey = process.env.GLM_API_KEY;
 
       if (!apiKey) {
@@ -470,7 +380,6 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // PII Redaction - CRITICAL: Redact before sending to GLM API to protect user privacy
       const { redacted: safeInput, redactedFields } = redactPII(user_input);
       if (redactedFields.length > 0) {
         safeLog(`Processing request with PII redacted: [${redactedFields.join(', ')}]`);
@@ -478,16 +387,12 @@ export async function POST(req: NextRequest) {
         safeLog(`Processing request for jurisdiction: ${jurisdiction}`);
       }
 
-      // === PERFORMANCE OPTIMIZATION: Parallel RAG Context Fetching ===
-      // Instead of serial fetching, fetch all context in parallel using Promise.all
-      // This reduces latency from ~3x network round-trips to ~1x
-      
       const isEmergency = hasEmergencyKeywords(user_input);
 
-      // Create parallel promises for all context fetching
+      // Parallel RAG Context Fetching
       const vectorSearchPromise = (async () => {
         if (!isVectorConfigured()) return { researchContext: '', vectorResultsCount: 0, source: 'vector_unavailable' as const };
-        
+
         try {
           const vectorResults = await searchLegalRules(`${user_input} ${jurisdiction}`, {
             jurisdiction: jurisdiction !== 'Federal' ? jurisdiction : undefined,
@@ -527,7 +432,7 @@ export async function POST(req: NextRequest) {
 
       const exParteRulesPromise = (async () => {
         if (!isEmergency) return { exParteRulesText: '' };
-        
+
         try {
           const exParteRules = await searchExParteRules(jurisdiction);
           if (exParteRules.length > 0) {
@@ -546,17 +451,18 @@ export async function POST(req: NextRequest) {
 
       const templateMatchPromise = (async () => {
         try {
-          const manifestPath = path.join(process.cwd(), 'public', 'templates', 'manifest.json');
-          const manifestRaw = await readFile(manifestPath, 'utf8');
-          const manifest = JSON.parse(manifestRaw);
-          const templates = manifest.templates || [];
+          const templates = templateManifest.templates || [];
           const { template: bestMatch } = findBestTemplate(user_input, templates);
 
           if (bestMatch) {
-            const templatePath = path.join(process.cwd(), 'public', bestMatch.templatePath);
-            const templateContent = await readFile(templatePath, 'utf8');
-            safeLog(`Using template: ${bestMatch.title}`);
-            return { templateContent, templateName: bestMatch.title };
+            // For edge runtime, we fetch the template via fetch() instead of fs
+            const templateUrl = new URL(bestMatch.templatePath, req.url).toString();
+            const templateResponse = await fetch(templateUrl);
+            if (templateResponse.ok) {
+              const templateContent = await templateResponse.text();
+              safeLog(`Using template: ${bestMatch.title}`);
+              return { templateContent, templateName: bestMatch.title };
+            }
           }
         } catch (error) {
           safeWarn('Template matching failed:', error);
@@ -564,7 +470,6 @@ export async function POST(req: NextRequest) {
         return { templateContent: GENERIC_MOTION_TEMPLATE, templateName: 'Generic Motion Template' };
       })();
 
-      // Wait for all context fetching to complete in parallel
       const [vectorResult, staticResult, exParteResult, templateResult] = await Promise.all([
         vectorSearchPromise,
         staticLookupPromise,
@@ -572,7 +477,6 @@ export async function POST(req: NextRequest) {
         templateMatchPromise,
       ]);
 
-      // Combine research context (vector takes priority, then static fallback)
       let researchContext = '';
       if (vectorResult.source === 'vector' && vectorResult.researchContext) {
         researchContext = vectorResult.researchContext;
@@ -590,7 +494,6 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Prepare documents text for prompt
       let documentsText = "";
       if (documents && documents.length > 0) {
         documentsText = "RELEVANT DOCUMENTS FROM VIRTUAL CASE FOLDER (OCR-EXTRACTED EVIDENCE):\n\n";
@@ -600,9 +503,6 @@ export async function POST(req: NextRequest) {
         documentsText += "CRITICAL: These are official court documents. Use them to fact-check the user's description.\n\n";
       }
 
-      // === STRUCTURED OUTPUT: GLM Function Calling ===
-      // Define the legal output schema as a tool for guaranteed structure compliance
-      // This eliminates the need for fragile JSON streaming/parsing
       const legalAnalysisTool = {
         type: 'function' as const,
         function: {
@@ -625,7 +525,6 @@ export async function POST(req: NextRequest) {
               },
               roadmap: {
                 type: 'array',
-                description: 'Step-by-step procedural roadmap',
                 items: {
                   type: 'object',
                   properties: {
@@ -686,7 +585,6 @@ export async function POST(req: NextRequest) {
         }
       };
 
-      // Prepare the system prompt (simplified since structure is enforced by tool)
       const systemPrompt = `You are LawSage, a Pro Se Architect AI helping self-represented litigants.
 
 IMPORTANT LIMITATIONS:
@@ -708,7 +606,6 @@ ${documentsText || ''}
 
 ${templateContent ? "Use this template as a reference for formatting." : ""}`;
 
-      // Build the user prompt with PII-redacted input
       const userPrompt = `Jurisdiction: ${jurisdiction}
 
 Situation: ${safeInput}
@@ -740,18 +637,15 @@ CRITICAL INSTRUCTIONS:
 6. MANDATORY: For each roadmap step, include a "counter_measure" field that explains how the opposition will likely respond and how to prepare for that counter-move.`;
 
       const encoder = new TextEncoder();
-      const decoder = new TextDecoder();
 
       const stream = new ReadableStream({
         async start(controller) {
           try {
-            // Send initial status
             controller.enqueue(encoder.encode(JSON.stringify({
               type: 'status',
               message: 'Conducting legal research and analysis...'
             }) + '\n'));
 
-            // Heartbeat to keep connection alive during processing
             const heartbeatInterval = setInterval(() => {
               controller.enqueue(encoder.encode(JSON.stringify({
                 type: 'status',
@@ -759,16 +653,13 @@ CRITICAL INSTRUCTIONS:
               }) + '\n'));
             }, 2000);
 
-            // Create AbortController for timeout handling
             const abortController = new AbortController();
-            const timeoutMs = 45000; // 45 second timeout (leave buffer for Vercel's 60s limit)
+            const timeoutMs = 55000;
             const timeoutId = setTimeout(() => {
-              safeWarn('GLM API request timed out after 45 seconds');
+              safeWarn('GLM API request timed out after 55 seconds');
               abortController.abort();
             }, timeoutMs);
 
-            // Call GLM with PII-redacted input for privacy protection
-            // Use function calling for guaranteed structured output
             const response = await fetch(GLM_API_URL, {
               method: 'POST',
               headers: {
@@ -795,12 +686,11 @@ CRITICAL INSTRUCTIONS:
             if (!response.ok) {
               const errorText = await response.text();
               safeError(`GLM API error: ${response.status} - ${errorText}`);
-              
-              // Check if request was aborted due to timeout
+
               if (response.status === 499 || errorText.includes('timeout') || errorText.toLowerCase().includes('aborted')) {
                 throw new Error('AI service timeout - request took too long. Please try again with a simpler query.');
               }
-              
+
               throw new Error(`GLM API error: ${response.status}`);
             }
 
@@ -814,6 +704,8 @@ CRITICAL INSTRUCTIONS:
             if (!reader) {
               throw new Error('ReadableStream not supported');
             }
+
+            const decoder = new TextDecoder();
 
             while (true) {
               const { done, value } = await reader.read();
@@ -836,17 +728,14 @@ CRITICAL INSTRUCTIONS:
                       throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
                     }
 
-                    // Handle tool_calls in the streaming response
                     const delta = data.choices?.[0]?.delta;
-                    
-                    // Check for tool_calls in the delta
+
                     if (delta?.tool_calls && delta.tool_calls.length > 0) {
                       const toolCall = delta.tool_calls[0];
-                      
-                      // Accumulate the function arguments (they come in chunks)
+
                       if (toolCall.function?.arguments) {
                         accumulatedToolArgs += toolCall.function.arguments;
-                        
+
                         if (!firstTokenReceived) {
                           firstTokenReceived = true;
                           controller.enqueue(encoder.encode(JSON.stringify({
@@ -854,20 +743,18 @@ CRITICAL INSTRUCTIONS:
                             message: 'Generating legal analysis...'
                           }) + '\n'));
                         }
-                        
-                        // Stream progress chunks
+
                         controller.enqueue(encoder.encode(JSON.stringify({
                           type: 'chunk',
                           content: toolCall.function.arguments
                         }) + '\n'));
                       }
                     }
-                    
-                    // Fallback: if no tool_calls but has content, use content (older model behavior)
+
                     const content = delta?.content || "";
                     if (content && !delta?.tool_calls) {
                       accumulatedToolArgs += content;
-                      
+
                       if (!firstTokenReceived) {
                         firstTokenReceived = true;
                         controller.enqueue(encoder.encode(JSON.stringify({
@@ -875,7 +762,7 @@ CRITICAL INSTRUCTIONS:
                           message: 'Generating legal analysis...'
                         }) + '\n'));
                       }
-                      
+
                       controller.enqueue(encoder.encode(JSON.stringify({
                         type: 'chunk',
                         content: content
@@ -888,7 +775,6 @@ CRITICAL INSTRUCTIONS:
               }
             }
 
-            // Process remaining buffer
             if (lineBuffer.trim()) {
               const trimmedLine = lineBuffer.trim();
               if (trimmedLine.startsWith('data: ') && trimmedLine !== 'data: [DONE]') {
@@ -910,28 +796,23 @@ CRITICAL INSTRUCTIONS:
               safeError('No content received from GLM API. Check API key and quota.');
             }
 
-            // Parse the accumulated tool arguments as JSON
             let parsedOutput: LegalOutput | null = null;
 
             try {
               console.log(`[GLM Response] Accumulated arguments length: ${accumulatedToolArgs.length}`);
-              
+
               if (!accumulatedToolArgs.trim()) {
                 throw new Error('Empty response from GLM API');
               }
 
-              // The arguments should be valid JSON since it's from function calling
-              // But strip any markdown wrappers just in case
               const cleanedJson = accumulatedToolArgs.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
 
               parsedOutput = JSON.parse(cleanedJson) as LegalOutput;
 
-              // Validate structure
               const validation = validateLegalOutputStructure(parsedOutput);
 
               if (!validation.valid) {
                 safeError(`Validation failed:`, validation.errors);
-                // Apply fallback for missing fields
                 parsedOutput = {
                   disclaimer: parsedOutput.disclaimer || "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. This is legal information, not legal advice. Always consult with a qualified attorney.",
                   strategy: parsedOutput.strategy || "Analysis incomplete. Please try again with more details.",
@@ -945,7 +826,6 @@ CRITICAL INSTRUCTIONS:
               }
             } catch (parseError) {
               safeError("Failed to parse JSON:", parseError);
-              // Return error response
               parsedOutput = {
                 disclaimer: "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. This is legal information, not legal advice. Always consult with a qualified attorney.",
                 strategy: "Unable to generate analysis. The AI service returned malformed data.",
@@ -962,7 +842,6 @@ CRITICAL INSTRUCTIONS:
               ({ title: c.text, uri: c.url })
             ) || [];
 
-            // Send final complete response with metadata
             controller.enqueue(encoder.encode(JSON.stringify({
               type: 'complete',
               result: {
@@ -998,7 +877,6 @@ CRITICAL INSTRUCTIONS:
         ? String((error as Record<string, unknown>).message)
         : 'Unknown error occurred';
 
-      // Check for timeout errors first
       if (errorMessage.toLowerCase().includes('timeout') || errorMessage.toLowerCase().includes('aborted')) {
         return NextResponse.json(
           {
@@ -1031,7 +909,6 @@ CRITICAL INSTRUCTIONS:
 }
 
 export async function GET(_req: NextRequest) {
-  // Health check endpoint
   return NextResponse.json({
     status: "ok",
     message: "LawSage API is running"
@@ -1039,7 +916,6 @@ export async function GET(_req: NextRequest) {
 }
 
 export async function HEAD(_req: NextRequest) {
-  // Health check endpoint for HEAD requests
   return new NextResponse(null, {
     status: 200,
     headers: {
