@@ -10,7 +10,7 @@
  * Client-side checks are purely informational.
  */
 
-import { safeLog, safeWarn } from './pii-redactor';
+import { safeWarn } from './pii-redactor';
 import { RATE_LIMIT } from '../config/constants';
 
 // Re-export for backward compatibility (deprecated)

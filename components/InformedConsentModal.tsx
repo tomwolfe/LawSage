@@ -17,7 +17,6 @@ interface InformedConsentModalProps {
  */
 export default function InformedConsentModal({ isOpen, onAccept }: InformedConsentModalProps) {
   const [allChecked, setAllChecked] = useState(false);
-  const [consentVersion, setConsentVersion] = useState('1.0');
   const modalRef = useRef<HTMLDivElement>(null);
   const firstCheckboxRef = useRef<HTMLInputElement>(null);
   const lastButtonRef = useRef<HTMLButtonElement>(null);
@@ -27,12 +26,12 @@ export default function InformedConsentModal({ isOpen, onAccept }: InformedConse
     const hasConsented = localStorage.getItem('lawsage_informed_consent');
     if (hasConsented) {
       const consentData = JSON.parse(hasConsented);
-      if (consentData.version === consentVersion && consentData.accepted) {
+      if (consentData.version === '1.0' && consentData.accepted) {
         // Already consented to current version
         onAccept();
       }
     }
-  }, [onAccept, consentVersion]);
+  }, [onAccept]);
 
   // Focus trap for accessibility
   useEffect(() => {

@@ -237,7 +237,7 @@ ${String(f.body || f.description || 'Filing content generation failed.')}
         structured: parsed
       };
     }
-  } catch (_error) {
+  } catch {
     // If JSON parsing fails, fall back to delimiter-based parsing
   }
 
@@ -302,7 +302,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
           localStorage.setItem('lawsage_quality_audit', JSON.stringify(log.slice(-10)));
           console.warn("LawSage Quality Audit: Low quality response detected.");
         }
-      } catch (_error) {
+      } catch {
         // Ignore parsing errors for audit logging
       }
     }
@@ -550,7 +550,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
           // If parsing fails, fall back to the original approach
           doc = await createStandardDocument();
         }
-      } catch (_error) {
+      } catch {
         // If parsing fails, fall back to the original approach
         doc = await createStandardDocument();
       }
@@ -887,7 +887,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
   // Helper function to create a motion document based on the schema
   const createMotionDocument = async (motion: LegalMotion): Promise<unknown> => {
     const docx = await import('docx');
-    const { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle } = docx;
+    const { Document, Paragraph, TextRun, HeadingLevel, AlignmentType } = docx;
 
     const isCalifornia = motion.caseInfo.jurisdiction.toLowerCase().includes('california');
     let children: unknown[] = [];
@@ -1766,7 +1766,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                                         loading: false
                                       }
                                     }));
-                                   } catch (_error) {
+                                   } catch {
                                      setCitationVerificationStatus(prev => ({
                                       ...prev,
                                       [citation.text]: {

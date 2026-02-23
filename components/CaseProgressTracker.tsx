@@ -354,17 +354,26 @@ export function CaseProgressTracker({
   caseStartDate
 }: CaseProgressTrackerProps) {
   const [selectedTransition, setSelectedTransition] = useState<StateTransition | null>(null);
-  
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+
   const stateInfo = STATE_DEFINITIONS[currentState];
-  
+
   // Get possible next states
   const possibleTransitions = STATE_TRANSITIONS.filter(
     t => t.from === currentState
   );
 
+  // Update current time every minute for days elapsed calculation
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
+    return () => clearInterval(interval);
+  }, []);
+
   // Calculate days elapsed
   const daysElapsed = caseStartDate
-    ? Math.floor((Date.now() - caseStartDate.getTime()) / (1000 * 60 * 60 * 24))
+    ? Math.floor((currentTime.getTime() - caseStartDate.getTime()) / (1000 * 60 * 60 * 24))
     : 0;
 
   return (
@@ -466,7 +475,7 @@ export function CaseProgressTracker({
           <div className="bg-white rounded-xl p-6 max-w-md w-full">
             <h3 className="text-lg font-bold mb-2">Confirm Status Change</h3>
             <p className="text-slate-600 mb-4">
-              Change case status to "{STATE_DEFINITIONS[selectedTransition.to].name}"?
+              Change case status to &quot;{STATE_DEFINITIONS[selectedTransition.to].name}&quot;?
             </p>
             {selectedTransition.requiredDocuments && (
               <div className="mb-4 p-3 bg-amber-50 rounded-lg border border-amber-200">

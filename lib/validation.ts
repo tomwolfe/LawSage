@@ -167,7 +167,7 @@ export class ResponseValidator {
 
         return formattedOutput;
       }
-    } catch (_error) {
+    } catch {
       // If JSON parsing fails, fall back to legacy approach
     }
 
@@ -278,8 +278,6 @@ export class ResponseValidator {
     }
 
     const citationCount = allMatches.size;
-
-    const hasCitations = citationCount >= 3;
 
     // 1. BLACKLIST PLACEHOLDERS - Force fail if placeholders detected
     const lower = content.toLowerCase();

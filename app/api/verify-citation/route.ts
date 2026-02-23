@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { safeLog, safeError, safeWarn } from '../../../lib/pii-redactor';
-import { CITATION_VERIFICATION, API, LIMITS } from '../../../config/constants';
+import { CITATION_VERIFICATION, API } from '../../../config/constants';
 
 interface VerifyCitationRequest {
   citation: string;

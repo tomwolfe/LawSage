@@ -20,10 +20,15 @@
  *   - BROWSERLESS_TOKEN: Optional token for Browserless.io headless browser service
  */
 
-const fs = require('fs');
-const path = require('path');
-const https = require('https');
-const crypto = require('crypto');
+import fs from 'fs';
+import path from 'path';
+import https from 'https';
+import crypto from 'crypto';
+import { fileURLToPath } from 'url';
+
+// ES module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Configuration
 const CONFIG = {
@@ -219,7 +224,7 @@ function extractDateFromHtml(html, sourceName) {
           return normalizeDate(dateMatch[1].trim());
         }
       }
-    } catch (error) {
+    } catch {
       // Continue to next selector
     }
   }
@@ -247,14 +252,6 @@ function normalizeDate(dateStr) {
   if (!dateStr) return null;
 
   try {
-    // Try parsing various date formats
-    const formats = [
-      // MM/DD/YYYY or MM-DD-YYYY
-      /(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/,
-      // Month DD, YYYY
-      /(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})/i,
-    ];
-
     let date = null;
 
     // Try MM/DD/YYYY format
@@ -290,7 +287,7 @@ function normalizeDate(dateStr) {
     if (date && !isNaN(date.getTime())) {
       return date.toISOString().split('T')[0]; // YYYY-MM-DD
     }
-  } catch (error) {
+  } catch {
     // Ignore parsing errors
   }
 
@@ -473,8 +470,7 @@ async function checkForUpdates() {
 
       // For API sources, we can check actual data
       if (url.includes('courtlistener.com/api')) {
-        const response = await fetchUrl(`${url}/search/?q=*&order_by=-date_created&limit=1`);
-        const data = JSON.parse(response);
+        await fetchUrl(`${url}/search/?q=*&order_by=-date_created&limit=1`);
         updates.sources[name] = {
           status: 'ok',
           lastCheck: new Date().toISOString(),
@@ -719,12 +715,12 @@ async function runUpdate() {
   report.recommendations.forEach(rec => console.log(`  • ${rec}`));
 
   console.log('\n✅ Update check complete!\n');
-  
+
   return report;
 }
 
 // Run if executed directly
-if (require.main === module) {
+if (process.argv[1] && process.argv[1].endsWith('update-legal-data.js')) {
   runUpdate()
     .then(() => process.exit(0))
     .catch(err => {
@@ -733,4 +729,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { runUpdate, checkForUpdates, createBackup };
+export { runUpdate, checkForUpdates, createBackup };

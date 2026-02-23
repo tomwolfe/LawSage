@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
-import { FileDown, Check, AlertCircle, Calendar, Mail, User, Building } from 'lucide-react';
-import { useProofOfService, ProofOfServiceOptions, CaseInfo, PartyInfo, ServiceInfo, autoPopulateServiceInfo, extractDocumentsFromAnalysis, validateProofOfServiceData } from '../src/utils/proof-of-service';
+import { FileDown, Check, AlertCircle, Calendar, User, Building } from 'lucide-react';
+import { useProofOfService, ProofOfServiceOptions, CaseInfo, ServiceInfo, extractDocumentsFromAnalysis, validateProofOfServiceData } from '../src/utils/proof-of-service';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface ProofOfServiceGeneratorProps {

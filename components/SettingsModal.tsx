@@ -3,26 +3,49 @@
 import { useState, useEffect } from 'react';
 import { Settings, X, Info, CheckCircle, Scale, Shield } from 'lucide-react';
 
-export default function SettingsModal() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [rateLimitStatus, setRateLimitStatus] = useState<{ remaining: number; resetAt: Date } | null>(null);
-
-  // Load rate limit status
-  useEffect(() => {
-    if (typeof window !== 'undefined' && isOpen) {
-      const stored = localStorage.getItem('lawsage_ratelimit_status');
-      if (stored) {
-        try {
-          const data = JSON.parse(stored);
-          setRateLimitStatus({
-            remaining: data.remaining,
-            resetAt: new Date(data.resetAt),
-          });
-        } catch {
-          // Ignore parse errors
-        }
+// Helper to read rate limit status from localStorage
+function readRateLimitStatus(): { remaining: number; resetAt: Date } | null {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem('lawsage_ratelimit_status');
+    if (stored) {
+      try {
+        const data = JSON.parse(stored);
+        return {
+          remaining: data.remaining,
+          resetAt: new Date(data.resetAt),
+        };
+      } catch {
+        // Ignore parse errors
       }
     }
+  }
+  return null;
+}
+
+export default function SettingsModal() {
+  const [isOpen, setIsOpen] = useState(false);
+  // Initialize state lazily from localStorage
+  const [rateLimitStatus, setRateLimitStatus] = useState<{ remaining: number; resetAt: Date } | null>(readRateLimitStatus);
+
+  // Update rate limit status periodically when modal is open
+  // This is acceptable because it's syncing with external state (localStorage)
+  // and not causing cascading renders
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const updateStatus = () => {
+      const status = readRateLimitStatus();
+      if (status) {
+        setRateLimitStatus(status);
+      }
+    };
+    
+    // Update immediately when opened
+    updateStatus();
+    
+    // Then update every 30 seconds while modal is open
+    const interval = setInterval(updateStatus, 30000);
+    return () => clearInterval(interval);
   }, [isOpen]);
 
   return (

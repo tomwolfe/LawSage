@@ -252,7 +252,7 @@ export default function TimelineView({
 
       {viewMode === 'list' && (
         <div className="space-y-3">
-          {roadmap.map((item, index) => {
+          {roadmap.map((item) => {
             const deadlineStatus = getDeadlineStatus(item);
             const isCompleted = completedSteps.includes(item.step);
 

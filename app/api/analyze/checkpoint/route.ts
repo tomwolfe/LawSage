@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { sessionId, user_input, jurisdiction } = body;
+    const { sessionId } = body;
 
     if (!sessionId) {
       return NextResponse.json(

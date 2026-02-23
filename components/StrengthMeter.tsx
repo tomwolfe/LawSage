@@ -1,6 +1,6 @@
 'use client';
 
-import { Shield, ShieldCheck, ShieldAlert, ShieldX, FileText, Gavel, CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
+import { Shield, ShieldCheck, ShieldAlert, ShieldX, CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -30,7 +30,6 @@ export function StrengthMeter({
   citations = [],
   roadmapLength = 0,
   hasAdversarialStrategy = false,
-  jurisdiction,
 }: StrengthMeterProps) {
   // Calculate strength score (0-100)
   let score = 50; // Base score

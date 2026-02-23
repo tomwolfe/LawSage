@@ -16,15 +16,14 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  MessageSquare, 
-  ChevronRight, 
-  ChevronLeft, 
-  CheckCircle, 
+import {
+  MessageSquare,
+  ChevronRight,
+  ChevronLeft,
+  CheckCircle,
   HelpCircle,
   SkipForward,
   Sparkles,
-  AlertCircle,
   Lightbulb
 } from 'lucide-react';
 
@@ -291,7 +290,7 @@ export default function InterviewMode({
       // Last question - submit what we have
       handleSubmit();
     }
-  }, [currentQuestion, currentQuestionIndex, questions.length]);
+  }, [currentQuestion, currentQuestionIndex, questions.length, handleSubmit]);
 
   const handleBack = useCallback(() => {
     if (currentQuestionIndex > 0) {

@@ -162,7 +162,7 @@ Generate clarifying questions. Focus on gaps in the information provided. If the
  * Static question generation fallback
  * Used when AI is unavailable or as a base template
  */
-function generateStaticQuestions(userInput: string, jurisdiction: string): InterviewQuestion[] {
+function generateStaticQuestions(userInput: string): InterviewQuestion[] {
   const lower = userInput.toLowerCase();
   const questions: InterviewQuestion[] = [];
 

@@ -21,7 +21,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import PDFDocumentType from 'pdfkit';
-import { Readable } from 'stream';
 import { safeLog, safeError, safeWarn } from '../../../lib/pii-redactor';
 
 export const runtime = 'nodejs';
@@ -86,16 +85,8 @@ interface GenerateProofOfServiceRequest {
 }
 
 /**
- * Convert Readable stream to Buffer
+ * Convert Readable stream to Buffer - removed as unused
  */
-function streamToBuffer(stream: Readable): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
-    stream.on('error', reject);
-    stream.on('end', () => resolve(Buffer.concat(chunks)));
-  });
-}
 
 /**
  * Draw California-style pleading paper line numbers
@@ -266,7 +257,7 @@ function generatePOS040(doc: PDFDoc, caseInfo: CaseInfo, serviceInfo: ServiceInf
   doc.font('Helvetica');
   yPosition += 18;
 
-  documents.forEach((docTitle, index) => {
+  documents.forEach((docTitle) => {
     doc.text(`☐ ${docTitle}`, margin + 10, yPosition, {
       width: pageWidth - margin * 2 - 10
     });
@@ -435,7 +426,7 @@ function generateFL335(doc: PDFDoc, caseInfo: CaseInfo, serviceInfo: ServiceInfo
   doc.font('Helvetica');
   yPosition += 18;
 
-  documents.forEach((docTitle, index) => {
+  documents.forEach((docTitle) => {
     doc.text(`☐ ${docTitle}`, margin + 10, yPosition, {
       width: pageWidth - margin * 2 - 10
     });
@@ -697,8 +688,7 @@ export async function POST(req: NextRequest) {
       formType,
       caseInfo,
       serviceInfo,
-      servedDocuments,
-      additionalParties
+      servedDocuments
     } = body;
 
     // Check if form is supported

@@ -20,9 +20,9 @@ interface AnalyzeRequest {
 //   json: (data: unknown) => unknown;
 // }
 
-export async function POST(_req: NextRequest): Promise<unknown> {
+export async function POST(req: NextRequest): Promise<unknown> {
   // Mock implementation that returns a predictable response
-  const requestData = await _req.json() as AnalyzeRequest;
+  const requestData = await req.json() as AnalyzeRequest;
 
   // Return a mock response similar to the real API
   // For different test cases, return different content
@@ -56,7 +56,7 @@ export async function POST(_req: NextRequest): Promise<unknown> {
   };
 }
 
-export async function GET(_req: NextRequest): Promise<unknown> {
+export async function GET(): Promise<unknown> {
   return {
     json: () => Promise.resolve({
       status: "ok",

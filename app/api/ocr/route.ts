@@ -265,7 +265,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   // Health check endpoint
   return NextResponse.json({
     status: "enabled",
@@ -274,7 +274,7 @@ export async function GET(_req: NextRequest) {
   });
 }
 
-export async function HEAD(_req: NextRequest) {
+export async function HEAD() {
   // Health check endpoint for HEAD requests
   return new NextResponse(null, {
     status: 200,

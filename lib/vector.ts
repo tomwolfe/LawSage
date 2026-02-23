@@ -40,7 +40,7 @@ export const vector = new Proxy({} as Index, {
         'Upstash Vector is not configured. Please set UPSTASH_VECTOR_URL and UPSTASH_VECTOR_TOKEN in your environment.'
       );
     }
-    return (client as any)[prop];
+    return client[prop as keyof Index];
   },
 });
 

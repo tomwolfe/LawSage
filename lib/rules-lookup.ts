@@ -225,7 +225,7 @@ export async function getAvailableStates(): Promise<Array<{ code: string; name: 
   }
   
   // Check each state code
-  for (const [alias, code] of Object.entries(LEGAL_DATA.STATE_CODE_ALIASES)) {
+  for (const [, code] of Object.entries(LEGAL_DATA.STATE_CODE_ALIASES)) {
     // Avoid duplicates
     if (!states.find(s => s.code === code)) {
       try {

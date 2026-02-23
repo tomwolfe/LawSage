@@ -35,7 +35,7 @@ export const redis = new Proxy({} as Redis, {
         'Upstash Redis is not configured. Please set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN in your environment.'
       );
     }
-    return (client as any)[prop];
+    return client[prop as keyof Redis];
   },
 });
 

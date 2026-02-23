@@ -1,20 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import PDFDocument from 'pdfkit';
-import { Readable } from 'stream';
-import type { PDFDoc, GeneratePdfRequest, CourtCaption } from '../../../types/legal-docs';
-import { generatePleadingPaperTemplate, paginateText, calculateLineCount } from '../../../lib/pleading-paper-template';
-
-/**
- * Convert a Readable stream to a Buffer
- */
-function streamToBuffer(stream: Readable): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    stream.on('data', (chunk) => chunks.push(Buffer.from(chunk)));
-    stream.on('error', reject);
-    stream.on('end', () => resolve(Buffer.concat(chunks)));
-  });
-}
+import type { PDFDoc, GeneratePdfRequest } from '../../../types/legal-docs';
 
 /**
  * Draw California-style pleading paper line numbers

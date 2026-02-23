@@ -13,7 +13,6 @@
  */
 
 import PDFDocumentType from 'pdfkit';
-import { Readable } from 'stream';
 
 export interface PleadingPaperOptions {
   court?: string;

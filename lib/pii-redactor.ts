@@ -336,9 +336,6 @@ export function redactPII(text: string, enablePass2: boolean = true): RedactionR
  * Use this instead of console.log in API routes
  */
 export function safeLog(message: string, ...data: unknown[]): void {
-  // Production guard: Only allow safeLog/safeError in production
-  const isProduction = process.env.NODE_ENV === 'production';
-  
   const redacted = redactPII(message);
   
   // Also redact PII from data objects if they are strings or have string properties
@@ -429,15 +426,4 @@ export function safeWarn(message: string, ...data: unknown[]): void {
   console.warn(`${logPrefix}${redacted.redacted}`, ...redactedData);
 }
 
-// Global production console suppression
-if (typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
-  const originalLog = console.log;
-  const originalWarn = console.warn;
-  // We keep console.error but it should still be used via safeError
-  
-  // Override console.log to do nothing in production unless it's from our safe logger
-  // Since we can't easily detect the caller without performance hit, we'll just 
-  // ensure all our logs go through safeLog. 
-  // A better approach for a monolith is to use a proper logging library,
-  // but for this task, we'll just emphasize using safeLog.
-}
+// Global production console suppression - ensures PII is never logged

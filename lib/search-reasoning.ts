@@ -1,4 +1,4 @@
-import { safeLog, safeError, safeWarn } from './pii-redactor';
+import { safeError, safeWarn } from './pii-redactor';
 
 const GLM_API_URL = "https://api.z.ai/api/paas/v4/chat/completions";
 

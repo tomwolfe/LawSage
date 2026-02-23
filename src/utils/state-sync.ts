@@ -256,6 +256,7 @@ export function createVirtualCaseFolderState(caseFolder: unknown, analysisResult
   // Create a copy of caseFolder without history to keep the sync payload small
   let caseFolderWithoutHistory: Record<string, unknown> = {};
   if (caseFolder && typeof caseFolder === 'object') {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { history, ...folderWithoutHistory } = caseFolder as Record<string, unknown>;
     caseFolderWithoutHistory = folderWithoutHistory;
   }

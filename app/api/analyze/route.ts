@@ -11,37 +11,6 @@ import path from 'path';
 
 export const runtime = 'nodejs'; // Unified runtime with OCR for consistent deployment
 
-/**
- * Repairs truncated JSON strings caused by token limits or streaming interruptions.
- * Handles unclosed strings, braces, and brackets.
- * @deprecated Use parsePartialJSON from streaming-json-parser instead
- */
-function repairTruncatedJSON(jsonString: string): string {
-  let cleaned = jsonString.trim();
-  
-  // Remove markdown code block wrappers if present
-  cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-
-  // Fix unclosed strings: count quotes (ignoring escaped ones)
-  const matches = cleaned.match(/"/g);
-  if (matches && matches.length % 2 !== 0) {
-    // We have an odd number of quotes, meaning the last one is open
-    cleaned += '"'; 
-  }
-
-  // Count braces and brackets
-  const openBraces = (cleaned.match(/\{/g) || []).length;
-  const closeBraces = (cleaned.match(/\}/g) || []).length;
-  const openBuckets = (cleaned.match(/\[/g) || []).length;
-  const closeBuckets = (cleaned.match(/\]/g) || []).length;
-
-  // Close unclosed structures in reverse order
-  for (let i = 0; i < openBuckets - closeBuckets; i++) cleaned += ']';
-  for (let i = 0; i < openBraces - closeBraces; i++) cleaned += '}';
-
-  return cleaned;
-}
-
 interface LegalRequest {
   user_input: string;
   jurisdiction: string;
@@ -316,79 +285,7 @@ _______________________
 **Note:** This is a generic template. Please consult your local court rules and consider seeking legal advice for your specific situation.
 `;
 
-const SYSTEM_INSTRUCTION = `
-You are LawSage, a specialized Pro Se Legal Architect.
-Your task is to generate high-fidelity legal analysis.
-
-STRICT OPERATIONAL CONSTRAINTS:
-1. NO PLACEHOLDERS: "Step Pending", "Citation unavailable", "[Details here]", "To be determined", or similar placeholders are STRICTLY FORBIDDEN.
-2. LEGAL ACCURACY: Use Wis. Stat. Chapter 823 for Nuisance. Do not use 895.48 for noise.
-3. CITATION MINIMUM: You must provide 3-5 real citations.
-4. CHAIN OF THOUGHT: Before generating the JSON, mentally verify if the statute actually exists for that topic.
-
-STRICT BREVITY CONSTRAINTS FOR VERCEL HOBBY TIER (60s TIMEOUT):
-5. MAX TOKENS: Keep the entire JSON response under 1800 tokens.
-6. CONCISE STRATEGY: Limit 'strategy' and 'adversarial_strategy' to 2 paragraphs each (max 300 words total). High-density legal theory only.
-7. TEMPLATE LIMIT: In 'filing_template', provide ONLY essential legal sections and core structure. Do NOT exceed 600 words. No boilerplate instructions.
-8. FOCUSED ROADMAP: Limit roadmap to 3-4 essential steps. Keep each step description under 80 words.
-9. TOKEN BUDGET: Prioritize substance over verbosity. Every word must earn its place.
-
-**CRITICAL: JSON KEY NAMING REQUIREMENTS**
-You MUST use EXACTLY these key names in your JSON response. DO NOT use synonyms or variations:
-- Use "roadmap" NOT "procedural_roadmap" or "next_steps" or "action_plan"
-- Use "citations" NOT "legal_citations" or "authorities" or "case_law"
-- Use "filing_template" NOT "motion_template" or "template" or "filing"
-- Use "local_logistics" NOT "logistics" or "court_info"
-- Use "procedural_checks" NOT "checks" or "compliance_checks"
-- Use "strategy" NOT "legal_strategy" or "analysis"
-- Use "adversarial_strategy" NOT "red_team" or "opposition_analysis"
-
-Your response MUST be in valid JSON format with the following structure:
-{
-  "disclaimer": "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. This is legal information, not legal advice. Always consult with a qualified attorney.",
-  "strategy": "Your primary legal strategy and analysis here",
-  "adversarial_strategy": "A DETAILED red-team analysis of the user's case. Identify specific weaknesses and how the opposition will likely counter each of the user's main points.",
-  "roadmap": [
-    {
-      "step": 1,
-      "title": "First step title",
-      "description": "Detailed description of what to do",
-      "estimated_time": "Timeframe for completion",
-      "required_documents": ["List of documents needed"]
-    }
-  ],
-  "filing_template": "A comprehensive template that includes TWO distinct sections:\\n(A) The Civil Complaint (grounded in relevant statutes).\\n(B) The Ex Parte Application for TRO/OSC.",
-  "citations": [
-    {
-      "text": "12 U.S.C. § 345",
-      "source": "federal statute",
-      "url": "optional URL to citation source"
-    }
-  ],
-  "sources": ["Additional sources referenced in the response"],
-  "local_logistics": {
-    "courthouse_address": "For housing TROs, prioritize the main civil courthouse. Specify the 'Ex Parte' window or housing department.",
-    "filing_fees": "Specific filing fees for this case type (e.g., $435 for Civil, or fee waiver info)",
-    "dress_code": "Courthouse dress code requirements",
-    "parking_info": "Parking information near courthouse",
-    "hours_of_operation": "Courthouse hours of operation",
-    "local_rules_url": "URL to local rules of court"
-  },
-  "procedural_checks": ["Results of procedural technicality checks against Local Rules of Court"]
-}
-
-CRITICAL INSTRUCTIONS:
-1. Use the provided RESEARCH CONTEXT to ground your citations and analysis.
-2. Cite sources explicitly using [Source X] notation when referencing the research context.
-3. Return ALL requested information in a single JSON response.
-4. Include at least 3 proper legal citations.
-5. Provide a detailed roadmap with at least 3 steps.
-6. MANDATORY: The 'adversarial_strategy' must NOT be empty or use generic placeholders.
-7. CRITICAL: Use EXACT key names as specified above.
-8. CRITICAL: Each roadmap item MUST have both 'title' and 'description' fields.
-9. CRITICAL: Each citation MUST have a 'text' field with the full citation string.
-10. CRITICAL: You are under oath to provide substantive, non-placeholder content for every field.
-`;
+// System prompt removed - was unused
 
 const GLM_API_URL = "https://api.z.ai/api/paas/v4/chat/completions";
 const ANALYSIS_MODEL = process.env.NEXT_PUBLIC_DEFAULT_MODEL || "glm-4.7-flash";
@@ -1006,14 +903,14 @@ CRITICAL INSTRUCTIONS:
   });
 }
 
-export async function GET(_req: NextRequest) {
+export async function GET() {
   return NextResponse.json({
     status: "ok",
     message: "LawSage API is running"
   });
 }
 
-export async function HEAD(_req: NextRequest) {
+export async function HEAD() {
   return new NextResponse(null, {
     status: 200,
     headers: {
