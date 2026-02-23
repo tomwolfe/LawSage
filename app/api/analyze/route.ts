@@ -4,6 +4,8 @@ import { safeLog, safeError, safeWarn, redactPII } from '../../../lib/pii-redact
 import { withRateLimit } from '../../../lib/rate-limiter';
 import { getLegalLookupResponse, searchExParteRules } from '../../../src/utils/legal-lookup';
 import { searchLegalRules, isVectorConfigured } from '../../../lib/vector';
+import { runCritiqueLoop, generateCorrectedOutput, hasPassedCritique } from '../../../lib/critique-agent';
+import { saveCheckpoint, generateSessionId } from '../../../lib/analysis-checkpoint';
 import templateManifest from '../../../public/templates/manifest.json';
 import { readFile } from 'fs/promises';
 import path from 'path';
@@ -419,14 +421,25 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      // Generate session ID for checkpoint/resume functionality
+      const sessionId = generateSessionId();
+
       const { redacted: safeInput, redactedFields } = redactPII(user_input);
       if (redactedFields.length > 0) {
         safeLog(`Processing request with PII redacted: [${redactedFields.join(', ')}]`);
       } else {
-        safeLog(`Processing request for jurisdiction: ${jurisdiction}`);
+        safeLog(`Processing request for jurisdiction: ${jurisdiction} (session: ${sessionId})`);
       }
 
       const isEmergency = hasEmergencyKeywords(user_input);
+
+      // Save initial checkpoint
+      await saveCheckpoint(sessionId, {
+        step: 'initial',
+        jurisdiction,
+        accumulatedArgs: '',
+        researchContext: '',
+      });
 
       // Parallel RAG Context Fetching
       const vectorSearchPromise = (async () => {
@@ -526,6 +539,14 @@ export async function POST(req: NextRequest) {
 
       const exParteRulesText = exParteResult.exParteRulesText;
       const templateContent = templateResult.templateContent;
+
+      // Save checkpoint after research is complete
+      await saveCheckpoint(sessionId, {
+        step: 'research',
+        jurisdiction,
+        accumulatedArgs: '',
+        researchContext: researchContext.substring(0, 500), // Truncate for storage
+      });
 
       if (!SafetyValidator.redTeamAudit(user_input, jurisdiction)) {
         return NextResponse.json(
@@ -865,6 +886,7 @@ CRITICAL INSTRUCTIONS:
             }
 
             let parsedOutput: LegalOutput | null = null;
+            let critiqueMetadata: Record<string, unknown> | null = null;
 
             try {
               console.log(`[GLM Response] Accumulated arguments length: ${accumulatedToolArgs.length}`);
@@ -896,6 +918,58 @@ CRITICAL INSTRUCTIONS:
                   procedural_checks: parsedOutput.procedural_checks || []
                 };
               }
+
+              // MULTI-AGENT CRITIQUE LOOP: Audit the Architect output
+              // This runs asynchronously to catch hallucinated statutes and procedural errors
+              safeLog('[Critique Loop] Starting multi-agent audit...');
+              controller.enqueue(encoder.encode(JSON.stringify({
+                type: 'status',
+                message: 'Auditing legal analysis for accuracy...'
+              }) + '\n'));
+
+              try {
+                const critiqueResult = await runCritiqueLoop(accumulatedToolArgs, {
+                  jurisdiction,
+                  researchContext,
+                  maxRetries: 1
+                });
+
+                critiqueMetadata = {
+                  audit_passed: critiqueResult.isValid,
+                  confidence: critiqueResult.overallConfidence,
+                  statute_issues_count: critiqueResult.statuteIssues.filter(s => !s.isVerified).length,
+                  roadmap_issues_count: critiqueResult.roadmapIssues.filter(r => !r.isVerified).length,
+                  audited_at: new Date().toISOString(),
+                  recommended_actions: critiqueResult.recommendedActions,
+                };
+
+                // If critique failed with low confidence, attempt correction
+                if (!critiqueResult.isValid && critiqueResult.overallConfidence < 0.6) {
+                  safeWarn('[Critique Loop] Low confidence detected, attempting correction...');
+                  controller.enqueue(encoder.encode(JSON.stringify({
+                    type: 'status',
+                    message: 'Correcting identified issues...'
+                  }) + '\n'));
+
+                  const correctedOutput = await generateCorrectedOutput(
+                    accumulatedToolArgs,
+                    critiqueResult,
+                    { jurisdiction, researchContext }
+                  );
+
+                  // Re-parse corrected output
+                  const correctedParsed = parsePartialJSON<LegalOutput>(correctedOutput);
+                  if (correctedParsed) {
+                    parsedOutput = correctedParsed;
+                    critiqueMetadata.correction_applied = true;
+                  }
+                }
+
+                safeLog(`[Critique Loop] Audit complete: confidence=${critiqueResult.overallConfidence.toFixed(2)}, valid=${critiqueResult.isValid}`);
+              } catch (critiqueError) {
+                safeWarn('[Critique Loop] Audit failed, proceeding with original output:', critiqueError);
+                // Don't fail the entire request if critique fails
+              }
             } catch (parseError) {
               safeError("Failed to parse JSON:", parseError);
               parsedOutput = {
@@ -914,11 +988,17 @@ CRITICAL INSTRUCTIONS:
               ({ title: c.text, uri: c.url })
             ) || [];
 
+            // Add critique metadata to the output if available
+            if (critiqueMetadata && parsedOutput) {
+              (parsedOutput as Record<string, unknown>)._critique_metadata = critiqueMetadata;
+            }
+
             controller.enqueue(encoder.encode(JSON.stringify({
               type: 'complete',
               result: {
                 text: JSON.stringify(parsedOutput),
-                sources
+                sources,
+                metadata: critiqueMetadata || undefined
               }
             }) + '\n'));
           } catch (e) {
@@ -939,7 +1019,8 @@ CRITICAL INSTRUCTIONS:
           'Cache-Control': 'no-cache',
           'Connection': 'keep-alive',
           'X-RateLimit-Limit': '5',
-          'X-RateLimit-Window': '3600'
+          'X-RateLimit-Window': '3600',
+          'X-Session-ID': sessionId
         }
       });
     } catch (error: unknown) {

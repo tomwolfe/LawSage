@@ -1,9 +1,9 @@
 /**
  * Pleading Paper Template Generator
- * 
+ *
  * Creates court-compliant California-style pleading paper templates.
  * Uses PDFKit to generate precise 28-line-per-page format with line numbers.
- * 
+ *
  * Court Compliance Features:
  * - 28 lines per page (California standard)
  * - Line numbers 1-28 on left margin
@@ -12,7 +12,7 @@
  * - Letter size (8.5" x 11")
  */
 
-import PDFDocument from 'pdfkit';
+import type PDFDocumentType from 'pdfkit';
 import { Readable } from 'stream';
 
 export interface PleadingPaperOptions {
@@ -30,6 +30,8 @@ export interface PleadingPaperOptions {
   email?: string;
 }
 
+export type PDFDoc = InstanceType<typeof PDFDocumentType>;
+
 /**
  * Generate a blank pleading paper template
  * Can be used as a background for overlaying text
@@ -37,8 +39,8 @@ export interface PleadingPaperOptions {
 export function generatePleadingPaperTemplate(
   options: PleadingPaperOptions = {},
   pageCount: number = 1
-): any {
-  const doc = new PDFDocument({
+): PDFDoc {
+  const doc = new PDFDocumentType({
     size: 'LETTER',
     margins: {
       top: 72,
@@ -112,7 +114,7 @@ export function generatePleadingPaperTemplate(
  * Draw court caption box on pleading paper
  */
 function drawCourtCaption(
-  doc: typeof PDFDocument,
+  doc: PDFDoc,
   options: PleadingPaperOptions,
   startY: number
 ): number {

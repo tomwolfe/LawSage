@@ -123,8 +123,8 @@ Generate clarifying questions. Focus on gaps in the information provided. If the
 
     // Validate question structure
     const validatedQuestions = questions
-      .filter((q: any) => q.id && q.question && q.category)
-      .map((q: any) => ({
+      .filter((q): q is InterviewQuestion => !!(q.id && q.question && q.category))
+      .map((q) => ({
         id: q.id,
         question: q.question,
         category: q.category,

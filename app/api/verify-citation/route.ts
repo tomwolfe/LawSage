@@ -15,7 +15,7 @@ interface VerifyCitationResponse {
   verification_source: string;
   status_message: string;
   details?: string;
-  courtlistener_data?: any;
+  courtlistener_data?: unknown;
   unverified_reason?: 'DATABASE_UNAVAILABLE' | 'NOT_FOUND' | 'AI_DISABLED' | 'STRICT_MODE';
   confidence_score?: number;  // 0-100 confidence percentage
   confidence_level?: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNVERIFIED';  // Visual indicator
@@ -28,7 +28,7 @@ const COURT_LISTENER_API = API.COURT_LISTENER_BASE;
  * Search CourtListener API for case citations
  * Uses the Free Law Project's RECAP database
  */
-async function searchCourtListener(citation: string): Promise<{ found: boolean; data?: any; error?: string }> {
+async function searchCourtListener(citation: string): Promise<{ found: boolean; data?: { caseName?: string; court?: string; dateFiled?: string; url?: string; docketNumber?: string; citation?: string }; error?: string }> {
   try {
     // CourtListener search endpoint for opinions
     const searchUrl = `${COURT_LISTENER_API}/search/?q=${encodeURIComponent(citation)}&type=o&order_by=score+desc`;
@@ -47,17 +47,17 @@ async function searchCourtListener(citation: string): Promise<{ found: boolean; 
       return { found: false, error: `CourtListener API error: ${response.status}` };
     }
 
-    const data = await response.json();
-    
+    const data = await response.json() as { count: number; results?: Array<{ text?: string; caseName?: string; citation?: string; court_full?: string; dateFiled?: string; resource_url?: string; docketNumber?: string }> };
+
     // Check if we found relevant results
     if (data.count > 0 && data.results && data.results.length > 0) {
       const topResult = data.results[0];
-      
+
       // Check if the citation appears in the result
-      const citationInText = topResult.text?.includes(citation) || 
-                            topResult.caseName?.toLowerCase().includes(citation.toLowerCase()) ||
-                            topResult.citation?.includes(citation);
-      
+      const citationInText = (topResult.text ?? '').includes(citation) ||
+                            (topResult.caseName ?? '').toLowerCase().includes(citation.toLowerCase()) ||
+                            (topResult.citation ?? '').includes(citation);
+
       if (citationInText || topResult.caseName) {
         return {
           found: true,
@@ -65,7 +65,7 @@ async function searchCourtListener(citation: string): Promise<{ found: boolean; 
             caseName: topResult.caseName,
             court: topResult.court_full,
             dateFiled: topResult.dateFiled,
-            url: `https://www.courtlistener.com${topResult.resource_url}`,
+            url: topResult.resource_url ? `https://www.courtlistener.com${topResult.resource_url}` : undefined,
             docketNumber: topResult.docketNumber,
             citation: topResult.citation
           }
@@ -76,9 +76,9 @@ async function searchCourtListener(citation: string): Promise<{ found: boolean; 
     return { found: false };
   } catch (error) {
     safeError('CourtListener search error:', error);
-    return { 
-      found: false, 
-      error: error instanceof Error ? error.message : 'Unknown CourtListener error' 
+    return {
+      found: false,
+      error: error instanceof Error ? error.message : 'Unknown CourtListener error'
     };
   }
 }
@@ -86,18 +86,18 @@ async function searchCourtListener(citation: string): Promise<{ found: boolean; 
 /**
  * Search for federal statutes in CourtListener
  */
-async function searchFederalStatute(citation: string): Promise<{ found: boolean; data?: any }> {
+async function searchFederalStatute(citation: string): Promise<{ found: boolean; data?: Record<string, unknown> }> {
   try {
     // Try to parse US Code citations (e.g., "28 U.S.C. § 1331")
     const uscMatch = citation.match(/(\d+)\s*U\.?S\.?C\.?\s*§?\s*(\d+)/i);
-    
+
     if (uscMatch) {
       const title = uscMatch[1];
       const section = uscMatch[2];
-      
+
       // Search for statutes
       const searchUrl = `${COURT_LISTENER_API}/search/?q=${encodeURIComponent(`"${title} U.S.C. ${section}"`)}&type=o`;
-      
+
       const response = await fetch(searchUrl, {
         headers: {
           'User-Agent': 'LawSage Legal Assistant'
@@ -105,7 +105,7 @@ async function searchFederalStatute(citation: string): Promise<{ found: boolean;
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const data = await response.json() as { count: number };
         if (data.count > 0) {
           return {
             found: true,
@@ -130,19 +130,19 @@ async function searchFederalStatute(citation: string): Promise<{ found: boolean;
 /**
  * Search for state statutes via CourtListener
  */
-async function searchStateStatute(citation: string, jurisdiction: string): Promise<{ found: boolean; data?: any }> {
+async function searchStateStatute(citation: string, jurisdiction: string): Promise<{ found: boolean; data?: Record<string, unknown> }> {
   try {
     // Map common jurisdiction names to state codes
     const stateCodeMap: Record<string, string> = {
       'california': 'CA', 'new york': 'NY', 'texas': 'TX', 'florida': 'FL',
       'illinois': 'IL', 'pennsylvania': 'PA', 'ohio': 'OH', 'georgia': 'GA'
     };
-    
+
     const stateCode = stateCodeMap[jurisdiction.toLowerCase()] || jurisdiction.substring(0, 2).toUpperCase();
-    
+
     // Search for state statute citations
     const searchUrl = `${COURT_LISTENER_API}/search/?q=${encodeURIComponent(`${citation} ${stateCode}`)}&type=o`;
-    
+
     const response = await fetch(searchUrl, {
       headers: {
         'User-Agent': 'LawSage Legal Assistant'
@@ -150,7 +150,7 @@ async function searchStateStatute(citation: string, jurisdiction: string): Promi
     });
 
     if (response.ok) {
-      const data = await response.json();
+      const data = await response.json() as { count: number };
       if (data.count > 0) {
         return {
           found: true,
