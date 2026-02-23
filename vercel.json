@@ -1,17 +1,10 @@
 {
   "functions": {
-    "app/api/analyze/route.ts": {
-      "runtime": "edge",
-      "maxDuration": 60
-    },
     "app/api/**/*": {
       "maxDuration": 60
     },
     "app/api/vector/**/*": {
       "maxDuration": 30
-    },
-    "app/api/ocr": {
-      "maxDuration": 60
     }
   },
   "headers": [
