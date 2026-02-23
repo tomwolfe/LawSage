@@ -1,12 +1,12 @@
 /**
  * Checkpoint Status API Endpoint
- * 
+ *
  * Allows clients to poll for analysis progress and resume from checkpoints
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getCheckpointStatus, resumeCheckpoint, deleteCheckpoint } from '../../../lib/analysis-checkpoint';
-import { safeLog, safeError } from '../../../lib/pii-redactor';
+import { getCheckpointStatus, resumeCheckpoint, deleteCheckpoint } from '@/lib/analysis-checkpoint';
+import { safeLog, safeError } from '@/lib/pii-redactor';
 
 export const runtime = 'edge';
 
