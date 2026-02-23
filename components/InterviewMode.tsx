@@ -279,6 +279,15 @@ export default function InterviewMode({
     }
   }, [currentQuestion, currentQuestionIndex, questions.length]);
 
+  const handleSubmit = useCallback(async () => {
+    setIsSubmitting(true);
+    try {
+      await onComplete(answers);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [answers, onComplete]);
+
   const handleSkip = useCallback(() => {
     if (!currentQuestion) return;
 
@@ -297,15 +306,6 @@ export default function InterviewMode({
       setCurrentQuestionIndex(prev => prev - 1);
     }
   }, [currentQuestionIndex]);
-
-  const handleSubmit = useCallback(async () => {
-    setIsSubmitting(true);
-    try {
-      await onComplete(answers);
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [answers, onComplete]);
 
   const handleSkipAll = useCallback(() => {
     if (onSkip) {

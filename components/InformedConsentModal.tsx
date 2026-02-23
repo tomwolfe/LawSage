@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { X, AlertTriangle, CheckCircle } from 'lucide-react';
 
+const consentVersion = '1.0';
+
 interface InformedConsentModalProps {
   isOpen: boolean;
   onAccept: () => void;
