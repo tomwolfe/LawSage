@@ -20,6 +20,7 @@
     "clsx": "^2.1.1",
     "docx": "^9.0.3",
     "framer-motion": "^12.34.3",
+    "jsonrepair": "^3.13.2",
     "lucide-react": "^0.563.0",
     "lz-string": "^1.5.0",
     "next": "16.1.6",

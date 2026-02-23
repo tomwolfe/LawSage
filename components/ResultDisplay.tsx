@@ -1701,24 +1701,52 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                           ) : (
                             <>
                               {status.is_verified !== undefined ? (
-                                <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+                                <div className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold ${
                                   status.is_verified
-                                    ? 'bg-green-100 text-green-800'
-                                    : 'bg-red-100 text-red-800'
+                                    ? 'bg-green-100 text-green-800 border border-green-200'
+                                    : 'bg-red-100 text-red-800 border border-red-200'
                                 }`}>
                                   {status.is_verified ? (
                                     <>
-                                      <CheckCircle size={12} />
-                                      Verified
+                                      <CheckCircle size={14} />
+                                      VERIFIED
                                     </>
                                   ) : (
                                     <>
-                                      <AlertTriangle size={12} />
-                                      Warning
+                                      <AlertTriangle size={14} />
+                                      UNVERIFIED
                                     </>
                                   )}
                                 </div>
                               ) : null}
+
+                              {/* Google Scholar Deep Link for Unverified Citations */}
+                              {status.is_verified === false && (
+                                <a
+                                  href={`https://scholar.google.com/scholar?q=${encodeURIComponent(citation.text)}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200 hover:bg-blue-200 transition-colors"
+                                  title="Search this citation on Google Scholar"
+                                >
+                                  <LinkIcon size={14} />
+                                  Scholar Search
+                                </a>
+                              )}
+
+                              {/* CourtListener Deep Link for Verified Citations */}
+                              {status.is_verified === true && status.verification_source?.includes('CourtListener') && (
+                                <a
+                                  href={`https://www.courtlistener.com/?q=${encodeURIComponent(citation.text)}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-200 hover:bg-indigo-200 transition-colors"
+                                  title="View on CourtListener"
+                                >
+                                  <LinkIcon size={14} />
+                                  CourtListener
+                                </a>
+                              )}
 
                               <button
                                 onClick={async () => {
@@ -1752,7 +1780,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                                 }}
                                 disabled={status.loading}
                                 className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors disabled:opacity-50"
-                                title="Verify citation status"
+                                title={status.is_verified === true ? "Re-verify citation" : status.is_verified === false ? "Re-verify citation" : "Verify citation status"}
                               >
                                 <RotateCcw size={16} />
                               </button>

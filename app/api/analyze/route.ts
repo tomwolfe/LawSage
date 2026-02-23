@@ -5,12 +5,15 @@ import { withRateLimit } from '../../../lib/rate-limiter';
 import { getLegalLookupResponse, searchExParteRules } from '../../../src/utils/legal-lookup';
 import { searchLegalRules, isVectorConfigured } from '../../../lib/vector';
 import templateManifest from '../../../public/templates/manifest.json';
+import { readFile } from 'fs/promises';
+import path from 'path';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs'; // Unified runtime with OCR for consistent deployment
 
 /**
  * Repairs truncated JSON strings caused by token limits or streaming interruptions.
  * Handles unclosed strings, braces, and brackets.
+ * @deprecated Use parsePartialJSON from streaming-json-parser instead
  */
 function repairTruncatedJSON(jsonString: string): string {
   let cleaned = jsonString.trim();
@@ -491,13 +494,14 @@ export async function POST(req: NextRequest) {
           const { template: bestMatch } = findBestTemplate(user_input, templates);
 
           if (bestMatch) {
-            // For edge runtime, we fetch the template via fetch() instead of fs
-            const templateUrl = new URL(bestMatch.templatePath, req.url).toString();
-            const templateResponse = await fetch(templateUrl);
-            if (templateResponse.ok) {
-              const templateContent = await templateResponse.text();
+            // Load template from filesystem (nodejs runtime)
+            const templatePath = path.join(process.cwd(), 'public', bestMatch.templatePath);
+            try {
+              const templateContent = await readFile(templatePath, 'utf8');
               safeLog(`Using template: ${bestMatch.title}`);
               return { templateContent, templateName: bestMatch.title };
+            } catch (fileError) {
+              safeWarn(`Failed to load template from ${templatePath}:`, fileError);
             }
           }
         } catch (error) {
@@ -735,6 +739,7 @@ CRITICAL INSTRUCTIONS:
             let accumulatedToolArgs = "";
             let firstTokenReceived = false;
             let lineBuffer = "";
+            let lastEmittedSectionCount = 0;
 
             const reader = response.body?.getReader();
             if (!reader) {
@@ -784,6 +789,33 @@ CRITICAL INSTRUCTIONS:
                           type: 'chunk',
                           content: toolCall.function.arguments
                         }) + '\n'));
+
+                        // PROGRESSIVE RENDERING: Try to parse and emit completed sections
+                        try {
+                          const { parsePartialJSON } = await import('../../../lib/streaming-json-parser');
+                          const partialOutput = parsePartialJSON<LegalOutput>(accumulatedToolArgs);
+                          
+                          if (partialOutput) {
+                            const completedSections = Object.keys(partialOutput).filter(
+                              key => partialOutput[key as keyof LegalOutput] !== undefined
+                            );
+                            
+                            // Only emit if we have new complete sections
+                            if (completedSections.length > lastEmittedSectionCount) {
+                              controller.enqueue(encoder.encode(JSON.stringify({
+                                type: 'progressive',
+                                sections: completedSections,
+                                partial: partialOutput
+                              }) + '\n'));
+                              lastEmittedSectionCount = completedSections.length;
+                            }
+                          }
+                        } catch (progressiveError) {
+                          // Silent fail - don't interrupt stream for progressive rendering
+                          if (process.env.NODE_ENV === 'development') {
+                            safeWarn('Progressive parse error:', progressiveError);
+                          }
+                        }
                       }
                     }
 
@@ -841,20 +873,12 @@ CRITICAL INSTRUCTIONS:
                 throw new Error('Empty response from GLM API');
               }
 
-              // First attempt: repair and parse
-              const cleanedJson = repairTruncatedJSON(accumulatedToolArgs);
+              // Use robust jsonrepair-based parser
+              const { parsePartialJSON } = await import('../../../lib/streaming-json-parser');
+              parsedOutput = parsePartialJSON<LegalOutput>(accumulatedToolArgs);
 
-              try {
-                parsedOutput = JSON.parse(cleanedJson) as LegalOutput;
-              } catch (repairError) {
-                // If repair fails, try the partial JSON parser as fallback
-                safeWarn("JSON repair failed, attempting partial parse:", repairError);
-                const { parsePartialJSON } = await import('../../../lib/streaming-json-parser');
-                parsedOutput = parsePartialJSON<LegalOutput>(accumulatedToolArgs);
-                
-                if (!parsedOutput) {
-                  throw new Error("Could not recover any usable data from AI response");
-                }
+              if (!parsedOutput) {
+                throw new Error("Could not recover any usable data from AI response");
               }
 
               const validation = validateLegalOutputStructure(parsedOutput);

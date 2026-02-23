@@ -227,7 +227,7 @@ describe('Motion Schemas Validation', () => {
     });
 
     it('should return error for unknown motion type', () => {
-      const unknownMotion: LegalMotion = {
+      const unknownMotion = {
         id: '',
         title: '',
         description: '',
@@ -248,8 +248,8 @@ describe('Motion Schemas Validation', () => {
           attorneyBarNumber: '',
           date: ''
         },
-        type: 'motion_to_dismiss'
-      } as unknown as LegalMotion;
+        type: 'unknown_motion_type'
+      } as LegalMotion;
 
       const result = validateLegalMotion(unknownMotion);
       expect(result.isValid).toBe(false);

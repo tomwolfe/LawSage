@@ -1,8 +1,24 @@
 /**
  * Streaming JSON Parser
  * Implements best-effort partial JSON parsing for real-time UI updates
- * Allows showing strategy sections as they are being generated
+ * Uses jsonrepair library for robust truncated JSON recovery
  */
+
+import { jsonrepair } from 'jsonrepair';
+
+/**
+ * Repairs truncated JSON using the jsonrepair state-machine parser
+ * Handles: unclosed strings, missing commas, trailing commas, incomplete values
+ */
+export function repairJSON(incompleteJSON: string): string {
+  try {
+    return jsonrepair(incompleteJSON);
+  } catch (repairError) {
+    // jsonrepair failed, return original for fallback parsing
+    console.warn('jsonrepair failed:', repairError);
+    return incompleteJSON;
+  }
+}
 
 /**
  * Attempts to parse incomplete JSON by fixing common truncation issues
@@ -13,12 +29,20 @@ export function parsePartialJSON<T>(incompleteJSON: string): T | null {
   try {
     return JSON.parse(incompleteJSON) as T;
   } catch {
-    // If that fails, attempt to fix common issues
+    // If that fails, attempt repair with jsonrepair
   }
 
-  // Remove trailing incomplete strings
+  // Use jsonrepair library for robust repair
+  try {
+    const repaired = repairJSON(incompleteJSON);
+    return JSON.parse(repaired) as T;
+  } catch {
+    // jsonrepair failed, fall back to manual fixes
+  }
+
+  // Manual fallback: Remove trailing incomplete strings
   let cleaned = incompleteJSON.trim();
-  
+
   // Fix trailing incomplete strings
   const lastQuote = cleaned.lastIndexOf('"');
   if (lastQuote !== -1 && lastQuote === cleaned.length - 1) {
@@ -87,7 +111,7 @@ function extractCompleteFields<T>(incompleteJSON: string): T | null {
     let match;
     while ((match = pattern.exec(trimmed)) !== null) {
       const key = match[1];
-      let valueStr = match[2];
+      const valueStr = match[2];
 
       // Parse the value
       let value: unknown;

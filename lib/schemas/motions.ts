@@ -148,17 +148,19 @@ export function validateMotionToDismiss(motion: MotionToDismiss): { isValid: boo
 
   // Validate grounds - at least one must be true
   const grounds = motion.grounds;
-  if (!grounds.lackOfSubjectMatterJurisdiction && 
-      !grounds.lackOfPersonalJurisdiction && 
-      !grounds.improperVenue && 
-      !grounds.insufficientService && 
-      !grounds.failureToStateClaim && 
-      !grounds.statuteOfLimitations && 
-      !grounds.other) {
+  if (!grounds || (
+    !grounds.lackOfSubjectMatterJurisdiction &&
+    !grounds.lackOfPersonalJurisdiction &&
+    !grounds.improperVenue &&
+    !grounds.insufficientService &&
+    !grounds.failureToStateClaim &&
+    !grounds.statuteOfLimitations &&
+    !grounds.other
+  )) {
     errors.push('At least one ground for dismissal must be selected');
   }
 
-  if (grounds.other && !grounds.otherDescription) {
+  if (grounds?.other && !grounds.otherDescription) {
     errors.push('Other ground description is required when "other" is selected');
   }
 
