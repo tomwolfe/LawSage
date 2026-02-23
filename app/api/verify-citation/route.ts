@@ -319,7 +319,7 @@ export async function POST(req: NextRequest) {
         courtlistener_data: federalStatuteResult.data,
         confidence_score: 95,  // Statute with citing cases = very high confidence
         confidence_level: 'HIGH',
-        deep_link: federalStatuteResult.data.searchUrl || undefined,
+        deep_link: (federalStatuteResult.data as { searchUrl?: string }).searchUrl || undefined,
       };
 
       return NextResponse.json(response);
@@ -340,7 +340,7 @@ export async function POST(req: NextRequest) {
         courtlistener_data: stateStatuteResult.data,
         confidence_score: 90,  // State statute = high confidence but less than federal
         confidence_level: 'HIGH',
-        deep_link: stateStatuteResult.data.searchUrl || undefined,
+        deep_link: (stateStatuteResult.data as { searchUrl?: string }).searchUrl || undefined,
       };
 
       return NextResponse.json(response);

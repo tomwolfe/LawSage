@@ -20,7 +20,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import type PDFDocumentType from 'pdfkit';
+import PDFDocumentType from 'pdfkit';
 import { Readable } from 'stream';
 import { safeLog, safeError, safeWarn } from '../../../lib/pii-redactor';
 
@@ -260,10 +260,10 @@ function generatePOS040(doc: PDFDoc, caseInfo: CaseInfo, serviceInfo: ServiceInf
   yPosition += 25;
 
   // List of documents served
-  doc.text('DOCUMENTS SERVED:', margin, yPosition, {
-    width: pageWidth - margin * 2,
-    bold: true
+  doc.font('Helvetica-Bold').text('DOCUMENTS SERVED:', margin, yPosition, {
+    width: pageWidth - margin * 2
   });
+  doc.font('Helvetica');
   yPosition += 18;
 
   documents.forEach((docTitle, index) => {
@@ -276,10 +276,10 @@ function generatePOS040(doc: PDFDoc, caseInfo: CaseInfo, serviceInfo: ServiceInf
   yPosition += 15;
 
   // Mailing information
-  doc.text('METHOD OF SERVICE:', margin, yPosition, {
-    width: pageWidth - margin * 2,
-    bold: true
+  doc.font('Helvetica-Bold').text('METHOD OF SERVICE:', margin, yPosition, {
+    width: pageWidth - margin * 2
   });
+  doc.font('Helvetica');
   yPosition += 18;
 
   doc.text(`☐ By Mail: I placed the documents in a sealed envelope and mailed them to the addresses below via United States Postal Service with postage prepaid.`, margin, yPosition, {
@@ -289,10 +289,10 @@ function generatePOS040(doc: PDFDoc, caseInfo: CaseInfo, serviceInfo: ServiceInf
   yPosition += 50;
 
   // Parties served
-  doc.text('PARTIES SERVED:', margin, yPosition, {
-    width: pageWidth - margin * 2,
-    bold: true
+  doc.font('Helvetica-Bold').text('PARTIES SERVED:', margin, yPosition, {
+    width: pageWidth - margin * 2
   });
+  doc.font('Helvetica');
   yPosition += 18;
 
   doc.text(`To: ${serviceInfo.servedTo.name}`, margin + 10, yPosition, {
@@ -362,10 +362,10 @@ function generateFL335(doc: PDFDoc, caseInfo: CaseInfo, serviceInfo: ServiceInfo
   doc.fontSize(10).font('Helvetica').fillColor('#000000');
 
   // Notice
-  doc.text('NOTICE:', margin, yPosition, {
-    width: pageWidth - margin * 2,
-    bold: true
+  doc.font('Helvetica-Bold').text('NOTICE:', margin, yPosition, {
+    width: pageWidth - margin * 2
   });
+  doc.font('Helvetica');
   yPosition += 18;
 
   doc.text('The person serving the documents must fill out this form and sign it on page 2. This form cannot be served by the party to this case. Mail service is not allowed for certain documents. Check the court rules.', margin, yPosition, {
@@ -375,10 +375,10 @@ function generateFL335(doc: PDFDoc, caseInfo: CaseInfo, serviceInfo: ServiceInfo
   yPosition += 50;
 
   // Server information
-  doc.text('1. SERVER INFORMATION', margin, yPosition, {
-    width: pageWidth - margin * 2,
-    bold: true
+  doc.font('Helvetica-Bold').text('1. SERVER INFORMATION', margin, yPosition, {
+    width: pageWidth - margin * 2
   });
+  doc.font('Helvetica');
   yPosition += 18;
 
   doc.text(`Name: ${serviceInfo.servedBy.name}`, margin, yPosition, {
@@ -407,10 +407,10 @@ function generateFL335(doc: PDFDoc, caseInfo: CaseInfo, serviceInfo: ServiceInfo
   yPosition += 30;
 
   // Party information
-  doc.text('2. PARTY SERVED', margin, yPosition, {
-    width: pageWidth - margin * 2,
-    bold: true
+  doc.font('Helvetica-Bold').text('2. PARTY SERVED', margin, yPosition, {
+    width: pageWidth - margin * 2
   });
+  doc.font('Helvetica');
   yPosition += 18;
 
   doc.text(`Name: ${serviceInfo.servedTo.name}`, margin, yPosition, {
@@ -429,10 +429,10 @@ function generateFL335(doc: PDFDoc, caseInfo: CaseInfo, serviceInfo: ServiceInfo
   yPosition += 30;
 
   // Documents served
-  doc.text('3. DOCUMENTS SERVED', margin, yPosition, {
-    width: pageWidth - margin * 2,
-    bold: true
+  doc.font('Helvetica-Bold').text('3. DOCUMENTS SERVED', margin, yPosition, {
+    width: pageWidth - margin * 2
   });
+  doc.font('Helvetica');
   yPosition += 18;
 
   documents.forEach((docTitle, index) => {
@@ -444,10 +444,10 @@ function generateFL335(doc: PDFDoc, caseInfo: CaseInfo, serviceInfo: ServiceInfo
   yPosition += 25;
 
   // Service method
-  doc.text('4. METHOD OF SERVICE', margin, yPosition, {
-    width: pageWidth - margin * 2,
-    bold: true
+  doc.font('Helvetica-Bold').text('4. METHOD OF SERVICE', margin, yPosition, {
+    width: pageWidth - margin * 2
   });
+  doc.font('Helvetica');
   yPosition += 18;
 
   doc.text(`☐ By Mail: On ${formatDate(serviceInfo.serviceDate)}, I served the party named above by placing a copy of the documents listed above in a sealed envelope with postage prepaid, and mailed it via United States Postal Service to the address shown above.`, margin, yPosition, {
@@ -457,10 +457,10 @@ function generateFL335(doc: PDFDoc, caseInfo: CaseInfo, serviceInfo: ServiceInfo
   yPosition += 50;
 
   // Declaration
-  doc.text('5. DECLARATION', margin, yPosition, {
-    width: pageWidth - margin * 2,
-    bold: true
+  doc.font('Helvetica-Bold').text('5. DECLARATION', margin, yPosition, {
+    width: pageWidth - margin * 2
   });
+  doc.font('Helvetica');
   yPosition += 18;
 
   doc.text('I declare under penalty of perjury under the laws of the State of California that the above is true and correct.', margin, yPosition, {
@@ -507,10 +507,10 @@ function generateGenericProofOfService(doc: PDFDoc, caseInfo: CaseInfo, serviceI
   doc.fontSize(10).font('Helvetica').fillColor('#000000');
 
   // Server declaration
-  doc.text('DECLARATION OF SERVER', margin, yPosition, {
-    width: pageWidth - margin * 2,
-    bold: true
+  doc.font('Helvetica-Bold').text('DECLARATION OF SERVER', margin, yPosition, {
+    width: pageWidth - margin * 2
   });
+  doc.font('Helvetica');
   yPosition += 20;
 
   doc.text(`I, ${serviceInfo.servedBy.name}, being duly sworn, depose and state:`, margin, yPosition, {
@@ -566,10 +566,10 @@ function generateGenericProofOfService(doc: PDFDoc, caseInfo: CaseInfo, serviceI
   yPosition += 25;
 
   // Verification
-  doc.text('VERIFICATION', margin, yPosition, {
-    width: pageWidth - margin * 2,
-    bold: true
+  doc.font('Helvetica-Bold').text('VERIFICATION', margin, yPosition, {
+    width: pageWidth - margin * 2
   });
+  doc.font('Helvetica');
   yPosition += 18;
 
   doc.text('I verify under penalty of perjury that the foregoing is true and correct.', margin, yPosition, {
@@ -702,8 +702,8 @@ export async function POST(req: NextRequest) {
     } = body;
 
     // Check if form is supported
-    const supportedForms = SUPPORTED_FORMS[jurisdiction] || SUPPORTED_FORMS['Federal'];
-    if (!supportedForms.includes(formType)) {
+    const supportedForms = (jurisdiction && SUPPORTED_FORMS[jurisdiction]) || SUPPORTED_FORMS['Federal'];
+    if (formType && !supportedForms.includes(formType)) {
       safeWarn(`Requested form ${formType} not supported for ${jurisdiction}, using GENERIC`);
     }
 

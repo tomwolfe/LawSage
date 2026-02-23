@@ -191,7 +191,7 @@ export const AnalysisCheckpointDataSchema = z.object({
   accumulatedArgs: z.string(),
   researchContext: z.string(),
   jurisdiction: z.string(),
-  critiqueMetadata: z.record(z.unknown()).optional(),
+  critiqueMetadata: z.record(z.string(), z.unknown()).optional(),
   expiresAt: z.number(),
 });
 

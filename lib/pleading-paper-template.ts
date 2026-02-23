@@ -12,7 +12,7 @@
  * - Letter size (8.5" x 11")
  */
 
-import type PDFDocumentType from 'pdfkit';
+import PDFDocumentType from 'pdfkit';
 import { Readable } from 'stream';
 
 export interface PleadingPaperOptions {
