@@ -443,6 +443,48 @@ export default function LegalInterface() {
             setHistory(updatedHistory);
             localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
             addToCaseLedger('complaint_filed', `Analysis generated for user input.`);
+
+            // Trigger Background Audit (Step 2) - Decoupled to avoid 60s timeout
+            // This runs asynchronously so the user sees results immediately
+            const auditPayload = {
+              analysis: finalResult.text,
+              jurisdiction,
+              researchContext: '' // Research context is already embedded in the analysis
+            };
+
+            // Fire-and-forget: Don't await, let it run in background
+            fetch('/api/audit', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(auditPayload)
+            })
+              .then(res => res.json())
+              .then(auditData => {
+                // Update the result with audit metadata
+                setResult(prev => {
+                  if (!prev) return null;
+                  try {
+                    const parsedText = JSON.parse(prev.text);
+                    parsedText._critique_metadata = auditData;
+                    return { ...prev, text: JSON.stringify(parsedText) };
+                  } catch {
+                    return prev;
+                  }
+                });
+                
+                // Show audit completion status
+                const statusMessage = auditData.audit_passed 
+                  ? 'Audit complete: Statutes verified.' 
+                  : `Audit complete: ${auditData.recommended_actions?.length || 0} issue(s) found.`;
+                setStreamingStatus(statusMessage);
+                setTimeout(() => setStreamingStatus(''), 5000);
+              })
+              .catch(auditError => {
+                safeWarn('Background audit failed:', auditError);
+                // Don't show error to user - audit is optional enhancement
+              });
           } else {
             throw new Error('No complete response received from server');
           }

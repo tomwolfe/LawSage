@@ -4,7 +4,6 @@ import { safeLog, safeError, safeWarn, redactPII } from '../../../lib/pii-redact
 import { withRateLimit } from '../../../lib/rate-limiter';
 import { getLegalLookupResponse, searchExParteRules } from '../../../src/utils/legal-lookup';
 import { searchLegalRules, isVectorConfigured } from '../../../lib/vector';
-import { runCritiqueLoop, generateCorrectedOutput, hasPassedCritique } from '../../../lib/critique-agent';
 import { saveCheckpoint, generateSessionId } from '../../../lib/analysis-checkpoint';
 import templateManifest from '../../../public/templates/manifest.json';
 import { readFile } from 'fs/promises';
@@ -327,11 +326,12 @@ STRICT OPERATIONAL CONSTRAINTS:
 3. CITATION MINIMUM: You must provide 3-5 real citations.
 4. CHAIN OF THOUGHT: Before generating the JSON, mentally verify if the statute actually exists for that topic.
 
-STRICT BREVITY CONSTRAINTS FOR VERCEL HOBBY TIER:
-5. CONCISE STRATEGY: Keep 'strategy' and 'adversarial_strategy' to 2-3 concise paragraphs each (max 400 words total).
-6. TEMPLATE LIMIT: In 'filing_template', provide core structure and essential allegations only. Do NOT exceed 800 words.
-7. FOCUSED ROADMAP: Limit roadmap to 3-5 essential steps. Keep each step description under 100 words.
-8. TOKEN BUDGET: You have a limited token budget. Prioritize substance over verbosity.
+STRICT BREVITY CONSTRAINTS FOR VERCEL HOBBY TIER (60s TIMEOUT):
+5. MAX TOKENS: Keep the entire JSON response under 1800 tokens.
+6. CONCISE STRATEGY: Limit 'strategy' and 'adversarial_strategy' to 2 paragraphs each (max 300 words total). High-density legal theory only.
+7. TEMPLATE LIMIT: In 'filing_template', provide ONLY essential legal sections and core structure. Do NOT exceed 600 words. No boilerplate instructions.
+8. FOCUSED ROADMAP: Limit roadmap to 3-4 essential steps. Keep each step description under 80 words.
+9. TOKEN BUDGET: Prioritize substance over verbosity. Every word must earn its place.
 
 **CRITICAL: JSON KEY NAMING REQUIREMENTS**
 You MUST use EXACTLY these key names in your JSON response. DO NOT use synonyms or variations:
@@ -886,7 +886,6 @@ CRITICAL INSTRUCTIONS:
             }
 
             let parsedOutput: LegalOutput | null = null;
-            let critiqueMetadata: Record<string, unknown> | null = null;
 
             try {
               console.log(`[GLM Response] Accumulated arguments length: ${accumulatedToolArgs.length}`);
@@ -919,57 +918,9 @@ CRITICAL INSTRUCTIONS:
                 };
               }
 
-              // MULTI-AGENT CRITIQUE LOOP: Audit the Architect output
-              // This runs asynchronously to catch hallucinated statutes and procedural errors
-              safeLog('[Critique Loop] Starting multi-agent audit...');
-              controller.enqueue(encoder.encode(JSON.stringify({
-                type: 'status',
-                message: 'Auditing legal analysis for accuracy...'
-              }) + '\n'));
-
-              try {
-                const critiqueResult = await runCritiqueLoop(accumulatedToolArgs, {
-                  jurisdiction,
-                  researchContext,
-                  maxRetries: 1
-                });
-
-                critiqueMetadata = {
-                  audit_passed: critiqueResult.isValid,
-                  confidence: critiqueResult.overallConfidence,
-                  statute_issues_count: critiqueResult.statuteIssues.filter(s => !s.isVerified).length,
-                  roadmap_issues_count: critiqueResult.roadmapIssues.filter(r => !r.isVerified).length,
-                  audited_at: new Date().toISOString(),
-                  recommended_actions: critiqueResult.recommendedActions,
-                };
-
-                // If critique failed with low confidence, attempt correction
-                if (!critiqueResult.isValid && critiqueResult.overallConfidence < 0.6) {
-                  safeWarn('[Critique Loop] Low confidence detected, attempting correction...');
-                  controller.enqueue(encoder.encode(JSON.stringify({
-                    type: 'status',
-                    message: 'Correcting identified issues...'
-                  }) + '\n'));
-
-                  const correctedOutput = await generateCorrectedOutput(
-                    accumulatedToolArgs,
-                    critiqueResult,
-                    { jurisdiction, researchContext }
-                  );
-
-                  // Re-parse corrected output
-                  const correctedParsed = parsePartialJSON<LegalOutput>(correctedOutput);
-                  if (correctedParsed) {
-                    parsedOutput = correctedParsed;
-                    critiqueMetadata.correction_applied = true;
-                  }
-                }
-
-                safeLog(`[Critique Loop] Audit complete: confidence=${critiqueResult.overallConfidence.toFixed(2)}, valid=${critiqueResult.isValid}`);
-              } catch (critiqueError) {
-                safeWarn('[Critique Loop] Audit failed, proceeding with original output:', critiqueError);
-                // Don't fail the entire request if critique fails
-              }
+              // Note: Critique/Audit loop has been decoupled to a separate endpoint (/api/audit)
+              // to stay within Vercel Hobby Tier's 60s timeout limit.
+              // The frontend will call the audit endpoint separately after receiving this response.
             } catch (parseError) {
               safeError("Failed to parse JSON:", parseError);
               parsedOutput = {
@@ -988,17 +939,11 @@ CRITICAL INSTRUCTIONS:
               ({ title: c.text, uri: c.url })
             ) || [];
 
-            // Add critique metadata to the output if available
-            if (critiqueMetadata && parsedOutput) {
-              (parsedOutput as Record<string, unknown>)._critique_metadata = critiqueMetadata;
-            }
-
             controller.enqueue(encoder.encode(JSON.stringify({
               type: 'complete',
               result: {
                 text: JSON.stringify(parsedOutput),
-                sources,
-                metadata: critiqueMetadata || undefined
+                sources
               }
             }) + '\n'));
           } catch (e) {
