@@ -600,9 +600,94 @@ export async function POST(req: NextRequest) {
         documentsText += "CRITICAL: These are official court documents. Use them to fact-check the user's description.\n\n";
       }
 
-      // Prepare the system prompt
+      // === STRUCTURED OUTPUT: GLM Function Calling ===
+      // Define the legal output schema as a tool for guaranteed structure compliance
+      // This eliminates the need for fragile JSON streaming/parsing
+      const legalAnalysisTool = {
+        type: 'function' as const,
+        function: {
+          name: 'generate_legal_analysis',
+          description: 'Generate comprehensive legal analysis and strategy for Pro Se litigants',
+          parameters: {
+            type: 'object',
+            properties: {
+              disclaimer: {
+                type: 'string',
+                description: 'Legal disclaimer stating this is information not advice'
+              },
+              strategy: {
+                type: 'string',
+                description: 'Primary legal strategy and analysis'
+              },
+              adversarial_strategy: {
+                type: 'string',
+                description: 'Detailed red-team analysis identifying weaknesses and how opposition will counter each point'
+              },
+              roadmap: {
+                type: 'array',
+                description: 'Step-by-step procedural roadmap',
+                items: {
+                  type: 'object',
+                  properties: {
+                    step: { type: 'number', description: 'Step number' },
+                    title: { type: 'string', description: 'Step title' },
+                    description: { type: 'string', description: 'Detailed description' },
+                    estimated_time: { type: 'string', description: 'Timeframe for completion' },
+                    required_documents: { type: 'array', items: { type: 'string' }, description: 'Required documents' },
+                    counter_measure: { type: 'string', description: 'Expected opposition response and how to prepare' }
+                  },
+                  required: ['step', 'title', 'description']
+                }
+              },
+              filing_template: {
+                type: 'string',
+                description: 'Complete filing template with caption, motion body, and certificate of service'
+              },
+              citations: {
+                type: 'array',
+                description: 'Legal citations (minimum 3)',
+                items: {
+                  type: 'object',
+                  properties: {
+                    text: { type: 'string', description: 'Full citation string' },
+                    source: { type: 'string', description: 'Type of source (statute, case, rule)' },
+                    url: { type: 'string', description: 'URL to citation source' }
+                  },
+                  required: ['text']
+                }
+              },
+              local_logistics: {
+                type: 'object',
+                description: 'Courthouse information and local requirements',
+                properties: {
+                  courthouse_address: { type: 'string' },
+                  filing_fees: { type: 'string' },
+                  dress_code: { type: 'string' },
+                  parking_info: { type: 'string' },
+                  hours_of_operation: { type: 'string' },
+                  local_rules_url: { type: 'string' }
+                }
+              },
+              procedural_checks: {
+                type: 'array',
+                description: 'Procedural compliance checks',
+                items: { type: 'string' }
+              }
+            },
+            required: ['disclaimer', 'strategy', 'adversarial_strategy', 'roadmap', 'filing_template', 'citations', 'local_logistics', 'procedural_checks']
+          }
+        }
+      };
+
+      const tool_choice = {
+        type: 'function' as const,
+        function: {
+          name: 'generate_legal_analysis'
+        }
+      };
+
+      // Prepare the system prompt (simplified since structure is enforced by tool)
       const systemPrompt = `You are LawSage, a Pro Se Architect AI helping self-represented litigants.
-Your response MUST be a single, valid JSON object matching the schema provided in the user message.
 
 IMPORTANT LIMITATIONS:
 - You do NOT have web search capabilities. Rely ONLY on the provided RESEARCH CONTEXT and your internal legal knowledge.
@@ -612,18 +697,16 @@ IMPORTANT LIMITATIONS:
 CRITICAL EVIDENCE HANDLING:
 You have been provided with OCR-extracted text from official documents in the 'documents' field.
 1. If the user's description conflicts with the OCR text (e.g., dates, case numbers, or facts), the OCR text is the source of truth.
-2. Explicitly reference documents using [Evidence X] notation in your strategy (e.g., "According to the Summons [Evidence 1], you were served on...").
+2. Explicitly reference documents using [Evidence X] notation in your strategy.
 3. Use the Case Number found in documents to populate the Filing Template.
-4. Cross-reference the user's claims against the extracted evidence to identify any contradictions or inaccuracies.
-5. If evidence documents exist, your adversarial_strategy should specifically address how the opposition might use these documents against the user.
+4. Cross-reference the user's claims against the extracted evidence to identify contradictions.
+5. If evidence documents exist, your adversarial_strategy should address how the opposition might use these documents.
 
 ${exParteRulesText}
 
 ${documentsText || ''}
 
-${templateContent ? "Use this template as a reference for formatting: " + templateContent.substring(0, 1000) + "..." : ""}
-
-Return a SINGLE JSON response with all required sections as specified in the schema.`;
+${templateContent ? "Use this template as a reference for formatting." : ""}`;
 
       // Build the user prompt with PII-redacted input
       const userPrompt = `Jurisdiction: ${jurisdiction}
@@ -685,6 +768,7 @@ CRITICAL INSTRUCTIONS:
             }, timeoutMs);
 
             // Call GLM with PII-redacted input for privacy protection
+            // Use function calling for guaranteed structured output
             const response = await fetch(GLM_API_URL, {
               method: 'POST',
               headers: {
@@ -697,8 +781,10 @@ CRITICAL INSTRUCTIONS:
                   { role: "system", content: systemPrompt },
                   { role: "user", content: userPrompt }
                 ],
+                tools: [legalAnalysisTool],
+                tool_choice: tool_choice,
                 temperature: 0.2,
-                max_tokens: 4096, // Reduced from 8192 to speed up response
+                max_tokens: 4096,
                 stream: true
               }),
               signal: abortController.signal
@@ -720,9 +806,9 @@ CRITICAL INSTRUCTIONS:
 
             clearInterval(heartbeatInterval);
 
-            let accumulatedJson = "";
+            let accumulatedToolArgs = "";
             let firstTokenReceived = false;
-            let lineBuffer = ""; // Buffer for incomplete lines
+            let lineBuffer = "";
 
             const reader = response.body?.getReader();
             if (!reader) {
@@ -734,12 +820,9 @@ CRITICAL INSTRUCTIONS:
               if (done) break;
 
               const chunk = decoder.decode(value, { stream: true });
-              
-              // Add chunk to buffer and split by newlines
+
               lineBuffer += chunk;
               const lines = lineBuffer.split('\n');
-              
-              // Keep the last incomplete line in the buffer
               lineBuffer = lines.pop() || "";
 
               for (const line of lines) {
@@ -747,24 +830,44 @@ CRITICAL INSTRUCTIONS:
                 if (trimmedLine.startsWith('data: ') && trimmedLine !== 'data: [DONE]') {
                   try {
                     const data = JSON.parse(trimmedLine.slice(6));
-                    
-                    // Check for error in response
+
                     if (data.error) {
-                      safeError('GLM API returned error in stream:', data.error);
+                      safeError('GLM API error in stream:', data.error);
                       throw new Error(typeof data.error === 'string' ? data.error : JSON.stringify(data.error));
                     }
-                    
-                    // GLM-4.7-flash returns reasoning_content (thinking) and content (actual response)
-                    // We only want the content field for the JSON response
+
+                    // Handle tool_calls in the streaming response
                     const delta = data.choices?.[0]?.delta;
+                    
+                    // Check for tool_calls in the delta
+                    if (delta?.tool_calls && delta.tool_calls.length > 0) {
+                      const toolCall = delta.tool_calls[0];
+                      
+                      // Accumulate the function arguments (they come in chunks)
+                      if (toolCall.function?.arguments) {
+                        accumulatedToolArgs += toolCall.function.arguments;
+                        
+                        if (!firstTokenReceived) {
+                          firstTokenReceived = true;
+                          controller.enqueue(encoder.encode(JSON.stringify({
+                            type: 'status',
+                            message: 'Generating legal analysis...'
+                          }) + '\n'));
+                        }
+                        
+                        // Stream progress chunks
+                        controller.enqueue(encoder.encode(JSON.stringify({
+                          type: 'chunk',
+                          content: toolCall.function.arguments
+                        }) + '\n'));
+                      }
+                    }
+                    
+                    // Fallback: if no tool_calls but has content, use content (older model behavior)
                     const content = delta?.content || "";
-
-                    // Note: reasoning_content logging removed to reduce log noise
-                    // The model's chain-of-thought is streamed character-by-character which creates excessive logs
-
-                    if (content) {
-                      accumulatedJson += content;
-
+                    if (content && !delta?.tool_calls) {
+                      accumulatedToolArgs += content;
+                      
                       if (!firstTokenReceived) {
                         firstTokenReceived = true;
                         controller.enqueue(encoder.encode(JSON.stringify({
@@ -772,63 +875,54 @@ CRITICAL INSTRUCTIONS:
                           message: 'Generating legal analysis...'
                         }) + '\n'));
                       }
-
-                      // Stream the raw chunk in the format the frontend expects
+                      
                       controller.enqueue(encoder.encode(JSON.stringify({
                         type: 'chunk',
                         content: content
                       }) + '\n'));
                     }
                   } catch (parseError) {
-                    // Log the raw line that failed to parse for debugging
                     safeWarn(`Failed to parse GLM chunk. Raw line: ${trimmedLine.substring(0, 100)}`, parseError);
                   }
-                } else if (trimmedLine && !trimmedLine.startsWith('data:')) {
-                  // Log non-data lines for debugging (might contain error info)
-                  safeWarn('Unexpected stream line format:', trimmedLine.substring(0, 100));
                 }
               }
             }
 
-            // Process any remaining line in the buffer
+            // Process remaining buffer
             if (lineBuffer.trim()) {
               const trimmedLine = lineBuffer.trim();
               if (trimmedLine.startsWith('data: ') && trimmedLine !== 'data: [DONE]') {
                 try {
                   const data = JSON.parse(trimmedLine.slice(6));
                   const delta = data.choices?.[0]?.delta;
-                  const content = delta?.content || "";
-                  if (content) {
-                    accumulatedJson += content;
+                  if (delta?.tool_calls?.[0]?.function?.arguments) {
+                    accumulatedToolArgs += delta.tool_calls[0].function.arguments;
+                  } else if (delta?.content) {
+                    accumulatedToolArgs += delta.content;
                   }
-                  // Note: reasoning_content logging removed to reduce log noise
                 } catch (parseError) {
-                  safeWarn(`Failed to parse final GLM chunk. Raw line: ${trimmedLine.substring(0, 100)}`, parseError);
+                  safeWarn(`Failed to parse final GLM chunk`, parseError);
                 }
               }
             }
 
-            // Debug: log if no content was received
-            if (!accumulatedJson) {
+            if (!accumulatedToolArgs) {
               safeError('No content received from GLM API. Check API key and quota.');
             }
 
-            // Process final accumulated text
+            // Parse the accumulated tool arguments as JSON
             let parsedOutput: LegalOutput | null = null;
 
             try {
-              // Debug: log what we received (use console.log directly to avoid PII redaction of numbers)
-              console.log(`[GLM Response] Accumulated JSON length: ${accumulatedJson.length}`);
-              if (accumulatedJson.length < 500) {
-                console.log(`[GLM Response] Content preview: ${accumulatedJson.substring(0, 200)}`);
-              }
-
-              if (!accumulatedJson.trim()) {
+              console.log(`[GLM Response] Accumulated arguments length: ${accumulatedToolArgs.length}`);
+              
+              if (!accumulatedToolArgs.trim()) {
                 throw new Error('Empty response from GLM API');
               }
 
-              // Strip markdown code block wrappers if present (common with GLM models)
-              const cleanedJson = accumulatedJson.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
+              // The arguments should be valid JSON since it's from function calling
+              // But strip any markdown wrappers just in case
+              const cleanedJson = accumulatedToolArgs.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '');
 
               parsedOutput = JSON.parse(cleanedJson) as LegalOutput;
 
