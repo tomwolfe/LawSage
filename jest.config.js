@@ -1,5 +1,5 @@
-module.exports = {
-  preset: 'ts-jest',
+export default {
+  preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'jsdom',
   roots: ['<rootDir>/__tests__'],
   testMatch: ['**/?(*.)+(spec|test).[jt]s?(x)'],
@@ -18,4 +18,8 @@ module.exports = {
     '!lib/**/*.d.ts',
   ],
   testPathIgnorePatterns: ['/node_modules/', '/__mocks__/'],
+  extensionsToTreatAsEsm: ['.ts'],
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+  },
 };

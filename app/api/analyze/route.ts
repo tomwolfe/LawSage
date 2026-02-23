@@ -478,14 +478,16 @@ export async function POST(req: NextRequest) {
         safeLog(`Processing request for jurisdiction: ${jurisdiction}`);
       }
 
-      // === ENHANCED RAG LAYER: Vector Search + Static Grounding ===
-      // Priority 1: Vector search for semantic similarity (if configured)
-      // Priority 2: Static JSON lookup for common procedural questions
-      let researchContext = "";
-      let vectorResultsCount = 0;
+      // === PERFORMANCE OPTIMIZATION: Parallel RAG Context Fetching ===
+      // Instead of serial fetching, fetch all context in parallel using Promise.all
+      // This reduces latency from ~3x network round-trips to ~1x
+      
+      const isEmergency = hasEmergencyKeywords(user_input);
 
-      // Try vector search first (falls back gracefully if not configured)
-      if (isVectorConfigured()) {
+      // Create parallel promises for all context fetching
+      const vectorSearchPromise = (async () => {
+        if (!isVectorConfigured()) return { researchContext: '', vectorResultsCount: 0, source: 'vector_unavailable' as const };
+        
         try {
           const vectorResults = await searchLegalRules(`${user_input} ${jurisdiction}`, {
             jurisdiction: jurisdiction !== 'Federal' ? jurisdiction : undefined,
@@ -494,66 +496,92 @@ export async function POST(req: NextRequest) {
           });
 
           if (vectorResults.length > 0) {
-            vectorResultsCount = vectorResults.length;
-            researchContext = "RELEVANT LEGAL RULES (Vector Search Results):\n\n";
+            let context = "RELEVANT LEGAL RULES (Vector Search Results):\n\n";
             vectorResults.forEach((result, index) => {
-              researchContext += `[Source ${index + 1}] ${result.metadata.rule_number} - ${result.metadata.title}\n`;
-              researchContext += `  ${result.metadata.description}\n`;
-              researchContext += `  Jurisdiction: ${result.metadata.jurisdiction}\n`;
-              researchContext += `  Similarity Score: ${Math.round(result.score)}%\n\n`;
+              context += `[Source ${index + 1}] ${result.metadata.rule_number} - ${result.metadata.title}\n`;
+              context += `  ${result.metadata.description}\n`;
+              context += `  Jurisdiction: ${result.metadata.jurisdiction}\n`;
+              context += `  Similarity Score: ${Math.round(result.score)}%\n\n`;
             });
-            safeLog(`Vector RAG: Found ${vectorResultsCount} relevant rules`);
+            safeLog(`Vector RAG: Found ${vectorResults.length} relevant rules`);
+            return { researchContext: context, vectorResultsCount: vectorResults.length, source: 'vector' as const };
           }
         } catch (vectorError) {
           safeWarn('Vector search failed, falling back to static lookup:', vectorError);
         }
-      }
+        return { researchContext: '', vectorResultsCount: 0, source: 'vector_failed' as const };
+      })();
 
-      // Fallback to static JSON lookup if vector search returned no results
-      if (!researchContext) {
-        const staticResponse = await getLegalLookupResponse(`${user_input} ${jurisdiction}`);
-        if (staticResponse) {
-          safeLog('Static grounding match found');
-          researchContext = `MANDATORY RESEARCH CONTEXT:\n${(staticResponse as { text: string }).text}\n`;
+      const staticLookupPromise = (async () => {
+        try {
+          const staticResponse = await getLegalLookupResponse(`${user_input} ${jurisdiction}`);
+          if (staticResponse) {
+            safeLog('Static grounding match found');
+            return { researchContext: `MANDATORY RESEARCH CONTEXT:\n${(staticResponse as { text: string }).text}\n`, found: true };
+          }
+        } catch (error) {
+          safeWarn('Static lookup failed:', error);
         }
-      }
+        return { researchContext: '', found: false };
+      })();
 
-      // Template injection - use fs.readFileSync instead of fetch to avoid network round-trips
-      let templateContent = '';
-      const isEmergency = hasEmergencyKeywords(user_input);
-
-      let exParteRulesText = "";
-      if (isEmergency) {
-        const exParteRules = await searchExParteRules(jurisdiction);
-        if (exParteRules.length > 0) {
-          exParteRulesText = "EX PARTE NOTICE RULES FOR THIS JURISDICTION:\n";
-          exParteRules.forEach(rule => {
-            exParteRulesText += `- ${rule.courthouse}: Notice due by ${rule.notice_time}. Rule: ${rule.rule}\n`;
-          });
-          exParteRulesText += "\n";
+      const exParteRulesPromise = (async () => {
+        if (!isEmergency) return { exParteRulesText: '' };
+        
+        try {
+          const exParteRules = await searchExParteRules(jurisdiction);
+          if (exParteRules.length > 0) {
+            let text = "EX PARTE NOTICE RULES FOR THIS JURISDICTION:\n";
+            exParteRules.forEach(rule => {
+              text += `- ${rule.courthouse}: Notice due by ${rule.notice_time}. Rule: ${rule.rule}\n`;
+            });
+            text += "\n";
+            return { exParteRulesText: text };
+          }
+        } catch (error) {
+          safeWarn('Ex Parte rules search failed:', error);
         }
-      }
+        return { exParteRulesText: '' };
+      })();
 
-      try {
-        // Read manifest directly from filesystem (async to avoid blocking event loop)
-        const manifestPath = path.join(process.cwd(), 'public', 'templates', 'manifest.json');
-        const manifestRaw = await readFile(manifestPath, 'utf8');
-        const manifest = JSON.parse(manifestRaw);
-        const templates = manifest.templates || [];
-        const { template: bestMatch } = findBestTemplate(user_input, templates);
+      const templateMatchPromise = (async () => {
+        try {
+          const manifestPath = path.join(process.cwd(), 'public', 'templates', 'manifest.json');
+          const manifestRaw = await readFile(manifestPath, 'utf8');
+          const manifest = JSON.parse(manifestRaw);
+          const templates = manifest.templates || [];
+          const { template: bestMatch } = findBestTemplate(user_input, templates);
 
-        if (bestMatch) {
-          const templatePath = path.join(process.cwd(), 'public', bestMatch.templatePath);
-          templateContent = await readFile(templatePath, 'utf8');
-          safeLog(`Using template: ${bestMatch.title}`);
-        } else {
-          templateContent = GENERIC_MOTION_TEMPLATE;
-          safeLog('No template match found, using generic motion template');
+          if (bestMatch) {
+            const templatePath = path.join(process.cwd(), 'public', bestMatch.templatePath);
+            const templateContent = await readFile(templatePath, 'utf8');
+            safeLog(`Using template: ${bestMatch.title}`);
+            return { templateContent, templateName: bestMatch.title };
+          }
+        } catch (error) {
+          safeWarn('Template matching failed:', error);
         }
-      } catch (error) {
-        safeWarn('Template matching failed:', error);
-        templateContent = GENERIC_MOTION_TEMPLATE;
+        return { templateContent: GENERIC_MOTION_TEMPLATE, templateName: 'Generic Motion Template' };
+      })();
+
+      // Wait for all context fetching to complete in parallel
+      const [vectorResult, staticResult, exParteResult, templateResult] = await Promise.all([
+        vectorSearchPromise,
+        staticLookupPromise,
+        exParteRulesPromise,
+        templateMatchPromise,
+      ]);
+
+      // Combine research context (vector takes priority, then static fallback)
+      let researchContext = '';
+      if (vectorResult.source === 'vector' && vectorResult.researchContext) {
+        researchContext = vectorResult.researchContext;
+      } else if (staticResult.found && staticResult.researchContext) {
+        researchContext = staticResult.researchContext;
       }
+
+      const exParteRulesText = exParteResult.exParteRulesText;
+      const templateContent = templateResult.templateContent;
 
       if (!SafetyValidator.redTeamAudit(user_input, jurisdiction)) {
         return NextResponse.json(

@@ -17,6 +17,9 @@ interface VerifyCitationResponse {
   details?: string;
   courtlistener_data?: any;
   unverified_reason?: 'DATABASE_UNAVAILABLE' | 'NOT_FOUND' | 'AI_DISABLED' | 'STRICT_MODE';
+  confidence_score?: number;  // 0-100 confidence percentage
+  confidence_level?: 'HIGH' | 'MEDIUM' | 'LOW' | 'UNVERIFIED';  // Visual indicator
+  deep_link?: string;  // URL to full text of statute/case
 }
 
 const COURT_LISTENER_API = API.COURT_LISTENER_BASE;
@@ -236,7 +239,9 @@ Only comment on format validity and relevance. Always note this is AI-based, not
     // Force is_verified to false - AI cannot verify citations
     result.is_verified = false;
     result.unverified_reason = 'AI_DISABLED';
-    
+    result.confidence_score = 40;  // AI format analysis only
+    result.confidence_level = 'LOW';
+
     return result;
   } catch (error) {
     safeError('GLM verification error:', error);
@@ -290,7 +295,10 @@ export async function POST(req: NextRequest) {
         verification_source: 'CourtListener (Free Law Project)',
         status_message: 'Citation found in legal database',
         details: `Case: ${caseLawResult.data.caseName || 'Unknown'} | Court: ${caseLawResult.data.court || 'Unknown'}`,
-        courtlistener_data: caseLawResult.data
+        courtlistener_data: caseLawResult.data,
+        confidence_score: 100,  // Database-verified = 100% confidence
+        confidence_level: 'HIGH',
+        deep_link: caseLawResult.data.url || undefined,
       };
 
       return NextResponse.json(response);
@@ -308,7 +316,10 @@ export async function POST(req: NextRequest) {
         verification_source: 'CourtListener (Free Law Project)',
         status_message: 'Federal statute found with citing cases',
         details: `${federalStatuteResult.data.casesCiting} cases cite this statute`,
-        courtlistener_data: federalStatuteResult.data
+        courtlistener_data: federalStatuteResult.data,
+        confidence_score: 95,  // Statute with citing cases = very high confidence
+        confidence_level: 'HIGH',
+        deep_link: federalStatuteResult.data.searchUrl || undefined,
       };
 
       return NextResponse.json(response);
@@ -326,7 +337,10 @@ export async function POST(req: NextRequest) {
         verification_source: 'CourtListener (Free Law Project)',
         status_message: 'State statute found with citing cases',
         details: `${stateStatuteResult.data.casesCiting} cases cite this statute`,
-        courtlistener_data: stateStatuteResult.data
+        courtlistener_data: stateStatuteResult.data,
+        confidence_score: 90,  // State statute = high confidence but less than federal
+        confidence_level: 'HIGH',
+        deep_link: stateStatuteResult.data.searchUrl || undefined,
       };
 
       return NextResponse.json(response);
@@ -338,7 +352,7 @@ export async function POST(req: NextRequest) {
     // STRICT MODE: Never fall back to AI verification
     if (isStrictMode) {
       safeLog(`Strict mode enabled - returning UNVERIFIED for: ${citation}`);
-      
+
       const response: VerifyCitationResponse = {
         is_verified: false,
         is_relevant: false,
@@ -346,6 +360,8 @@ export async function POST(req: NextRequest) {
         status_message: 'UNVERIFIED - Database Unavailable',
         details: 'This citation was not found in the CourtListener legal database. In Strict Mode, AI-based verification is disabled to prevent hallucination. Manual verification through official sources is required.',
         unverified_reason: 'STRICT_MODE',
+        confidence_score: 0,
+        confidence_level: 'UNVERIFIED',
       };
 
       return NextResponse.json(response);
@@ -363,6 +379,8 @@ export async function POST(req: NextRequest) {
         status_message: 'Citation not found in legal database',
         details: 'This citation was not found in the CourtListener database. It may be invalid, obscure, or require manual verification through official sources.',
         unverified_reason: 'NOT_FOUND',
+        confidence_score: 10,  // Very low - not in database
+        confidence_level: 'LOW',
       };
 
       return NextResponse.json(response);
@@ -370,10 +388,15 @@ export async function POST(req: NextRequest) {
 
     // Use GLM for format analysis only (NOT verification)
     safeWarn(`Using AI format analysis (NOT verification) for: ${citation}`);
-    
+
     const glmResult = await verifyWithGLM(citation, jurisdiction, subject_matter || '', apiKey);
 
-    return NextResponse.json(glmResult);
+    // Add confidence score to GLM result (AI format analysis = low confidence)
+    return NextResponse.json({
+      ...glmResult,
+      confidence_score: 40,  // AI format check only - significant hallucination risk
+      confidence_level: 'LOW',
+    });
 
   } catch (error) {
     safeError('Error verifying citation:', error);
@@ -390,6 +413,8 @@ export async function POST(req: NextRequest) {
       status_message: 'UNVERIFIED - Verification Service Unavailable',
       details: 'The citation verification service is temporarily unavailable. Please try again later or verify manually through official sources.',
       unverified_reason: 'DATABASE_UNAVAILABLE',
+      confidence_score: 0,
+      confidence_level: 'UNVERIFIED',
     };
 
     return NextResponse.json(response, { status: 500 });
