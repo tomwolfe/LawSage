@@ -53,6 +53,46 @@ interface ValidationResult {
   missingFields?: string[];
 }
 
+/**
+ * Legal case categories for RAG metadata filtering
+ * Maps keywords to legal practice areas
+ */
+const CASE_CATEGORIES = {
+  'Housing': ['eviction', 'landlord', 'tenant', 'lease', 'rent', 'deposit', 'housing', 'rental', 'foreclosure'],
+  'Family': ['custody', 'divorce', 'support', 'visitation', 'child', 'spouse', 'marriage', 'family'],
+  'Employment': ['employment', 'worker', 'wage', 'discrimination', 'harassment', 'termination', 'layoff'],
+  'Personal Injury': ['injury', 'accident', 'negligence', 'liability', 'slip', 'fall', 'car accident'],
+  'Criminal': ['criminal', 'arrest', 'charge', 'defense', 'misdemeanor', 'felony', 'court appointed'],
+  'Bankruptcy': ['bankruptcy', 'debt', 'creditor', 'loan', 'foreclosure', 'chapter 7', 'chapter 13'],
+  'Immigration': ['immigration', 'visa', 'deportation', 'citizenship', 'green card', 'asylum'],
+  'Consumer': ['consumer', 'fraud', 'scam', 'warranty', 'product', 'credit report', 'debt collection'],
+  'Civil Rights': ['civil rights', 'discrimination', 'harassment', 'ada', 'disability', 'voting'],
+  'Estate': ['will', 'trust', 'probate', 'estate', 'inheritance', 'beneficiary'],
+  'Business': ['contract', 'business', 'partnership', 'corporation', 'llc', 'commercial'],
+} as const;
+
+/**
+ * Detect case category from user input for RAG metadata filtering
+ * Prevents cross-contamination between unrelated legal domains
+ */
+function detectCaseCategory(userInput: string): keyof typeof CASE_CATEGORIES | 'General' {
+  const inputLower = userInput.toLowerCase();
+  
+  // Count matches for each category
+  let bestMatch: { category: keyof typeof CASE_CATEGORIES; score: number } | null = null;
+  
+  for (const [category, keywords] of Object.entries(CASE_CATEGORIES)) {
+    const matchCount = keywords.filter(keyword => inputLower.includes(keyword)).length;
+    
+    if (matchCount > 0 && (!bestMatch || matchCount > bestMatch.score)) {
+      bestMatch = { category: category as keyof typeof CASE_CATEGORIES, score: matchCount };
+    }
+  }
+  
+  // Return best matching category if found, otherwise 'General'
+  return bestMatch ? bestMatch.category : 'General';
+}
+
 function validateLegalOutputStructure(output: LegalOutput): ValidationResult {
   const errors: string[] = [];
   const missingFields: string[] = [];
@@ -343,8 +383,12 @@ export async function POST(req: NextRequest) {
         if (!isVectorConfigured()) return { researchContext: '', vectorResultsCount: 0, source: 'vector_unavailable' as const };
 
         try {
+          // METADATA FILTERING: Detect case category from user input for better RAG filtering
+          const detectedCategory = detectCaseCategory(user_input);
+          
           const vectorResults = await searchLegalRules(`${user_input} ${jurisdiction}`, {
             jurisdiction: jurisdiction !== 'Federal' ? jurisdiction : undefined,
+            category: detectedCategory !== 'General' ? detectedCategory : undefined,  // NEW: Category filter
             topK: 5,
             threshold: 40,
           });
@@ -355,9 +399,10 @@ export async function POST(req: NextRequest) {
               context += `[Source ${index + 1}] ${result.metadata.rule_number} - ${result.metadata.title}\n`;
               context += `  ${result.metadata.description}\n`;
               context += `  Jurisdiction: ${result.metadata.jurisdiction}\n`;
+              context += `  Category: ${result.metadata.category}\n`;  // Show category in output
               context += `  Similarity Score: ${Math.round(result.score)}%\n\n`;
             });
-            safeLog(`Vector RAG: Found ${vectorResults.length} relevant rules`);
+            safeLog(`Vector RAG: Found ${vectorResults.length} relevant rules (category filter: ${detectedCategory})`);
             return { researchContext: context, vectorResultsCount: vectorResults.length, source: 'vector' as const };
           }
         } catch (vectorError) {

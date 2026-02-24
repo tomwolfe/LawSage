@@ -12,6 +12,7 @@ import { checkClientSideRateLimit, generateClientFingerprint } from '../lib/rate
 import { safeError, safeWarn } from '../lib/pii-redactor';
 import { processImageForOCR } from '../src/utils/image-processor';
 import { parsePartialJSON } from '../lib/streaming-json-parser';
+import { createStateVersion } from '../types/state';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -143,6 +144,9 @@ export default function LegalInterface() {
   const [rateLimitInfo, setRateLimitInfo] = useState<{ remaining: number; resetAt: Date | null } | null>(null);
   const [evidence, setEvidence] = useState<OCRResult[]>([]);
   const [streamingPreview, setStreamingPreview] = useState<{ strategy?: string; roadmap?: string } | null>(null);
+  /** Current state version for drift prevention */
+  const [currentStateId, setCurrentStateId] = useState<string>('');
+  const [currentStateHash, setCurrentStateHash] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const ocrFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -350,7 +354,10 @@ export default function LegalInterface() {
 
     setLoading(true);
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 55000); // 55s timeout (before Vercel's 60s limit)
+
+    // Generate session ID for checkpoint resume
+    const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     try {
       const response = await fetch('/api/analyze', {
@@ -358,6 +365,7 @@ export default function LegalInterface() {
         headers: {
           'Content-Type': 'application/json',
           'X-Client-Fingerprint': generateClientFingerprint(),
+          'X-Session-ID': sessionId,
         },
         body: JSON.stringify({
           user_input: userInput.trim(),
@@ -374,6 +382,11 @@ export default function LegalInterface() {
       if (!response.ok) {
         if (response.status === 429) {
           setError('Rate limit exceeded. Please wait and try again later.');
+          return;
+        } else if (response.status === 504) {
+          // VERCEL TIMEOUT: Initiate checkpoint resume flow
+          setStreamingStatus('Request timed out. Resuming from checkpoint...');
+          await handleCheckpointResume(sessionId);
           return;
         } else {
           const errorData = await response.json();
@@ -446,10 +459,18 @@ export default function LegalInterface() {
 
             // Trigger Background Audit (Step 2) - Decoupled to avoid 60s timeout
             // This runs asynchronously so the user sees results immediately
+            // STATE DRIFT PREVENTION: Include stateId and stateHash
+            const currentState = { userInput, jurisdiction, evidence, activeTab };
+            const stateVersion = await createStateVersion(currentState);
+            setCurrentStateId(stateVersion.stateId);
+            setCurrentStateHash(stateVersion.stateHash);
+
             const auditPayload = {
               analysis: finalResult.text,
               jurisdiction,
-              researchContext: '' // Research context is already embedded in the analysis
+              researchContext: '',
+              stateId: stateVersion.stateId,
+              stateHash: stateVersion.stateHash
             };
 
             // Fire-and-forget: Don't await, let it run in background
@@ -462,6 +483,12 @@ export default function LegalInterface() {
             })
               .then(res => res.json())
               .then(auditData => {
+                // STATE DRIFT CHECK: Reject audit if state has changed
+                if (auditData.stateId && auditData.stateId !== currentStateId) {
+                  safeWarn('[State Drift] Audit result rejected - state has changed');
+                  return; // Reject stale audit result
+                }
+
                 // Update the result with audit metadata
                 setResult(prev => {
                   if (!prev) return null;
@@ -473,10 +500,10 @@ export default function LegalInterface() {
                     return prev;
                   }
                 });
-                
+
                 // Show audit completion status
-                const statusMessage = auditData.audit_passed 
-                  ? 'Audit complete: Statutes verified.' 
+                const statusMessage = auditData.audit_passed
+                  ? 'Audit complete: Statutes verified.'
                   : `Audit complete: ${auditData.recommended_actions?.length || 0} issue(s) found.`;
                 setStreamingStatus(statusMessage);
                 setTimeout(() => setStreamingStatus(''), 5000);
@@ -546,6 +573,87 @@ export default function LegalInterface() {
     };
 
     setCaseLedger(prev => [...prev, newEntry]);
+  };
+
+  /**
+   * Handle Vercel 60s timeout by resuming from checkpoint
+   * Implements UI polling pattern for long-running analyses
+   */
+  const handleCheckpointResume = async (sessionId: string, maxRetries = 3) => {
+    let retries = 0;
+    
+    while (retries < maxRetries) {
+      try {
+        setStreamingStatus(`Resuming analysis (attempt ${retries + 1}/${maxRetries})...`);
+        
+        // Poll checkpoint endpoint for accumulated state
+        const response = await fetch(`/api/analyze/checkpoint?sessionId=${sessionId}`, {
+          method: 'GET',
+          headers: {
+            'X-Client-Fingerprint': generateClientFingerprint(),
+          },
+        });
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            // Checkpoint not ready yet, wait and retry
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            retries++;
+            continue;
+          }
+          throw new Error('Checkpoint resume failed');
+        }
+
+        const checkpointData = await response.json();
+        
+        if (checkpointData.status === 'complete' && checkpointData.result) {
+          // Analysis complete, restore result
+          const finalResult: LegalResult = checkpointData.result;
+          setResult(finalResult);
+          setActiveTab('strategy');
+
+          const newHistoryItem: CaseHistoryItem = {
+            id: Date.now().toString(),
+            timestamp: new Date(),
+            jurisdiction,
+            userInput: userInput.trim(),
+            result: finalResult
+          };
+
+          const updatedHistory = [newHistoryItem, ...history];
+          setHistory(updatedHistory);
+          localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
+          addToCaseLedger('complaint_filed', `Analysis generated (resumed from checkpoint).`);
+
+          setStreamingStatus('Analysis complete (resumed from timeout)');
+          setTimeout(() => setStreamingStatus(''), 5000);
+          return;
+        } else if (checkpointData.status === 'processing') {
+          // Still processing, continue polling
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          retries++;
+          continue;
+        } else {
+          throw new Error('Unexpected checkpoint status');
+        }
+      } catch (error) {
+        safeWarn('Checkpoint resume error:', error);
+        retries++;
+        
+        if (retries >= maxRetries) {
+          setError('Analysis timed out and could not be resumed. Please try again with a simpler query.');
+          setLoading(false);
+          return;
+        }
+        
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+    }
+
+    // Max retries exceeded
+    setError('Analysis timed out after multiple resume attempts. Please try again later.');
+    setLoading(false);
   };
 
   // Case File Management Functions

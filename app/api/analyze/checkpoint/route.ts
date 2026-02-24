@@ -1,126 +1,100 @@
-/**
- * Checkpoint Status API Endpoint
- *
- * Allows clients to poll for analysis progress and resume from checkpoints
- */
-
 import { NextRequest, NextResponse } from 'next/server';
-import { getCheckpointStatus, resumeCheckpoint, deleteCheckpoint } from '@/lib/analysis-checkpoint';
-import { safeLog, safeError } from '@/lib/pii-redactor';
+import { getCheckpoint, deleteCheckpoint, KEY_PREFIX } from '../../../lib/analysis-checkpoint';
+import { safeLog, safeError, safeWarn } from '../../../lib/pii-redactor';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 /**
- * GET /api/analyze/checkpoint?sessionId=xxx
+ * Checkpoint Resume Endpoint
  * 
- * Returns checkpoint status for polling
+ * Allows frontend to poll for analysis results after a Vercel 60s timeout.
+ * The analyze API saves checkpoints to Redis during streaming.
+ * This endpoint retrieves those checkpoints.
+ * 
+ * Usage:
+ *   GET /api/analyze/checkpoint?sessionId=<session_id>
+ * 
+ * Response:
+ *   - 404: Checkpoint not ready yet (still processing)
+ *   - 200 + status: 'processing' | 'complete' | 'failed'
  */
 export async function GET(req: NextRequest) {
   try {
-    const searchParams = req.nextUrl.searchParams;
-    const sessionId = searchParams.get('sessionId');
+    const sessionId = req.nextUrl.searchParams.get('sessionId');
 
     if (!sessionId) {
       return NextResponse.json(
-        { error: 'sessionId parameter required' },
+        { error: 'sessionId is required' },
         { status: 400 }
       );
     }
 
-    const status = await getCheckpointStatus(sessionId);
+    safeLog(`[Checkpoint] Checking for session: ${sessionId}`);
 
-    if (!status) {
-      return NextResponse.json(
-        { error: 'Redis not configured or unavailable' },
-        { status: 503 }
-      );
-    }
-
-    if (!status.exists) {
-      // No checkpoint = either never started or completed
-      return NextResponse.json({
-        exists: false,
-        step: 'complete',
-        message: 'Analysis complete or not started'
-      });
-    }
-
-    return NextResponse.json({
-      exists: true,
-      step: status.step,
-      updatedAt: status.updatedAt,
-      canResume: true
-    });
-  } catch (error) {
-    safeError('Checkpoint status error:', error);
-    return NextResponse.json(
-      { error: 'Failed to get checkpoint status' },
-      { status: 500 }
-    );
-  }
-}
-
-/**
- * POST /api/analyze/checkpoint/resume
- * 
- * Resume analysis from checkpoint
- */
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { sessionId } = body;
-
-    if (!sessionId) {
-      return NextResponse.json(
-        { error: 'sessionId parameter required' },
-        { status: 400 }
-      );
-    }
-
-    const checkpoint = await resumeCheckpoint(sessionId);
+    // Retrieve checkpoint from Redis
+    const checkpoint = await getCheckpoint(sessionId);
 
     if (!checkpoint) {
+      // No checkpoint found - either session expired or never created
+      safeWarn(`[Checkpoint] No checkpoint found for session: ${sessionId}`);
       return NextResponse.json(
-        { 
-          error: 'No checkpoint found or checkpoint expired',
-          canResume: false
-        },
+        { error: 'Session not found or expired' },
         { status: 404 }
       );
     }
 
-    // Check if checkpoint is still valid (not expired)
-    if (checkpoint.expiresAt < Date.now()) {
-      await deleteCheckpoint(sessionId);
-      return NextResponse.json(
-        { 
-          error: 'Checkpoint expired (older than 24 hours)',
-          canResume: false
-        },
-        { status: 410 }
-      );
+    // Check checkpoint status
+    if (checkpoint.status === 'processing') {
+      // Still processing - return progress info
+      return NextResponse.json({
+        status: 'processing',
+        progress: checkpoint.progress || 0,
+        lastUpdate: checkpoint.lastUpdate,
+        accumulatedContent: checkpoint.accumulatedArgs?.content?.substring(0, 500) || '', // Preview only
+      });
     }
 
-    safeLog(`[Checkpoint API] Resuming session ${sessionId} from step ${checkpoint.step}`);
+    if (checkpoint.status === 'complete') {
+      // Analysis complete - return full result
+      safeLog(`[Checkpoint] Session complete, returning result`);
+      
+      // Clean up checkpoint after retrieval
+      await deleteCheckpoint(sessionId).catch(err => {
+        safeWarn('[Checkpoint] Failed to delete checkpoint after retrieval:', err);
+      });
 
-    // Return checkpoint data for client to resume
-    return NextResponse.json({
-      canResume: true,
-      sessionId,
-      checkpoint: {
-        step: checkpoint.step,
-        jurisdiction: checkpoint.jurisdiction,
-        hasResearchContext: !!checkpoint.researchContext,
-        hasAccumulatedArgs: checkpoint.accumulatedArgs.length > 0,
-        updatedAt: checkpoint.updatedAt
-      },
-      // Client should re-submit the request with checkpoint data
-      instructions: 'Re-submit your original request. The server will resume from the checkpoint.'
-    });
-  } catch (error) {
-    safeError('Checkpoint resume error:', error);
+      return NextResponse.json({
+        status: 'complete',
+        result: checkpoint.result,
+        completedAt: checkpoint.completedAt,
+      });
+    }
+
+    if (checkpoint.status === 'failed') {
+      // Analysis failed
+      safeError(`[Checkpoint] Session failed:`, checkpoint.error);
+      
+      // Clean up checkpoint
+      await deleteCheckpoint(sessionId).catch(err => {
+        safeWarn('[Checkpoint] Failed to delete failed checkpoint:', err);
+      });
+
+      return NextResponse.json({
+        status: 'failed',
+        error: checkpoint.error || 'Unknown error',
+      });
+    }
+
+    // Unknown status
     return NextResponse.json(
-      { error: 'Failed to resume checkpoint' },
+      { error: 'Unknown checkpoint status' },
+      { status: 500 }
+    );
+
+  } catch (error) {
+    safeError('[Checkpoint] Error:', error);
+    return NextResponse.json(
+      { error: 'Checkpoint retrieval failed' },
       { status: 500 }
     );
   }

@@ -82,20 +82,23 @@ export interface VectorSearchResult {
 /**
  * Search for similar legal rules using vector similarity
  * @param query - The search query (will be embedded automatically by Upstash)
- * @param jurisdiction - Optional jurisdiction filter (e.g., "California", "Federal")
- * @param topK - Number of results to return (default: 5)
- * @param threshold - Minimum similarity score threshold (0-100, default: 30)
+ * @param options - Search options
+ * @param options.jurisdiction - Optional jurisdiction filter (e.g., "California", "Federal")
+ * @param options.category - Optional category filter (e.g., "Housing", "Family", "Criminal")
+ * @param options.topK - Number of results to return (default: 5)
+ * @param options.threshold - Minimum similarity score threshold (0-100, default: 30)
  */
 export async function searchLegalRules(
   query: string,
   options?: {
     jurisdiction?: string;
+    category?: string;  // NEW: Category filter for metadata filtering
     topK?: number;
     threshold?: number;
   }
 ): Promise<VectorSearchResult[]> {
   const client = getVectorClient();
-  
+
   if (!client) {
     console.warn('Vector search unavailable - Upstash Vector not configured');
     return [];
@@ -103,19 +106,32 @@ export async function searchLegalRules(
 
   const {
     jurisdiction,
+    category,
     topK = 5,
     threshold = 30,
   } = options || {};
 
   try {
     // Build filter string for Upstash Vector
-    // Format: "field='value'" or "field>number"
+    // Format: "field='value'" or combine multiple with AND/OR
+    // METADATA FILTERING: Now supports both jurisdiction AND category
     let filter: string | undefined;
+    const filters: string[] = [];
+
     if (jurisdiction) {
-      filter = `jurisdiction='${jurisdiction}'`;
+      filters.push(`jurisdiction='${jurisdiction}'`);
     }
 
-    // Perform vector search
+    if (category) {
+      filters.push(`category='${category}'`);
+    }
+
+    // Combine filters with AND
+    if (filters.length > 0) {
+      filter = filters.join(' AND ');
+    }
+
+    // Perform vector search with metadata filtering
     const results = await client.query({
       topK,
       data: query, // Upstash auto-embeds the query string

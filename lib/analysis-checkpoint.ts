@@ -24,11 +24,17 @@ export interface AnalysisCheckpointData {
   sessionId: string;
   createdAt: number;
   updatedAt: number;
+  status: 'processing' | 'complete' | 'failed';
   step: 'initial' | 'research' | 'analysis' | 'critique' | 'complete';
   accumulatedArgs: string;
   researchContext: string;
   jurisdiction: string;
   critiqueMetadata?: Record<string, unknown>;
+  result?: unknown;  // Store final result when complete
+  error?: string;    // Store error message when failed
+  progress?: number; // Progress percentage (0-100)
+  lastUpdate?: string; // Last update timestamp (ISO string)
+  completedAt?: number; // Completion timestamp
   expiresAt: number;
 }
 
@@ -81,18 +87,24 @@ export async function saveCheckpoint(
       sessionId,
       createdAt: existing?.createdAt || now,
       updatedAt: now,
-      step: data.step || 'initial',
+      status: data.status || existing?.status || 'processing',
+      step: data.step || existing?.step || 'initial',
       accumulatedArgs: data.accumulatedArgs || existing?.accumulatedArgs || '',
       researchContext: data.researchContext || existing?.researchContext || '',
       jurisdiction: data.jurisdiction || existing?.jurisdiction || '',
       critiqueMetadata: data.critiqueMetadata || existing?.critiqueMetadata,
+      result: data.result || existing?.result,
+      error: data.error || existing?.error,
+      progress: data.progress ?? existing?.progress,
+      lastUpdate: data.lastUpdate || new Date().toISOString(),
+      completedAt: data.completedAt || existing?.completedAt,
       expiresAt: now + (CHECKPOINT_TTL * 1000),
     };
 
     // Save with TTL
     await redis.set(key, checkpoint, { ex: CHECKPOINT_TTL });
 
-    safeLog(`[Checkpoint] Saved checkpoint for session ${sessionId} at step ${checkpoint.step}`);
+    safeLog(`[Checkpoint] Saved checkpoint for session ${sessionId} at step ${checkpoint.step} (status: ${checkpoint.status})`);
     return true;
   } catch (error) {
     safeError('[Checkpoint] Failed to save:', error);
@@ -148,6 +160,37 @@ export async function deleteCheckpoint(sessionId: string): Promise<boolean> {
   } catch (error) {
     safeError('[Checkpoint] Failed to delete:', error);
     return false;
+  }
+}
+
+/**
+ * Get checkpoint (for resume polling)
+ */
+export async function getCheckpoint(
+  sessionId: string
+): Promise<AnalysisCheckpointData | null> {
+  const redis = getRedisClient();
+  if (!redis) return null;
+
+  try {
+    const key = getCheckpointKey(sessionId);
+    const checkpoint = await redis.get<AnalysisCheckpointData>(key);
+
+    if (!checkpoint) {
+      return null;
+    }
+
+    // Check if expired
+    if (checkpoint.expiresAt < Date.now()) {
+      safeLog(`[Checkpoint] Checkpoint expired for session ${sessionId}`);
+      await redis.del(key);
+      return null;
+    }
+
+    return checkpoint;
+  } catch (error) {
+    safeError('[Checkpoint] Failed to get:', error);
+    return null;
   }
 }
 

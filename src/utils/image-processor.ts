@@ -1,5 +1,8 @@
 // utils/image-processor.ts
 // Client-side image processing utility for resizing and compressing images before OCR
+// HYBRID OCR: Now includes enhancement filters for better small text detection
+
+import { enhanceImageForOCR, type ImageEnhancementOptions, type EnhancedOCRResult } from './hybrid-ocr';
 
 /**
  * Resizes and compresses an image using the Canvas API with optional grayscaling
@@ -104,7 +107,7 @@ export async function resizeAndCompressImage(
 export function getImageSize(base64String: string): number {
   // Remove the data URL prefix if present
   const base64Data = base64String.includes(',') ? base64String.split(',')[1] : base64String;
-  
+
   // Calculate approximate size (base64 increases size by ~33%)
   return Math.round((base64Data.length * 3) / 4);
 }
@@ -158,6 +161,51 @@ export async function processImageForOCR(
 }
 
 /**
+ * Enhanced OCR processing with hybrid image enhancement
+ * Applies contrast, sharpening, and adaptive thresholding for better small text detection
+ * @param file The image file to process
+ * @param options Enhancement options
+ * @returns Promise resolving to enhanced OCR result with quality metrics
+ */
+export async function processImageForOCREnhanced(
+  file: File,
+  options?: {
+    enhance?: boolean;
+    enhancementOptions?: ImageEnhancementOptions;
+  }
+): Promise<EnhancedOCRResult & { base64: string }> {
+  // First, resize and compress the image
+  const base64 = await processImageForOCR(file);
+
+  // Apply hybrid OCR enhancement if requested
+  if (options?.enhance !== false) {
+    const enhanced = await enhanceImageForOCR(
+      base64,
+      options?.enhancementOptions || {
+        contrast: 30,
+        sharpen: 20,
+        grayscale: true,
+        enhanceSmallText: true,
+      }
+    );
+
+    return {
+      ...enhanced,
+      base64: enhanced.enhancedImage,
+    };
+  }
+
+  // Return unenhanced result
+  return {
+    enhancedImage: base64,
+    regions: [],
+    qualityScore: 100,
+    recommendations: [],
+    base64,
+  };
+}
+
+/**
  * Checks if an image file is too large before processing
  * Provides early warning to users about large images
  * @param file The image file to check
@@ -175,13 +223,13 @@ export function isFileTooLarge(file: File, maxSize: number = 4.5 * 1024 * 1024):
  */
 export function getLargeImageWarning(file: File): string {
   const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
-  
+
   if (file.size > 4.5 * 1024 * 1024) {
     return `Warning: This image is ${sizeMB} MB. Images over 4.5 MB may fail to process. Consider using a smaller image.`;
   } else if (file.size > 2 * 1024 * 1024) {
     return `Note: This image is ${sizeMB} MB. Processing may take a few seconds.`;
   }
-  
+
   return '';
 }
 

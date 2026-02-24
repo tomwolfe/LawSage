@@ -17,9 +17,17 @@ interface StrengthMeterProps {
 }
 
 /**
- * Case Strength Meter
+ * Procedural Readiness Meter (formerly "Strength Meter")
+ *
+ * UPL COMPLIANCE: Renamed from "Strength Score" to "Procedural Readiness Score"
+ * to avoid implying legal advice about case "winnability".
  * 
- * Visual indicator showing the "winnability" score based on:
+ * This meter now measures:
+ * - Procedural compliance (documents, citations, roadmap completeness)
+ * - NOT likelihood of winning
+ * - NOT legal advice
+ * 
+ * Visual indicator showing procedural readiness based on:
  * - Evidence documents (OCR-extracted)
  * - Verified citations
  * - Roadmap completeness
@@ -31,42 +39,43 @@ export function StrengthMeter({
   roadmapLength = 0,
   hasAdversarialStrategy = false,
 }: StrengthMeterProps) {
-  // Calculate strength score (0-100)
-  let score = 50; // Base score
+  // Calculate procedural readiness score (0-100)
+  // NOTE: This measures compliance/readiness, NOT case "strength" or "winnability"
+  let score = 50; // Base score for having initiated the process
   const breakdown: Array<{ label: string; points: number; icon: 'check' | 'warn' | 'fail' }> = [];
 
   // Evidence documents (max +20 points)
   if (documents.length === 0) {
-    breakdown.push({ label: 'No evidence documents', points: 0, icon: 'fail' });
+    breakdown.push({ label: 'No evidence documents uploaded', points: 0, icon: 'fail' });
   } else if (documents.length === 1) {
     score += 10;
-    breakdown.push({ label: '1 evidence document', points: 10, icon: 'check' });
+    breakdown.push({ label: '1 evidence document uploaded', points: 10, icon: 'check' });
   } else if (documents.length >= 2) {
     score += 20;
-    breakdown.push({ label: `${documents.length} evidence documents`, points: 20, icon: 'check' });
+    breakdown.push({ label: `${documents.length} evidence documents uploaded`, points: 20, icon: 'check' });
   }
 
   // Verified citations (max +15 points)
   const verifiedCitations = citations.filter(c => c.is_verified).length;
   const unverifiedCitations = citations.length - verifiedCitations;
-  
+
   if (citations.length === 0) {
-    breakdown.push({ label: 'No citations', points: 0, icon: 'fail' });
+    breakdown.push({ label: 'No legal citations identified', points: 0, icon: 'fail' });
   } else if (verifiedCitations > 0) {
     const citationPoints = Math.min(15, verifiedCitations * 5);
     score += citationPoints;
     breakdown.push({ label: `${verifiedCitations} verified citation${verifiedCitations > 1 ? 's' : ''}`, points: citationPoints, icon: 'check' });
-    
+
     if (unverifiedCitations > 0) {
-      breakdown.push({ label: `${unverifiedCitations} unverified citation${unverifiedCitations > 1 ? 's' : ''}`, points: 0, icon: 'warn' });
+      breakdown.push({ label: `${unverifiedCitations} unverified citation${unverifiedCitations > 1 ? 's' : ''} (needs review)`, points: 0, icon: 'warn' });
     }
   } else {
-    breakdown.push({ label: `${citations.length} unverified citation${citations.length > 1 ? 's' : ''}`, points: 0, icon: 'warn' });
+    breakdown.push({ label: `${citations.length} unverified citation${citations.length > 1 ? 's' : ''} (needs review)`, points: 0, icon: 'warn' });
   }
 
   // Roadmap completeness (max +10 points)
   if (roadmapLength === 0) {
-    breakdown.push({ label: 'No roadmap', points: 0, icon: 'fail' });
+    breakdown.push({ label: 'No procedural roadmap', points: 0, icon: 'fail' });
   } else if (roadmapLength < 3) {
     score += 5;
     breakdown.push({ label: `Incomplete roadmap (${roadmapLength} steps)`, points: 5, icon: 'warn' });
@@ -78,7 +87,7 @@ export function StrengthMeter({
   // Adversarial strategy (max +5 points)
   if (hasAdversarialStrategy) {
     score += 5;
-    breakdown.push({ label: 'Red-team analysis included', points: 5, icon: 'check' });
+    breakdown.push({ label: 'Red-team analysis completed', points: 5, icon: 'check' });
   } else {
     breakdown.push({ label: 'No red-team analysis', points: 0, icon: 'warn' });
   }
@@ -86,43 +95,48 @@ export function StrengthMeter({
   // Cap score at 100
   score = Math.min(100, score);
 
-  // Determine strength level and styling
-  const getStrengthLevel = (s: number) => {
-    if (s >= 80) return { 
-      label: 'Strong Case', 
-      color: 'text-green-700', 
-      bgColor: 'bg-green-50', 
+  // Determine readiness level and styling
+  // NOTE: Labels changed from "Strong Case" to "High Readiness" etc.
+  const getReadinessLevel = (s: number) => {
+    if (s >= 80) return {
+      label: 'High Procedural Readiness',
+      sublabel: 'You have most required documents and citations',
+      color: 'text-green-700',
+      bgColor: 'bg-green-50',
       borderColor: 'border-green-300',
       progressBar: 'bg-green-500',
-      icon: ShieldCheck 
+      icon: ShieldCheck
     };
-    if (s >= 60) return { 
-      label: 'Moderate Case', 
-      color: 'text-blue-700', 
-      bgColor: 'bg-blue-50', 
+    if (s >= 60) return {
+      label: 'Moderate Procedural Readiness',
+      sublabel: 'You have a good foundation, some items pending',
+      color: 'text-blue-700',
+      bgColor: 'bg-blue-50',
       borderColor: 'border-blue-300',
       progressBar: 'bg-blue-500',
-      icon: Shield 
+      icon: Shield
     };
-    if (s >= 40) return { 
-      label: 'Weak Case', 
-      color: 'text-amber-700', 
-      bgColor: 'bg-amber-50', 
+    if (s >= 40) return {
+      label: 'Low Procedural Readiness',
+      sublabel: 'Missing key documents or citations',
+      color: 'text-amber-700',
+      bgColor: 'bg-amber-50',
       borderColor: 'border-amber-300',
       progressBar: 'bg-amber-500',
-      icon: ShieldAlert 
+      icon: ShieldAlert
     };
-    return { 
-      label: 'Very Weak Case', 
-      color: 'text-red-700', 
-      bgColor: 'bg-red-50', 
+    return {
+      label: 'Very Low Procedural Readiness',
+      sublabel: 'Start by uploading evidence documents',
+      color: 'text-red-700',
+      bgColor: 'bg-red-50',
       borderColor: 'border-red-300',
       progressBar: 'bg-red-500',
-      icon: ShieldX 
+      icon: ShieldX
     };
   };
 
-  const level = getStrengthLevel(score);
+  const level = getReadinessLevel(score);
   const IconComponent = level.icon;
 
   return (
@@ -139,11 +153,14 @@ export function StrengthMeter({
               {level.label}
             </h3>
             <p className="text-sm text-slate-600">
-              Strength Score: <span className="font-bold">{score}/100</span>
+              Procedural Readiness Score: <span className="font-bold">{score}/100</span>
             </p>
+            {level.sublabel && (
+              <p className="text-xs text-slate-500 mt-1">{level.sublabel}</p>
+            )}
           </div>
         </div>
-        
+
         {/* Circular progress indicator */}
         <div className="relative w-16 h-16">
           <svg className="w-full h-full transform -rotate-90">
@@ -178,7 +195,7 @@ export function StrengthMeter({
         </div>
       </div>
 
-      {/* Strength breakdown */}
+      {/* Readiness breakdown */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
         {breakdown.map((item, index) => (
           <div
@@ -205,13 +222,15 @@ export function StrengthMeter({
         ))}
       </div>
 
-      {/* Disclaimer */}
+      {/* UPL Compliance Disclaimer */}
       <div className="mt-4 pt-4 border-t border-slate-300">
         <p className="text-xs text-slate-600 flex items-start gap-2">
           <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
           <span>
-            <strong>Disclaimer:</strong> This strength meter is an AI-generated estimate based on available evidence and citations. 
-            It does not guarantee case outcomes. Always consult with a qualified attorney for professional legal assessment.
+            <strong>Important Notice:</strong> This Procedural Readiness Score is an AI-generated assessment of document 
+            completeness and citation verification. It measures procedural compliance, NOT the likelihood of case success. 
+            This is NOT legal advice and does not guarantee any particular outcome. Always consult with a qualified attorney 
+            for professional legal assessment of your specific situation.
           </span>
         </p>
       </div>
