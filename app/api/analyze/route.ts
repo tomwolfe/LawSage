@@ -644,22 +644,23 @@ CRITICAL INSTRUCTIONS:
       const stream = new ReadableStream({
         async start(controller) {
           try {
+            // Immediate acknowledgment to prevent client-side timeout
             controller.enqueue(encoder.encode(JSON.stringify({
               type: 'status',
-              message: 'Conducting legal research and analysis...'
+              message: `Starting analysis for ${jurisdiction}...`
             }) + '\n'));
 
             const heartbeatInterval = setInterval(() => {
               controller.enqueue(encoder.encode(JSON.stringify({
                 type: 'status',
-                message: 'Processing... This may take a moment.'
+                message: 'Researching case law and generating strategy...'
               }) + '\n'));
-            }, 2000);
+            }, 3000);
 
             const abortController = new AbortController();
-            const timeoutMs = 55000;
+            const timeoutMs = 45000; // Reduced to 45s to stay within Vercel's 60s limit with buffer
             const timeoutId = setTimeout(() => {
-              safeWarn('GLM API request timed out after 55 seconds');
+              safeWarn('GLM API request timed out after 45 seconds');
               abortController.abort();
             }, timeoutMs);
 
@@ -677,8 +678,8 @@ CRITICAL INSTRUCTIONS:
                 ],
                 tools: [legalAnalysisTool],
                 tool_choice: tool_choice,
-                temperature: 0.2,
-                max_tokens: 3500,
+                temperature: 0.3, // Slightly higher for faster generation
+                max_tokens: 2000, // Reduced from 3500 to fit within timeout
                 stream: true
               }),
               signal: abortController.signal
