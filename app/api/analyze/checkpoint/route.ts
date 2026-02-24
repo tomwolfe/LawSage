@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCheckpoint, deleteCheckpoint, KEY_PREFIX } from '../../../lib/analysis-checkpoint';
-import { safeLog, safeError, safeWarn } from '../../../lib/pii-redactor';
+import { getCheckpoint, deleteCheckpoint } from '@/lib/analysis-checkpoint';
+import { safeLog, safeError, safeWarn } from '@/lib/pii-redactor';
 
 export const runtime = 'nodejs';
 
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
         status: 'processing',
         progress: checkpoint.progress || 0,
         lastUpdate: checkpoint.lastUpdate,
-        accumulatedContent: checkpoint.accumulatedArgs?.content?.substring(0, 500) || '', // Preview only
+        preview: checkpoint.accumulatedArgs?.substring(0, 500) || '',
       });
     }
 

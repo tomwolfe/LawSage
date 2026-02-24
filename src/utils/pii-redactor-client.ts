@@ -1,9 +1,9 @@
 /**
  * Client-Side PII Redaction Worker Manager
- * 
+ *
  * Provides a simple Promise-based API for client-side PII redaction
  * using WebWorkers to avoid blocking the main thread.
- * 
+ *
  * SECURITY: Ensures PII never leaves the client device.
  */
 
@@ -11,8 +11,16 @@ import type { WorkerRequest, WorkerResponse } from '../workers/pii-redactor.work
 
 let workerInstance: Worker | null = null;
 let requestIdCounter = 0;
+
+type RedactionResult = {
+  redacted: string;
+  redactedFields: string[];
+  pass1Count: number;
+  pass2Count: number;
+};
+
 const pendingRequests = new Map<string, {
-  resolve: (response: WorkerResponse) => void;
+  resolve: (response: RedactionResult) => void;
   reject: (error: Error) => void;
   timeoutId: ReturnType<typeof setTimeout>;
 }>();
@@ -38,9 +46,15 @@ function getWorker(): Worker {
         clearTimeout(pending.timeoutId);
 
         if (response.success) {
-          pending.resolve(response);
+          // Extract success fields
+          pending.resolve({
+            redacted: response.redacted,
+            redactedFields: response.redactedFields,
+            pass1Count: response.pass1Count,
+            pass2Count: response.pass2Count,
+          });
         } else {
-          pending.reject(new Error((response as any).error));
+          pending.reject(new Error(response.error));
         }
 
         pendingRequests.delete(requestId);

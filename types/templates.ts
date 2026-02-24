@@ -247,7 +247,7 @@ export function renderTemplate<T extends TemplateVariables>(
   
   // Replace all placeholders
   return template.replace(TEMPLATE_VARIABLE_PATTERN, (_, key) => {
-    const value = (variables as Record<string, unknown>)[key];
+    const value = (variables as unknown as Record<string, unknown>)[key];
     
     if (value === undefined || value === null) {
       return `[${key.toUpperCase()}_MISSING]`;

@@ -82,14 +82,19 @@ export interface AuditResponseWithVersion {
   audited_at: string;
   recommended_actions: string[];
   statute_issues: Array<{
-    citation: string;
+    statute: string;
     isVerified: boolean;
+    confidence?: number;
     issue?: string;
+    suggestion?: string;
   }>;
   roadmap_issues: Array<{
-    step: string;
+    step: number;
+    title: string;
     isVerified: boolean;
+    confidence?: number;
     issue?: string;
+    suggestion?: string;
   }>;
   correction_applied: boolean;
   corrected_output?: string;
