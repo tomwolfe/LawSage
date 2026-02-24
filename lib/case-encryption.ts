@@ -92,7 +92,7 @@ async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey>
   return crypto.subtle.deriveKey(
     {
       name: 'PBKDF2',
-      salt: salt,
+      salt: salt.buffer as ArrayBuffer,
       iterations: KEY_DERIVATION_CONFIG.iterations,
       hash: KEY_DERIVATION_CONFIG.hash,
     },
@@ -136,7 +136,7 @@ export async function encryptCaseData(
     const ciphertext = await crypto.subtle.encrypt(
       {
         name: 'AES-GCM',
-        iv: iv,
+        iv: iv.buffer as ArrayBuffer,
       },
       key,
       plaintext
@@ -145,8 +145,8 @@ export async function encryptCaseData(
     return {
       version: 1,
       algorithm: 'AES-GCM-256',
-      salt: arrayBufferToBase64(salt.buffer),
-      iv: arrayBufferToBase64(iv.buffer),
+      salt: arrayBufferToBase64(salt.buffer as ArrayBuffer),
+      iv: arrayBufferToBase64(iv.buffer as ArrayBuffer),
       ciphertext: arrayBufferToBase64(ciphertext),
       timestamp: Date.now(),
       caseId,
@@ -186,7 +186,7 @@ export async function decryptCaseData(
     const plaintext = await crypto.subtle.decrypt(
       {
         name: 'AES-GCM',
-        iv: iv,
+        iv: iv.buffer as ArrayBuffer,
       },
       key,
       base64ToArrayBuffer(encryptedData.ciphertext)
@@ -216,12 +216,12 @@ export function generateCaseId(): string {
 
 /**
  * Generate a password hash for key storage
- * 
+ *
  * This can be used to store a password verifier without storing the actual password
  */
 export async function generatePasswordHash(password: string, salt?: Uint8Array): Promise<{ hash: string; salt: string }> {
   const usedSalt = salt || generateSalt();
-  
+
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     'raw',
@@ -234,7 +234,7 @@ export async function generatePasswordHash(password: string, salt?: Uint8Array):
   const hash = await crypto.subtle.deriveBits(
     {
       name: 'PBKDF2',
-      salt: usedSalt,
+      salt: usedSalt.buffer as ArrayBuffer,
       iterations: KEY_DERIVATION_CONFIG.iterations,
       hash: KEY_DERIVATION_CONFIG.hash,
     },
@@ -244,7 +244,7 @@ export async function generatePasswordHash(password: string, salt?: Uint8Array):
 
   return {
     hash: arrayBufferToBase64(hash),
-    salt: arrayBufferToBase64(usedSalt.buffer),
+    salt: arrayBufferToBase64(usedSalt.buffer as ArrayBuffer),
   };
 }
 
@@ -404,11 +404,7 @@ export async function migrateToEncryptedStorage(
  */
 export function isCryptoSupported(): boolean {
   return !!(
-    crypto &&
-    crypto.subtle &&
-    crypto.subtle.encrypt &&
-    crypto.subtle.decrypt &&
-    crypto.subtle.deriveKey &&
-    crypto.getRandomValues
+    typeof crypto !== 'undefined' &&
+    crypto.subtle
   );
 }
