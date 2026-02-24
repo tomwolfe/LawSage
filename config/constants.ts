@@ -57,9 +57,12 @@ export const PII_REDACTION = {
 
 // Citation Verification Configuration
 export const CITATION_VERIFICATION = {
-  STRICT_MODE: false, // If true, never fall back to AI verification
+  STRICT_MODE: true, // If true, never fall back to AI verification (HARD-GATE)
   TIMEOUT_MS: 10000, // 10 second timeout for CourtListener
   MAX_RETRIES: 2,
+  // In strict mode, if CourtListener fails, return SERVICE UNAVAILABLE
+  // rather than letting AI "grade its own homework"
+  HARD_FAIL_ON_DATABASE_ERROR: true,
 } as const;
 
 // JSON Streaming Configuration
