@@ -3,7 +3,7 @@ import { runCritiqueLoop, generateCorrectedOutput } from '../../../lib/critique-
 import { runShadowCitationCheck, generateCitationReport } from '../../../lib/shadow-citation-checker';
 import { loadJurisdictionRules } from '../../../lib/rag-context-injector';
 import { safeLog, safeError, safeWarn } from '../../../lib/pii-redactor';
-import type { AuditRequestWithVersion, AuditResponseWithVersion } from '../../../types/state';
+import { hashStateContent, type AuditRequestWithVersion, type AuditResponseWithVersion } from '../../../types/state';
 
 export const runtime = 'nodejs';
 
@@ -13,10 +13,11 @@ export const runtime = 'nodejs';
  * This endpoint handles the "Judge" agent independently from the "Architect" agent.
  * By decoupling the critique loop, we stay within Vercel Hobby Tier's 60s limit.
  *
- * STATE DRIFT PREVENTION:
+ * STATE DRIFT PREVENTION (Roadmap Item #5):
  * - Accepts stateId and stateHash from client
+ * - Server-side hash verification BEFORE processing
  * - Returns same stateId/stateHash in response
- * - Frontend rejects audit if state has changed
+ * - Returns 409 Conflict if state hash doesn't match
  *
  * SHADOW CITATION CHECKING:
  * - Performs server-side citation verification against RAG context
@@ -45,9 +46,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate state version if provided (prevent state drift)
-    if (!stateId || !stateHash) {
-      safeWarn('[Audit API] Missing stateId or stateHash - audit may be for stale state');
+    // STATE DRIFT PREVENTION: Server-side guard
+    // Verify that the state hash matches the expected analysis hash
+    if (stateId && stateHash) {
+      const serverHash = await hashStateContent(analysis);
+      
+      // If hashes don't match, reject the audit request
+      if (serverHash !== stateHash) {
+        safeWarn(`[Audit API] State drift detected! Client hash: ${stateHash}, Server hash: ${serverHash}`);
+        
+        return NextResponse.json(
+          {
+            error: 'State drift detected',
+            message: 'The analysis content has changed since the request was made. Please refresh and try again.',
+            drift_detected: true,
+            expected_hash: stateHash,
+            actual_hash: serverHash,
+            stateId
+          },
+          { status: 409 } // 409 Conflict
+        );
+      }
+      
+      safeLog(`[Audit API] State hash verified for stateId: ${stateId}`);
+    } else {
+      safeWarn('[Audit API] Missing stateId or stateHash - proceeding without drift protection');
     }
 
     safeLog(`[Audit API] Starting independent audit for ${jurisdiction} (stateId: ${stateId || 'unknown'})`);
