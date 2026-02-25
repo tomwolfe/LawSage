@@ -119,16 +119,21 @@ async function checkRateLimit(
  * Proxy function - runs on every request
  */
 export async function proxy(request: NextRequest) {
-  // Only apply rate limiting to API routes
+  // 1. Security Headers (Always applied)
+  const response = pathnameIsAsset(request.nextUrl.pathname) 
+    ? NextResponse.next() 
+    : await handleSecurityHeaders(request);
+
+  // 2. Rate Limiting (API routes only)
   const { pathname } = request.nextUrl;
   
   if (!pathname.startsWith('/api/')) {
-    return NextResponse.next();
+    return response;
   }
   
   // Exclude health check endpoints from rate limiting
   if (pathname === '/api/health' || pathname.startsWith('/api/health/')) {
-    return NextResponse.next();
+    return response;
   }
   
   // Ensure session cookie exists
@@ -140,30 +145,32 @@ export async function proxy(request: NextRequest) {
   // Check rate limit
   const rateLimitStatus = await checkRateLimit(clientKey);
   
-  // Build response
-  const response = rateLimitStatus.allowed
-    ? NextResponse.next()
-    : NextResponse.json(
-        {
-          error: 'Rate limit exceeded',
-          message: `You have exceeded the rate limit of ${RATE_LIMIT.SERVER_MAX_REQUESTS} requests per hour.`,
-          retry_after: Math.ceil((rateLimitStatus.resetAt - Date.now()) / 1000),
-        },
-        { status: 429 }
-      );
+  // If not allowed, create a new 429 response but keep security headers
+  let finalResponse = response;
+  if (!rateLimitStatus.allowed) {
+    finalResponse = NextResponse.json(
+      {
+        error: 'Rate limit exceeded',
+        message: `You have exceeded the rate limit of ${RATE_LIMIT.SERVER_MAX_REQUESTS} requests per hour.`,
+        retry_after: Math.ceil((rateLimitStatus.resetAt - Date.now()) / 1000),
+      },
+      { status: 429 }
+    );
+    
+    // Re-apply security headers to the new response
+    applySecurityHeaders(finalResponse);
+    
+    finalResponse.headers.set('Retry-After', Math.ceil((rateLimitStatus.resetAt - Date.now()) / 1000).toString());
+  }
   
   // Add rate limit headers for transparency
-  response.headers.set('X-RateLimit-Limit', rateLimitStatus.limit.toString());
-  response.headers.set('X-RateLimit-Remaining', rateLimitStatus.remaining.toString());
-  response.headers.set('X-RateLimit-Reset', rateLimitStatus.resetAt.toString());
-  
-  if (!rateLimitStatus.allowed) {
-    response.headers.set('Retry-After', Math.ceil((rateLimitStatus.resetAt - Date.now()) / 1000).toString());
-  }
+  finalResponse.headers.set('X-RateLimit-Limit', rateLimitStatus.limit.toString());
+  finalResponse.headers.set('X-RateLimit-Remaining', rateLimitStatus.remaining.toString());
+  finalResponse.headers.set('X-RateLimit-Reset', rateLimitStatus.resetAt.toString());
   
   // Set or update session cookie (HttpOnly for security)
   if (!request.cookies.get(SESSION.COOKIE_NAME)?.value) {
-    response.cookies.set(SESSION.COOKIE_NAME, sessionToken, {
+    finalResponse.cookies.set(SESSION.COOKIE_NAME, sessionToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -172,6 +179,40 @@ export async function proxy(request: NextRequest) {
     });
   }
   
+  return finalResponse;
+}
+
+/**
+ * Helper to check if a path is a static asset
+ */
+function pathnameIsAsset(pathname: string): boolean {
+  return (
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/favicon.ico') ||
+    pathname.includes('.') // Simple check for file extensions
+  );
+}
+
+/**
+ * Apply security headers to a response
+ */
+function applySecurityHeaders(response: NextResponse | Response) {
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('X-XSS-Protection', '1; mode=block');
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  response.headers.set(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; font-src 'self' data:; connect-src 'self' https://api.z.ai https://*.upstash.io;"
+  );
+}
+
+/**
+ * Handle security headers for a request
+ */
+async function handleSecurityHeaders(request: NextRequest): Promise<NextResponse> {
+  const response = NextResponse.next();
+  applySecurityHeaders(response);
   return response;
 }
 
@@ -181,11 +222,11 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all API routes except:
-     * - static files (/_next/static)
-     * - images (/_next/image)
-     * - favicon
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
      */
-    '/api/:path*',
+    '/((?!_next/static|_next/image|favicon.ico).*)',
   ],
 };

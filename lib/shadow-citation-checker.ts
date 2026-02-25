@@ -339,8 +339,8 @@ export function generateCitationReport(
   return {
     summary: `Verified ${result.verified.length}/${result.allCitations.length} citations`,
     status,
-    verifiedCount: result.verifiedCount,
-    unverifiedCount: result.unverifiedCount,
+    verifiedCount: result.verified.length,
+    unverifiedCount: result.unverified.length,
     citations: [
       ...result.verified.map(v => ({
         citation: v.citation,

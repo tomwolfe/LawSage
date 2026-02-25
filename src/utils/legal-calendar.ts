@@ -15,14 +15,14 @@ export type Jurisdiction = 'Federal' | 'California' | 'New York' | 'Texas' | 'Fl
  * Common Federal Holidays (Fixed and Relative)
  */
 export const FEDERAL_HOLIDAYS = [
-  { name: 'New Year's Day', month: 0, day: 1 },
+  { name: "New Year's Day", month: 0, day: 1 },
   { name: 'Martin Luther King Jr. Day', month: 0, week: 3, dayOfWeek: 1 }, // 3rd Monday in Jan
-  { name: 'Presidents' Day', month: 1, week: 3, dayOfWeek: 1 },         // 3rd Monday in Feb
+  { name: "Presidents' Day", month: 1, week: 3, dayOfWeek: 1 },         // 3rd Monday in Feb
   { name: 'Memorial Day', month: 4, last: true, dayOfWeek: 1 },          // Last Monday in May
   { name: 'Juneteenth', month: 5, day: 19 },
   { name: 'Independence Day', month: 6, day: 4 },
   { name: 'Labor Day', month: 8, week: 1, dayOfWeek: 1 },                // 1st Monday in Sep
-  { name: 'Indigenous Peoples' Day', month: 9, week: 2, dayOfWeek: 1 }, // 2nd Monday in Oct
+  { name: "Indigenous Peoples' Day", month: 9, week: 2, dayOfWeek: 1 }, // 2nd Monday in Oct
   { name: 'Veterans Day', month: 10, day: 11 },
   { name: 'Thanksgiving Day', month: 10, week: 4, dayOfWeek: 4 },        // 4th Thursday in Nov
   { name: 'Christmas Day', month: 11, day: 25 },

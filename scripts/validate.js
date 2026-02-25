@@ -168,29 +168,29 @@ function validateConstants() {
 }
 
 /**
- * Validate middleware exists for server-side rate limiting
+ * Validate proxy exists for server-side rate limiting
  */
-function validateMiddleware() {
-  info('Validating middleware configuration...');
+function validateProxy() {
+  info('Validating proxy configuration...');
   
-  const middlewarePath = path.join(ROOT_DIR, 'middleware.ts');
+  const proxyPath = path.join(ROOT_DIR, 'proxy.ts');
   
-  if (!fs.existsSync(middlewarePath)) {
-    error('middleware.ts not found - server-side rate limiting required');
+  if (!fs.existsSync(proxyPath)) {
+    error('proxy.ts not found - server-side rate limiting required');
     return;
   }
   
-  const content = fs.readFileSync(middlewarePath, 'utf8');
+  const content = fs.readFileSync(proxyPath, 'utf8');
   
   if (!content.includes('checkRateLimit')) {
-    error('middleware.ts: Missing rate limiting implementation');
+    error('proxy.ts: Missing rate limiting implementation');
   }
   
-  if (!content.includes('@vercel/kv')) {
-    warn('middleware.ts: Consider using Vercel KV for distributed rate limiting');
+  if (!content.includes('redis')) {
+    warn('proxy.ts: Ensure Redis is used for distributed rate limiting');
   }
   
-  success('Middleware validated');
+  success('Proxy validated');
 }
 
 /**
@@ -293,7 +293,7 @@ function validateSecurity() {
   info('Scanning for security issues...');
   
   const filesToCheck = [
-    'middleware.ts',
+    'proxy.ts',
     'lib/rate-limiter-client.ts',
     'app/api/verify-citation/route.ts',
   ];
@@ -327,7 +327,7 @@ async function runValidations() {
   log('='.repeat(60) + '\n', colors.blue);
   
   validateConstants();
-  validateMiddleware();
+  validateProxy();
   validateRulesFiles();
   validateCitationVerification();
   validateMagicNumbers();

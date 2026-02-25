@@ -3,10 +3,10 @@
  * These are safe to use in React Client Components
  * 
  * DEPRECATED: This module provides client-side rate limiting only.
- * Server-side rate limiting is enforced in middleware.ts using Vercel KV.
+ * Server-side rate limiting is enforced in proxy.ts using Vercel KV.
  * Client-side limits are for UI feedback only and should not be trusted.
  * 
- * Security Note: Trust boundary is now at the server (middleware.ts).
+ * Security Note: Trust boundary is now at the server (proxy.ts).
  * Client-side checks are purely informational.
  */
 
@@ -87,7 +87,7 @@ export function getClientSideRateLimitKey(): string {
 
 /**
  * Check rate limit on client-side (localStorage-based)
- * DEPRECATED: For UI feedback only. Server-side rate limiting in middleware.ts is authoritative.
+ * DEPRECATED: For UI feedback only. Server-side rate limiting in proxy.ts is authoritative.
  */
 export function checkClientSideRateLimit(): { allowed: boolean; remaining: number; resetAt: number } {
   try {
@@ -150,7 +150,7 @@ export function checkClientSideRateLimit(): { allowed: boolean; remaining: numbe
 
 /**
  * Get client-side rate limit status without consuming a request
- * DEPRECATED: For UI feedback only. Server-side rate limiting in middleware.ts is authoritative.
+ * DEPRECATED: For UI feedback only. Server-side rate limiting in proxy.ts is authoritative.
  */
 export function getClientSideRateLimitStatus(): { remaining: number; resetAt: number; limit: number } {
   try {
