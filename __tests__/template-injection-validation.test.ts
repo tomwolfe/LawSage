@@ -2,12 +2,18 @@
 // Uses mocked route implementation from __mocks__/app/api/analyze/route
 
 import { POST as AnalyzePOST } from '../__mocks__/app/api/analyze/route';
+import type { NextRequest } from 'next/server';
 
-// Helper to create a mock request object
-function createMockNextRequest(jsonBody: Record<string, unknown>): { json: () => Promise<Record<string, unknown>> } {
+// Helper to create a mock request object that satisfies NextRequest
+function createMockNextRequest(jsonBody: Record<string, unknown>): NextRequest {
+  const url = new URL('http://localhost:3000/api/analyze');
+  
+  // Create a minimal mock that satisfies TypeScript
   return {
-    json: () => Promise.resolve(jsonBody)
-  };
+    json: async () => jsonBody,
+    headers: new Headers(),
+    nextUrl: url,
+  } as unknown as NextRequest;
 }
 
 describe('Template Injection Validation Tests', () => {
@@ -17,7 +23,7 @@ describe('Template Injection Validation Tests', () => {
       jurisdiction: "California"
     });
 
-    const response = await AnalyzePOST(mockRequest);
+    const response = await AnalyzePOST(mockRequest) as { json: () => Promise<{ text: string; sources: Array<{ title: string; uri: string }> }> };
     const result = await response.json();
 
     // Verify the response structure
@@ -35,7 +41,7 @@ describe('Template Injection Validation Tests', () => {
       jurisdiction: "California"
     });
 
-    const response = await AnalyzePOST(mockRequest);
+    const response = await AnalyzePOST(mockRequest) as { json: () => Promise<{ text: string }> };
     const result = await response.json();
 
     // Verify that the response contains content from the matched template
@@ -49,10 +55,10 @@ describe('Template Injection Validation Tests', () => {
       jurisdiction: "California"
     });
 
-    const response = await AnalyzePOST(mockRequest);
+    const response = await AnalyzePOST(mockRequest) as { json: () => Promise<{ text: string }> };
     const result = await response.json();
 
-    // Verify that the response still contains legal content but not necessarily the specific template
+    // Verify the response still contains legal content but not necessarily the specific template
     expect(result).toHaveProperty('text');
     expect(result.text).toContain('test template'); // From the mocked AI response
   });
@@ -63,7 +69,7 @@ describe('Template Injection Validation Tests', () => {
       jurisdiction: "New York"
     });
 
-    const response = await AnalyzePOST(mockRequest);
+    const response = await AnalyzePOST(mockRequest) as { json: () => Promise<{ text: string }> };
     const result = await response.json();
 
     // Verify that the response contains required legal sections
@@ -99,7 +105,7 @@ describe('Template Injection Validation Tests', () => {
         jurisdiction: "California"
       });
 
-      const response = await AnalyzePOST(mockRequest);
+      const response = await AnalyzePOST(mockRequest) as { json: () => Promise<{ text: string }> };
       const result = await response.json();
 
       // Verify that the appropriate template content is included

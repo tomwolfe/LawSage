@@ -249,7 +249,7 @@ describe('Motion Schemas Validation', () => {
           date: ''
         },
         type: 'unknown_motion_type'
-      } as LegalMotion;
+      } as unknown as LegalMotion;
 
       const result = validateLegalMotion(unknownMotion);
       expect(result.isValid).toBe(false);

@@ -381,3 +381,131 @@ export function createCourtCaption(
     county: options.county,
   };
 }
+
+/**
+ * Extract court caption information from OCR results
+ * This enables auto-filling the caption from uploaded documents
+ */
+export interface OCRCaptionData {
+  courtName?: string;
+  caseNumber?: string;
+  plaintiff?: string;
+  defendant?: string;
+  county?: string;
+  state?: string;
+}
+
+/**
+ * Parse court information from OCR text
+ */
+export function extractCaptionFromOCR(ocrText: string): OCRCaptionData {
+  const result: OCRCaptionData = {};
+
+  // Extract case number patterns
+  const caseNumberPatterns = [
+    /case\s*(?:no|number|#)?\.?\s*:?\s*([A-Z0-9]+-?\d+)/i,
+    /No\.?\s*([A-Z0-9]{2,}\d+)/i,
+    /Case\s*No\.?\s*([A-Z0-9]+)/i,
+  ];
+
+  for (const pattern of caseNumberPatterns) {
+    const match = ocrText.match(pattern);
+    if (match) {
+      result.caseNumber = match[1].trim();
+      break;
+    }
+  }
+
+  // Extract court name
+  const courtPatterns = [
+    /(?:superior|circuit|district|family|probate)\s+court\s+of\s+([A-Za-z\s]+)/i,
+    /(?:in the|)\s*([A-Za-z\s]+)\s+(?:superior|circuit|district)\s+court/i,
+  ];
+
+  for (const pattern of courtPatterns) {
+    const match = ocrText.match(pattern);
+    if (match) {
+      result.courtName = `Superior Court of ${match[1].trim()}`;
+      break;
+    }
+  }
+
+  // Extract parties
+  const plaintiffPatterns = [
+    /(?:plaintiff|petitioner|appellant)\s*:?\s*([A-Z][A-Za-z\s,]+)/i,
+    /^([A-Z][A-Za-z\s]+),?\s+plaintiff/im,
+  ];
+
+  for (const pattern of plaintiffPatterns) {
+    const match = ocrText.match(pattern);
+    if (match && match[1]) {
+      result.plaintiff = match[1].trim().replace(/,\s*$/, '');
+      break;
+    }
+  }
+
+  const defendantPatterns = [
+    /(?:defendant|respondent)\s*:?\s*([A-Z][A-Za-z\s,]+)/i,
+    /(?:vs?|v\.?|versus)\s+([A-Z][A-Za-z\s]+),?\s+defendant/im,
+  ];
+
+  for (const pattern of defendantPatterns) {
+    const match = ocrText.match(pattern);
+    if (match && match[1]) {
+      result.defendant = match[1].trim().replace(/,\s*$/, '');
+      break;
+    }
+  }
+
+  // Extract county
+  const countyPattern = /(?:county|parish)\s+of\s+([A-Za-z\s]+)/i;
+  const countyMatch = ocrText.match(countyPattern);
+  if (countyMatch) {
+    result.county = countyMatch[1].trim();
+  }
+
+  // Extract state from common patterns
+  const statePatterns = [
+    /state\s+of\s+([A-Z][a-z]+)/i,
+    /(?:California|New York|Texas|Florida|Illinois|Pennsylvania|Ohio|Georgia)/i,
+  ];
+
+  for (const pattern of statePatterns) {
+    const match = ocrText.match(pattern);
+    if (match) {
+      result.state = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase();
+      break;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Create CourtCaption from multiple OCR results
+ * Merges information from multiple documents
+ */
+export function createCaptionFromOCRResults(
+  ocrResults: Array<{ extractedText: string; documentType?: string }>,
+  jurisdiction: string
+): CourtCaption {
+  let combinedData: OCRCaptionData = {
+    state: jurisdiction,
+  };
+
+  for (const result of ocrResults) {
+    const data = extractCaptionFromOCR(result.extractedText);
+    
+    // Merge data (later results can override earlier ones)
+    combinedData = {
+      ...combinedData,
+      ...data,
+    };
+  }
+
+  return createCourtCaption({
+    ...combinedData,
+    jurisdiction,
+    documentTitle: '[DOCUMENT TITLE]',
+  });
+}

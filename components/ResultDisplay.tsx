@@ -1344,7 +1344,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
                   </h3>
                   <p className="text-indigo-100 text-sm">
                     Review the side-by-side comparison above to identify weaknesses in your own argument before the opposition does. 
-                    The "Opposition View" represents the most likely "Red-Team" attack on your position based on local rules and common defense tactics.
+                    The &quot;Opposition View&quot; represents the most likely &quot;Red-Team&quot; attack on your position based on local rules and common defense tactics.
                   </p>
                 </div>
               </div>
