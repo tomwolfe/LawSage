@@ -47,13 +47,20 @@ interface CritiqueResult {
 function extractStatutes(content: string): string[] {
   const statutePatterns = [
     // Federal: 12 U.S.C. § 345, 15 U.S.C. § 1234
-    /(\d+\s+[A-Z]\.[A-Z]\.[A-Z]\.?\s+§?\s*\d+[a-z]?)/gi,
+    /(\d+\s+[A-Z]\.[A-Z]\.[A-Z]\.?\s+§?\s*\d+(?:\.\d+)?[a-z]?)/gi,
     // California: Cal. Civ. Code § 1708, CCP § 412.20
-    /((?:Cal\.?\s+)?(?:Civ\.?\s+)?(?:Code|Penal|Civil|Probate|Family|Evidence|Corp)\s+§?\s*\d+[a-z]?)/gi,
+    /((?:Cal\.?\s+)?(?:Civ\.?\s+)?(?:Code|Penal|Civil|Probate|Family|Evidence|Corp)\s+§?\s*\d+(?:\.\d+)?[a-z]?)/gi,
+    // CCP standalone
+    /(CCP\s+§?\s*\d+(?:\.\d+)?[a-z]?)/gi,
     // State statutes: Wis. Stat. § 823.01, N.Y. Civ. Prac. L. & R. § 3211
-    /(([A-Z][a-z]+\.?\s+(?:Stat\.?|Code|Crim\.?\s+Proc\.?))\s+§?\s*\d+(?:\.\d+)?[a-z]?)/gi,
-    // Court rules: Fed. R. Civ. P. 12(b)(6), Cal. Rules of Court, rule 3.1324
-    /((?:Fed\.?\s+R\.?\s+(?:Civ\.?\s+)?P\.?)|(?:Cal\.?\s+Rules\s+of\s+Court)|(?:Local\s+Rule))\s+rule\.?\s*\d+(?:\.\d+)?[a-z]?/gi,
+    /(([A-Z][a-z]+\.?\s+(?:Stat\.?|Code|Crim\.?\s+Proc\.?|Civ\.?\s+Prac\.?))\s+§?\s*\d+(?:\.\d+)?[a-z]?)/gi,
+    // Court rules: Fed. R. Civ. P. 12(b)(6), FRCP 12, Cal. Rules of Court, rule 3.1324
+    /((?:Fed\.?\s+R\.?\s+(?:Civ\.?\s+)?P\.?|FRCP|CRCP|TRCP|FLRCP)\s*(?:rule\.?)?\s*\d+(?:\.\d+)?(?:\([a-z0-9]+\))?)/gi,
+    // Rules of Court
+    /((?:Cal\.?\s+Rules\s+of\s+Court|Local\s+Rule)\s+(?:rule\.?\s*)?\d+(?:\.\d+)?[a-z]?)/gi,
+    // Case Law (e.g., 410 U.S. 113, Roe v. Wade)
+    /(\d+\s+[A-Z]\.?\s+[A-Z]\.?\d?d?\s+\d+)/gi,
+    /([A-Z][a-z]+\s+v\.\s+[A-Z][a-z]+)/g,
   ];
 
   const statutes = new Set<string>();
@@ -79,6 +86,25 @@ function verifyStatuteAgainstContext(
   const statuteLower = statute.toLowerCase();
   const contextLower = researchContext.toLowerCase();
 
+  // HEURISTIC: Check for obvious fake/placeholder statute numbers used in tests or hallucinations
+  const fakePatterns = [
+    /§\s*999999/i,
+    /(?:Rule|FRCP|CCP|Stat)\s*999/i,
+    /fake/i,
+    /fabricated/i,
+    /\[INSERT/i
+  ];
+  
+  if (fakePatterns.some(pattern => pattern.test(statute))) {
+    return {
+      statute,
+      isVerified: false,
+      confidence: 0.1,
+      issue: `Statute "${statute}" is a known placeholder or fabricated citation`,
+      suggestion: 'Provide a real, verified statute or court rule.'
+    };
+  }
+
   // Check if statute is mentioned in the research context
   const isMentioned = contextLower.includes(statuteLower);
 
@@ -102,6 +128,10 @@ function verifyStatuteAgainstContext(
       /Cal\.?\s+(?:Civ\.?\s+)?Code\s+§\s*\d+/i,
       /CCP\s+§\s*\d+/i,
       /Cal\.?\s+Rules\s+of\s+Court/i,
+    ],
+    'Federal': [
+      /Fed\.?\s+R\.?\s+(?:Civ\.?\s+)?P\.?\s+\d+/i,
+      /\d+\s+U\.?S\.?C\.?\s+§?\s*\d+/i,
     ],
     'Wisconsin': [
       /Wis\.?\s+Stat\.?\s+§\s*\d+(?:\.\d+)?/i,

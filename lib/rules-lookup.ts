@@ -9,6 +9,7 @@
  */
 
 import { LEGAL_DATA } from '../config/constants';
+import { calculateLegalDeadline, Jurisdiction } from '../src/utils/legal-calendar';
 
 export interface StateRules {
   jurisdiction: string;
@@ -202,10 +203,8 @@ export function getFilingDeadline(
 /**
  * Calculate deadline date from a starting date
  */
-export function calculateDeadline(startDate: Date, days: number): Date {
-  const result = new Date(startDate);
-  result.setDate(result.getDate() + days);
-  return result;
+export function calculateDeadline(startDate: Date, days: number, jurisdiction: Jurisdiction = 'Federal'): Date {
+  return calculateLegalDeadline(startDate, days, jurisdiction);
 }
 
 /**

@@ -53,6 +53,9 @@ export const OCRResultSchema = z.object({
   parties: z.array(z.string()).optional(),
   important_dates: z.array(z.string()).optional(),
   legal_references: z.array(z.string()).optional(),
+  has_signature: z.boolean().optional(),
+  has_seal: z.boolean().optional(),
+  authenticity_score: z.number().min(0).max(100).optional(),
 });
 
 // Type exports

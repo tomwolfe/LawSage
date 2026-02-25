@@ -15,6 +15,7 @@
  */
 
 import { safeLog, safeWarn } from './pii-redactor';
+import { calculateLegalDeadline, isCourtDay, Jurisdiction } from '../src/utils/legal-calendar';
 
 /**
  * Document type enumeration
@@ -735,27 +736,46 @@ function getHearingRequirements(documentType: DocumentType, jurisdiction: string
 export function calculateDeadlineCountdown(
   deadline: DeadlineRequirement,
   hearingDate: Date,
-  eventDate?: Date
+  eventDate?: Date,
+  jurisdiction: Jurisdiction = 'Federal'
 ): DeadlineCountdown {
   const referenceDate = deadline.daysBeforeHearing > 0 ? hearingDate : (eventDate || new Date());
   
-  // Calculate due date
-  const dueDate = new Date(referenceDate);
+  // Calculate due date using formal legal logic
   const daysToSubtract = deadline.daysBeforeHearing > 0 ? deadline.daysBeforeHearing : deadline.daysBeforeEvent;
   
-  if (deadline.businessDaysOnly) {
-    // Subtract business days
-    let daysSubtracted = 0;
-    while (daysSubtracted < daysToSubtract) {
-      dueDate.setDate(dueDate.getDate() - 1);
-      // Skip weekends (0 = Sunday, 6 = Saturday)
-      if (dueDate.getDay() !== 0 && dueDate.getDay() !== 6) {
-        daysSubtracted++;
+  // Note: calculateLegalDeadline adds days, but here we often need to subtract (X days BEFORE hearing)
+  // For simplicity, we handle the "X days before" by passing negative days or manual subtraction
+  // But wait, the legal calendar utility usually counts forward. 
+  // Let's implement a robust "subtract court days" if needed.
+  
+  let dueDate: Date;
+  if (deadline.daysBeforeHearing > 0 || deadline.daysBeforeEvent > 0) {
+    // Counting backwards from a future date
+    dueDate = new Date(referenceDate);
+    if (deadline.businessDaysOnly) {
+      let courtDaysSubtracted = 0;
+      while (courtDaysSubtracted < daysToSubtract) {
+        dueDate.setDate(dueDate.getDate() - 1);
+        if (isCourtDay(dueDate, jurisdiction)) {
+          courtDaysSubtracted++;
+        }
+      }
+    } else {
+      dueDate.setDate(dueDate.getDate() - daysToSubtract);
+      // If it lands on a non-court day when counting backwards, some jurisdictions
+      // require it to be filed EARLIER (the preceding court day).
+      // Standard CRC rule for "X days before" usually means if it falls on a weekend, 
+      // you must file by the preceding Friday.
+      while (!isCourtDay(dueDate, jurisdiction)) {
+        dueDate.setDate(dueDate.getDate() - 1);
       }
     }
   } else {
-    // Subtract calendar days
-    dueDate.setDate(dueDate.getDate() - daysToSubtract);
+    // Counting forwards (e.g., "21 days after service")
+    dueDate = calculateLegalDeadline(referenceDate, daysToSubtract, jurisdiction, { 
+      businessDaysOnly: deadline.businessDaysOnly 
+    });
   }
   
   // Calculate remaining days
@@ -766,10 +786,19 @@ export function calculateDeadlineCountdown(
   // Calculate business days remaining
   let businessDaysRemaining = 0;
   let currentDate = new Date(now);
-  while (currentDate < dueDate) {
-    currentDate.setDate(currentDate.getDate() + 1);
-    if (currentDate.getDay() !== 0 && currentDate.getDay() !== 6) {
-      businessDaysRemaining++;
+  if (currentDate < dueDate) {
+    while (currentDate < dueDate) {
+      currentDate.setDate(currentDate.getDate() + 1);
+      if (isCourtDay(currentDate, jurisdiction)) {
+        businessDaysRemaining++;
+      }
+    }
+  } else {
+    while (currentDate > dueDate) {
+      currentDate.setDate(currentDate.getDate() - 1);
+      if (isCourtDay(currentDate, jurisdiction)) {
+        businessDaysRemaining--;
+      }
     }
   }
   
@@ -802,7 +831,8 @@ export function calculateDeadlineCountdown(
  */
 export function generateStickyHeaderData(
   matchedRule: MatchedRule,
-  hearingDate: Date
+  hearingDate: Date,
+  jurisdiction: Jurisdiction = 'Federal'
 ): {
   title: string;
   ruleReference: string;
@@ -811,7 +841,7 @@ export function generateStickyHeaderData(
   showWarning: boolean;
 } {
   const deadlines = matchedRule.deadlines.map(d =>
-    calculateDeadlineCountdown(d, hearingDate)
+    calculateDeadlineCountdown(d, hearingDate, undefined, jurisdiction)
   );
   
   // Find most urgent deadline
@@ -873,7 +903,7 @@ export function processOCRForRules(
   // Generate sticky header data
   let stickyHeaderData = null;
   if (matchedRule && hearingDateToUse) {
-    stickyHeaderData = generateStickyHeaderData(matchedRule, hearingDateToUse);
+    stickyHeaderData = generateStickyHeaderData(matchedRule, hearingDateToUse, jurisdiction as Jurisdiction);
   }
   
   return {

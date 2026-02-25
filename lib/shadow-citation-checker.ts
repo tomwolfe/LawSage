@@ -339,8 +339,8 @@ export function generateCitationReport(
   return {
     summary: `Verified ${result.verified.length}/${result.allCitations.length} citations`,
     status,
-    verifiedCount: result.verified.length,
-    unverifiedCount: result.unverified.length,
+    verifiedCount: result.verifiedCount,
+    unverifiedCount: result.unverifiedCount,
     citations: [
       ...result.verified.map(v => ({
         citation: v.citation,
@@ -357,4 +357,43 @@ export function generateCitationReport(
       })),
     ],
   };
+}
+
+/**
+ * Perform live verification of citations using the verify-citation API
+ * 
+ * Used for the "Hard-Gate" check before final output delivery.
+ */
+export async function verifyCitationsLive(
+  citations: string[],
+  jurisdiction: string,
+  baseUrl: string
+): Promise<Array<{ citation: string; is_verified: boolean; details?: string }>> {
+  const results = [];
+  
+  for (const citation of citations) {
+    try {
+      const response = await fetch(`${baseUrl}/api/verify-citation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ citation, jurisdiction, strict_mode: true }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        results.push({
+          citation,
+          is_verified: data.is_verified,
+          details: data.details,
+        });
+      } else {
+        results.push({ citation, is_verified: false, details: 'Verification service error' });
+      }
+    } catch (error) {
+      safeError(`Live verification failed for ${citation}:`, error);
+      results.push({ citation, is_verified: false, details: 'Network error during verification' });
+    }
+  }
+  
+  return results;
 }

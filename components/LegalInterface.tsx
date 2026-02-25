@@ -40,7 +40,7 @@ export interface CaseLedgerEntry {
 export interface CaseFolderState {
   userInput: string;
   jurisdiction: string;
-  activeTab: 'strategy' | 'filings' | 'sources' | 'survival-guide' | 'opposition-view' | 'roadmap';
+  activeTab: 'strategy' | 'filings' | 'sources' | 'survival-guide' | 'opposition-view' | 'roadmap' | 'battle-plan';
   history: CaseHistoryItem[];
   selectedHistoryItem: string | null;
   backendUnreachable: boolean;
@@ -133,7 +133,7 @@ export default function LegalInterface() {
   const [isListening, setIsListening] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<LegalResult | null>(null);
-  const [activeTab, setActiveTab] = useState<'strategy' | 'filings' | 'sources' | 'survival-guide' | 'opposition-view' | 'roadmap'>('strategy');
+  const [activeTab, setActiveTab] = useState<'strategy' | 'filings' | 'sources' | 'survival-guide' | 'opposition-view' | 'roadmap' | 'battle-plan'>('strategy');
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
   const [history, setHistory] = useState<CaseHistoryItem[]>([]);
@@ -170,7 +170,7 @@ export default function LegalInterface() {
 
         if (caseFolder.userInput !== undefined) setUserInput(caseFolder.userInput);
         if (caseFolder.jurisdiction !== undefined) setJurisdiction(caseFolder.jurisdiction);
-        if (caseFolder.activeTab !== undefined) setActiveTab(caseFolder.activeTab as "strategy" | "filings" | "sources" | "survival-guide" | "opposition-view" | "roadmap");
+        if (caseFolder.activeTab !== undefined) setActiveTab(caseFolder.activeTab as "strategy" | "filings" | "sources" | "survival-guide" | "opposition-view" | "roadmap" | "battle-plan");
         if (caseFolder.history !== undefined) setHistory(caseFolder.history);
         if (caseFolder.selectedHistoryItem !== undefined) setSelectedHistoryItem(caseFolder.selectedHistoryItem);
         if (caseFolder.backendUnreachable !== undefined) setBackendUnreachable(caseFolder.backendUnreachable);
@@ -200,7 +200,7 @@ export default function LegalInterface() {
         if (legacyState.userInput !== undefined) setUserInput(legacyState.userInput as string);
         if (legacyState.jurisdiction !== undefined) setJurisdiction(legacyState.jurisdiction as string);
         if (legacyState.result !== undefined) setResult(legacyState.result as LegalResult);
-        if (legacyState.activeTab !== undefined) setActiveTab(legacyState.activeTab as "strategy" | "filings" | "sources" | "survival-guide" | "opposition-view" | "roadmap");
+        if (legacyState.activeTab !== undefined) setActiveTab(legacyState.activeTab as "strategy" | "filings" | "sources" | "survival-guide" | "opposition-view" | "roadmap" | "battle-plan");
         if (legacyState.history !== undefined) setHistory(legacyState.history as CaseHistoryItem[]);
         if (legacyState.selectedHistoryItem !== undefined) setSelectedHistoryItem(legacyState.selectedHistoryItem as string | null);
         if (legacyState.backendUnreachable !== undefined) setBackendUnreachable(legacyState.backendUnreachable as boolean);

@@ -5,6 +5,8 @@ import { withRateLimit } from '../../../lib/rate-limiter';
 import { getLegalLookupResponse, searchExParteRules } from '../../../src/utils/legal-lookup';
 import { searchLegalRules, isVectorConfigured } from '../../../lib/vector';
 import { saveCheckpoint, generateSessionId } from '../../../lib/analysis-checkpoint';
+import { verifyCitationsLive } from '../../../lib/shadow-citation-checker';
+import { CITATION_VERIFICATION } from '../../../config/constants';
 import templateManifest from '../../../public/templates/manifest.json';
 import { readFile } from 'fs/promises';
 import path from 'path';
@@ -961,6 +963,54 @@ CRITICAL INSTRUCTIONS:
               // Note: Critique/Audit loop has been decoupled to a separate endpoint (/api/audit)
               // to stay within Vercel Hobby Tier's 60s timeout limit.
               // The frontend will call the audit endpoint separately after receiving this response.
+
+              // HARD-GATE CITATION VERIFICATION
+              const isStrictMode = CITATION_VERIFICATION.STRICT_MODE || process.env.CITATION_VERIFICATION_STRICT_MODE === 'true';
+              if (parsedOutput.citations && parsedOutput.citations.length > 0) {
+                controller.enqueue(encoder.encode(JSON.stringify({
+                  type: 'status',
+                  message: 'Performing Hard-Gate Citation Verification...'
+                }) + '\n'));
+
+                const citationTexts = parsedOutput.citations.map(c => c.text);
+                const baseUrl = req.nextUrl.origin;
+                
+                const verificationResults = await verifyCitationsLive(citationTexts, jurisdiction, baseUrl);
+                
+                let redactionCount = 0;
+                verificationResults.forEach((v, index) => {
+                  if (!v.is_verified) {
+                    safeWarn(`Citation verification FAILED: ${v.citation}`);
+                    
+                    if (isStrictMode && parsedOutput) {
+                      redactionCount++;
+                      const placeholder = `[Citation Removed: Verification Failed - ${v.citation}]`;
+                      
+                      // Redact from strategy
+                      if (parsedOutput.strategy) {
+                        parsedOutput.strategy = parsedOutput.strategy.split(v.citation).join(placeholder);
+                      }
+                      
+                      // Redact from filing template
+                      if (parsedOutput.filing_template) {
+                        parsedOutput.filing_template = parsedOutput.filing_template.split(v.citation).join(placeholder);
+                      }
+                      
+                      // Mark in citations list
+                      if (parsedOutput.citations && parsedOutput.citations[index]) {
+                        parsedOutput.citations[index].text = placeholder;
+                        parsedOutput.citations[index].url = undefined;
+                      }
+                    }
+                  }
+                });
+
+                if (redactionCount > 0) {
+                  safeLog(`Hard-Gate: Redacted ${redactionCount} unverified citations.`);
+                  parsedOutput.disclaimer = (parsedOutput.disclaimer || "") + `\n\nWARNING: ${redactionCount} citation(s) were removed because they could not be verified in official legal databases. Manual verification is required.`;
+                }
+              }
+
             } catch (parseError) {
               safeError("Failed to parse JSON:", parseError);
               parsedOutput = {
