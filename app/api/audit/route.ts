@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runCritiqueLoop, generateCorrectedOutput } from '../../../lib/critique-agent';
+import { runShadowCitationCheck, generateCitationReport } from '../../../lib/shadow-citation-checker';
+import { loadJurisdictionRules } from '../../../lib/rag-context-injector';
 import { safeLog, safeError, safeWarn } from '../../../lib/pii-redactor';
 import type { AuditRequestWithVersion, AuditResponseWithVersion } from '../../../types/state';
 
@@ -15,6 +17,11 @@ export const runtime = 'nodejs';
  * - Accepts stateId and stateHash from client
  * - Returns same stateId/stateHash in response
  * - Frontend rejects audit if state has changed
+ *
+ * SHADOW CITATION CHECKING:
+ * - Performs server-side citation verification against RAG context
+ * - Cross-references citations with jurisdiction rules
+ * - Provides hard-gate blocking for unverified citations
  *
  * The frontend calls this endpoint AFTER receiving the initial analysis,
  * allowing the user to see results immediately while the audit runs in background.
@@ -45,6 +52,21 @@ export async function POST(req: NextRequest) {
 
     safeLog(`[Audit API] Starting independent audit for ${jurisdiction} (stateId: ${stateId || 'unknown'})`);
 
+    // Load jurisdiction rules for enhanced verification
+    const rules = await loadJurisdictionRules(jurisdiction);
+
+    // SHADOW CITATION CHECK: Server-side verification before streaming
+    safeLog('[Audit API] Running shadow citation check...');
+    const citationCheckResult = runShadowCitationCheck(
+      analysis,
+      jurisdiction,
+      researchContext || '',
+      rules
+    );
+
+    const citationReport = generateCitationReport(citationCheckResult);
+    safeLog(`[Audit API] Citation check: ${citationReport.summary}, status=${citationReport.status}`);
+
     // Run the critique loop (the "Judge" agent)
     const critiqueResult = await runCritiqueLoop(analysis, {
       jurisdiction,
@@ -63,24 +85,39 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Combine critique and citation check results
+    const combinedValid = critiqueResult.isValid && !citationCheckResult.hardGateBlocked;
+    const combinedConfidence = (critiqueResult.overallConfidence + citationCheckResult.overallConfidence) / 2;
+
     // Build response with audit metadata AND state version (for drift prevention)
-    const auditResponse: AuditResponseWithVersion = {
-      audit_passed: critiqueResult.isValid,
-      confidence: critiqueResult.overallConfidence,
-      statute_issues_count: critiqueResult.statuteIssues.filter(s => !s.isVerified).length,
+    const auditResponse: AuditResponseWithVersion & {
+      citation_check?: ReturnType<typeof generateCitationReport>;
+      citation_hard_gate_blocked?: boolean;
+      can_download?: boolean;
+    } = {
+      audit_passed: combinedValid,
+      confidence: combinedConfidence,
+      statute_issues_count: critiqueResult.statuteIssues.filter(s => !s.isVerified).length + citationCheckResult.unverified.length,
       roadmap_issues_count: critiqueResult.roadmapIssues.filter(r => !r.isVerified).length,
       audited_at: new Date().toISOString(),
-      recommended_actions: critiqueResult.recommendedActions,
+      recommended_actions: [
+        ...critiqueResult.recommendedActions,
+        ...citationCheckResult.unverified.map(u => `Verify citation: ${u.citation}`),
+      ],
       statute_issues: critiqueResult.statuteIssues,
       roadmap_issues: critiqueResult.roadmapIssues,
       correction_applied: !!correctedOutput,
       corrected_output: correctedOutput,
       // Return state version for client-side drift detection
       stateId: stateId || '',
-      stateHash: stateHash || ''
+      stateHash: stateHash || '',
+      // Shadow citation check results
+      citation_check: citationReport,
+      citation_hard_gate_blocked: citationCheckResult.hardGateBlocked,
+      can_download: !citationCheckResult.hardGateBlocked && combinedValid,
     };
 
-    safeLog(`[Audit API] Audit complete: confidence=${critiqueResult.overallConfidence.toFixed(2)}, valid=${critiqueResult.isValid}`);
+    safeLog(`[Audit API] Audit complete: confidence=${combinedConfidence.toFixed(2)}, valid=${combinedValid}, can_download=${!citationCheckResult.hardGateBlocked && combinedValid}`);
 
     return NextResponse.json(auditResponse);
   } catch (error) {

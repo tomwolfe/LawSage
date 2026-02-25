@@ -4,6 +4,8 @@
  * are matched to the correct version of the case state.
  */
 
+import type { EvidenceItem, VaultMetadata } from '../lib/evidence-vault';
+
 /**
  * Unique state version identifier (UUID v4 format)
  * Generated on every state update
@@ -15,6 +17,42 @@ export interface StateVersion {
   timestamp: number;
   /** Hash of the state content for integrity verification */
   stateHash: string;
+}
+
+/**
+ * Evidence Vault state for encrypted document storage
+ */
+export interface EvidenceVaultState {
+  /** Vault is initialized */
+  initialized: boolean;
+  /** Vault case ID */
+  caseId: string;
+  /** Number of evidence items (unencrypted metadata) */
+  evidenceCount: number;
+  /** Vault metadata (unencrypted) */
+  metadata: VaultMetadata | null;
+  /** Whether vault is currently unlocked */
+  isUnlocked: boolean;
+  /** Last unlock timestamp */
+  lastUnlockedAt?: number;
+}
+
+/**
+ * Complete application state with version tracking
+ */
+export interface AppState {
+  /** Current jurisdiction */
+  jurisdiction: string;
+  /** User's legal situation description */
+  userInput: string;
+  /** Generated analysis from AI */
+  analysis: string | null;
+  /** Audit results */
+  audit: AuditResponseWithVersion | null;
+  /** Evidence vault state */
+  evidenceVault: EvidenceVaultState;
+  /** State version for drift prevention */
+  version: StateVersion;
 }
 
 /**

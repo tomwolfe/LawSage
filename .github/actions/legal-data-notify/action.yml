@@ -1,0 +1,38 @@
+name: Legal Data Update - Email Notification
+
+# This is a composite action that can be reused in other workflows
+# Usage:
+# - uses: ./.github/actions/legal-data-notify
+#   with:
+#     report-path: './backups/legal-data/update-report.json'
+#     send-to: 'legal-team@example.com'
+
+name: 'Legal Data Update Notification'
+description: 'Send email notification for legal data updates'
+inputs:
+  report-path:
+    description: 'Path to the update report JSON file'
+    required: true
+  send-to:
+    description: 'Email address to send notification to'
+    required: true
+  smtp-server:
+    description: 'SMTP server for sending emails'
+    required: false
+  smtp-username:
+    description: 'SMTP username'
+    required: false
+  smtp-password:
+    description: 'SMTP password'
+    required: false
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Send email notification
+      shell: bash
+      run: |
+        echo "Email notification would be sent to ${{ inputs.send-to }}"
+        echo "Report path: ${{ inputs.report-path }}"
+        # In production, this would use a service like SendGrid, Mailgun, or SMTP
+        # For now, the GitHub Issue creation in the main workflow handles notifications

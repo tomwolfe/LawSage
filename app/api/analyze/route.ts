@@ -45,6 +45,7 @@ interface LegalOutput {
   citations?: Array<{ text: string; source?: string; url?: string }>;
   local_logistics?: Record<string, unknown>;
   procedural_checks?: string[];
+  [key: string]: unknown;
 }
 
 interface ValidationResult {
@@ -621,15 +622,39 @@ ${researchContext}
 CRITICAL: You MUST use the statute numbers and legal rules provided in the RESEARCH CONTEXT above. This is verified legal data from Upstash Vector (RAG). If the context mentions Wis. Stat. § 823.01, do NOT use other numbers for nuisance. This is a mandatory source priority rule.
 ` : ""}
 
-Return a COMPLETE JSON response with ALL required fields:
-- disclaimer
-- strategy
-- adversarial_strategy (detailed red-team analysis with COUNTER-MEASURES for each step)
-- roadmap (at least 3 steps, each with a "counter_measure" sub-field explaining expected opposition response)
-- filing_template
-- citations (at least 3)
-- local_logistics
-- procedural_checks
+Return a COMPLETE response with ALL required fields. Use the following EXACT section delimiters to wrap each part of your response:
+
+[[DISCLAIMER_START]]
+<disclaimer content>
+[[DISCLAIMER_END]]
+
+[[STRATEGY_START]]
+<strategy content>
+[[STRATEGY_END]]
+
+[[ADVERSARIAL_START]]
+<adversarial strategy content with red-team analysis>
+[[ADVERSARIAL_END]]
+
+[[ROADMAP_START]]
+[{"step": 1, "title": "...", "description": "...", "counter_measure": "..."}, ...]
+[[ROADMAP_END]]
+
+[[FILING_TEMPLATE_START]]
+<filing template content>
+[[FILING_TEMPLATE_END]]
+
+[[CITATIONS_START]]
+[{"text": "...", "source": "...", "url": "..."}, ...]
+[[CITATIONS_END]]
+
+[[LOCAL_LOGISTICS_START]]
+{"courthouse_address": "...", "filing_fees": "...", ...}
+[[LOCAL_LOGISTICS_END]]
+
+[[PROCEDURAL_CHECKS_START]]
+["check 1", "check 2", ...]
+[[PROCEDURAL_CHECKS_END]]
 
 CRITICAL INSTRUCTIONS:
 1. You MUST use the statute numbers provided in the RESEARCH CONTEXT above. This is verified legal data from RAG (Retrieval Augmented Generation).
@@ -637,7 +662,8 @@ CRITICAL INSTRUCTIONS:
 3. Ensure "procedural_checks" is strictly an ARRAY OF STRINGS, not objects.
 4. You are under oath to provide substantive, non-placeholder content for every field.
 5. Do NOT use placeholders. Provide substantive content for all fields. If you lack specific information, provide exact instructions on WHERE the user can find it (e.g., "Check Milwaukee County Local Rule 3.15 regarding noise").
-6. MANDATORY: For each roadmap step, include a "counter_measure" field that explains how the opposition will likely respond and how to prepare for that counter-move.`;
+6. MANDATORY: For each roadmap step, include a "counter_measure" field that explains how the opposition will likely respond and how to prepare for that counter-move.
+7. MANDATORY: Wrap each section with the exact delimiters shown above. This is critical for proper parsing.`;
 
       const encoder = new TextEncoder();
 
@@ -705,6 +731,13 @@ CRITICAL INSTRUCTIONS:
             let lineBuffer = "";
             let lastEmittedSectionCount = 0;
 
+            // Atomic section parser for progressive rendering
+            const { AtomicSectionParser } = await import('../../../lib/atomic-section-stream');
+            const sectionParser = new AtomicSectionParser((section, content) => {
+              // Callback when a section is complete
+              safeLog(`[Atomic Stream] Section complete: ${section}`);
+            });
+
             const reader = response.body?.getReader();
             if (!reader) {
               throw new Error('ReadableStream not supported');
@@ -754,16 +787,29 @@ CRITICAL INSTRUCTIONS:
                           content: toolCall.function.arguments
                         }) + '\n'));
 
+                        // ATOMIC SECTION PARSING: Process section delimiters
+                        const sectionResults = sectionParser.processChunk(toolCall.function.arguments);
+                        
+                        for (const result of sectionResults) {
+                          if (result.complete) {
+                            controller.enqueue(encoder.encode(JSON.stringify({
+                              type: 'section_complete',
+                              section: result.section,
+                              content: result.content
+                            }) + '\n'));
+                          }
+                        }
+
                         // PROGRESSIVE RENDERING: Try to parse and emit completed sections
                         try {
                           const { parsePartialJSON } = await import('../../../lib/streaming-json-parser');
                           const partialOutput = parsePartialJSON<LegalOutput>(accumulatedToolArgs);
-                          
+
                           if (partialOutput) {
                             const completedSections = Object.keys(partialOutput).filter(
                               key => partialOutput[key as keyof LegalOutput] !== undefined
                             );
-                            
+
                             // Only emit if we have new complete sections
                             if (completedSections.length > lastEmittedSectionCount) {
                               controller.enqueue(encoder.encode(JSON.stringify({
@@ -799,6 +845,18 @@ CRITICAL INSTRUCTIONS:
                         type: 'chunk',
                         content: content
                       }) + '\n'));
+
+                      // Also process through atomic section parser
+                      const sectionResults = sectionParser.processChunk(content);
+                      for (const result of sectionResults) {
+                        if (result.complete) {
+                          controller.enqueue(encoder.encode(JSON.stringify({
+                            type: 'section_complete',
+                            section: result.section,
+                            content: result.content
+                          }) + '\n'));
+                        }
+                      }
                     }
                   } catch (parseError) {
                     safeWarn(`Failed to parse GLM chunk. Raw line: ${trimmedLine.substring(0, 100)}`, parseError);
@@ -837,9 +895,48 @@ CRITICAL INSTRUCTIONS:
                 throw new Error('Empty response from GLM API');
               }
 
-              // Use robust jsonrepair-based parser
-              const { parsePartialJSON } = await import('../../../lib/streaming-json-parser');
-              parsedOutput = parsePartialJSON<LegalOutput>(accumulatedToolArgs);
+              // ATOMIC SECTION PARSING: First try to parse using section delimiters
+              const { parseDelimitedContent } = await import('../../../lib/atomic-section-stream');
+              const delimitedResult = parseDelimitedContent<Record<string, unknown>>(accumulatedToolArgs);
+
+              // Check if we got any complete sections from delimiters
+              const hasDelimitedSections = Object.keys(delimitedResult).length > 0;
+
+              if (hasDelimitedSections) {
+                // Use delimited content, fill in missing fields with JSON parse
+                parsedOutput = {
+                  disclaimer: (delimitedResult.disclaimer as string) || '',
+                  strategy: (delimitedResult.strategy as string) || '',
+                  adversarial_strategy: (delimitedResult.adversarial_strategy as string) || '',
+                  roadmap: (delimitedResult.roadmap as Array<{ step: number; title: string; description: string; estimated_time?: string; required_documents?: string[]; counter_measure?: string }>) || [],
+                  filing_template: (delimitedResult.filing_template as string) || '',
+                  citations: (delimitedResult.citations as Array<{ text: string; source?: string; url?: string }>) || [],
+                  local_logistics: (delimitedResult.local_logistics as Record<string, unknown>) || {},
+                  procedural_checks: (delimitedResult.procedural_checks as string[]) || [],
+                };
+
+                // Fill in any missing sections from JSON parse
+                if (!parsedOutput.disclaimer || !parsedOutput.strategy) {
+                  const { parsePartialJSON } = await import('../../../lib/streaming-json-parser');
+                  const jsonParsed = parsePartialJSON<LegalOutput>(accumulatedToolArgs);
+                  if (jsonParsed) {
+                    parsedOutput = {
+                      disclaimer: parsedOutput.disclaimer || jsonParsed.disclaimer || '',
+                      strategy: parsedOutput.strategy || jsonParsed.strategy || '',
+                      adversarial_strategy: parsedOutput.adversarial_strategy || jsonParsed.adversarial_strategy || '',
+                      roadmap: parsedOutput.roadmap && parsedOutput.roadmap.length > 0 ? parsedOutput.roadmap : (jsonParsed.roadmap || []),
+                      filing_template: parsedOutput.filing_template || jsonParsed.filing_template || '',
+                      citations: parsedOutput.citations && parsedOutput.citations.length > 0 ? parsedOutput.citations : (jsonParsed.citations || []),
+                      local_logistics: Object.keys(parsedOutput.local_logistics || {}).length > 0 ? parsedOutput.local_logistics : (jsonParsed.local_logistics || {}),
+                      procedural_checks: parsedOutput.procedural_checks && parsedOutput.procedural_checks.length > 0 ? parsedOutput.procedural_checks : (jsonParsed.procedural_checks || []),
+                    };
+                  }
+                }
+              } else {
+                // No delimiters found, fall back to JSON parsing
+                const { parsePartialJSON } = await import('../../../lib/streaming-json-parser');
+                parsedOutput = parsePartialJSON<LegalOutput>(accumulatedToolArgs);
+              }
 
               if (!parsedOutput) {
                 throw new Error("Could not recover any usable data from AI response");

@@ -1,0 +1,201 @@
+name: Legal Data Update Check
+
+on:
+  schedule:
+    # Run every Monday at 6:00 AM UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    # Allow manual trigger
+
+jobs:
+  check-for-updates:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run legal data update check
+        run: npm run update-legal-data
+        env:
+          BROWSERLESS_TOKEN: ${{ secrets.BROWSERLESS_TOKEN }}
+      
+      - name: Check for changes
+        id: changes
+        run: |
+          # Check if any files were modified
+          if ! git diff --quiet || git status --porcelain; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "Changes detected in legal data sources"
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No changes detected"
+          fi
+      
+      - name: Create backup of update report
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          # Copy the update report to a known location
+          mkdir -p ./update-reports
+          cp ./backups/legal-data/update-report-*.json ./update-reports/ 2>/dev/null || true
+      
+      - name: Upload update report
+        if: steps.changes.outputs.has_changes == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: legal-data-update-report
+          path: ./update-reports/
+          retention-days: 30
+      
+      - name: Send Slack notification (if changes detected)
+        if: steps.changes.outputs.has_changes == 'true'
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "⚖️ LawSage Legal Data Update Alert",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "⚖️ Legal Data Update Detected",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "Changes detected in legal data sources. Please review the update report and update the RAG database if necessary."
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Repository:*\n${{ github.repository }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Workflow:*\n${{ github.workflow }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Workflow Run",
+                        "emoji": true
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+      
+      - name: Create GitHub Issue (if changes detected)
+        if: steps.changes.outputs.has_changes == 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            
+            // Find the latest update report
+            const reportDir = './backups/legal-data';
+            const reports = fs.readdirSync(reportDir)
+              .filter(f => f.startsWith('update-report-') && f.endsWith('.json'));
+            
+            if (reports.length === 0) {
+              console.log('No update report found');
+              return;
+            }
+            
+            const latestReport = reports.sort().pop();
+            const reportPath = path.join(reportDir, latestReport);
+            const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+            
+            // Format the issue body
+            let body = '## Legal Data Update Detection\n\n';
+            body += 'The automated legal data check has detected changes that require manual review.\n\n';
+            body += '### Summary\n\n';
+            body += `- **Check Date:** ${report.timestamp}\n`;
+            body += `- **Sources Checked:** ${Object.keys(report.updateCheck.sources).length}\n`;
+            body += `- **Changes Detected:** ${report.updateCheck.flags?.length || 0}\n`;
+            body += `- **Validation Errors:** ${report.validationErrors?.length || 0}\n\n`;
+            
+            if (report.updateCheck.flags && report.updateCheck.flags.length > 0) {
+              body += '### Jurisdictions Flagged for Review\n\n';
+              for (const flag of report.updateCheck.flags) {
+                if (flag.type === 'date_change') {
+                  body += `#### ⚠️ ${flag.jurisdiction}\n`;
+                  body += `- **Type:** Rule effective date changed\n`;
+                  body += `- **Old Date:** ${flag.oldDate}\n`;
+                  body += `- **New Date:** ${flag.newDate}\n\n`;
+                } else if (flag.type === 'content_change') {
+                  body += `#### ⚠️ ${flag.jurisdiction}\n`;
+                  body += `- **Type:** Content changed\n`;
+                  body += `- **Source:** ${flag.source}\n\n`;
+                }
+              }
+            }
+            
+            if (report.validationErrors && report.validationErrors.length > 0) {
+              body += '### Validation Errors\n\n';
+              for (const error of report.validationErrors) {
+                body += `#### ${error.file}\n`;
+                body += `- ${error.errors.join(', ')}\n\n`;
+              }
+            }
+            
+            body += '### Recommended Actions\n\n';
+            if (report.recommendations) {
+              for (const rec of report.recommendations) {
+                body += `- [ ] ${rec}\n`;
+              }
+            }
+            
+            body += '\n---\n*This issue was automatically generated by the Legal Data Update workflow.*\n';
+            
+            // Create the issue
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 Legal Data Update Review Required - ${new Date().toISOString().split('T')[0]}`,
+              body: body,
+              labels: ['legal-data', 'review-required', 'automated']
+            });
+      
+      - name: Commit and push changes (optional)
+        if: steps.changes.outputs.has_changes == 'true'
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: 'chore: auto-update legal data hashes and metadata
+          
+          Automated legal data update check performed.
+          Update report generated in backups/legal-data/'
+          file_pattern: 'public/data/*.json'
+          branch: legal-data-updates
+          create_branch: true
