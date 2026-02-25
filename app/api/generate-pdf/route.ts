@@ -207,7 +207,6 @@ export async function POST(req: NextRequest) {
 
     // Generate unique document verification ID
     const documentId = generateDocumentId();
-    let currentPageNumber = 1;
 
     // Add metadata
     if (metadata) {

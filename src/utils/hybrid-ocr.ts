@@ -401,7 +401,7 @@ export async function enhanceImageForOCR(
 
   // Load image
   const img = await base64ToImage(base64Image);
-  let canvas = imageToCanvas(img);
+  const canvas = imageToCanvas(img);
   const ctx = canvas.getContext('2d');
   
   if (!ctx) {

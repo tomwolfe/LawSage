@@ -231,7 +231,7 @@ describe('Hallucination Detection', () => {
       ];
 
       let hallucinationCount = 0;
-      let totalCount = testCases.length;
+      const totalCount = testCases.length;
 
       for (const testCase of testCases) {
         const analysis = JSON.stringify({

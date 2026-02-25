@@ -785,7 +785,7 @@ export function calculateDeadlineCountdown(
   
   // Calculate business days remaining
   let businessDaysRemaining = 0;
-  let currentDate = new Date(now);
+  const currentDate = new Date(now);
   if (currentDate < dueDate) {
     while (currentDate < dueDate) {
       currentDate.setDate(currentDate.getDate() + 1);

@@ -1,5 +1,5 @@
-import { safeLog, safeWarn } from './pii-redactor';
-import { validateLegalOutput, containsPlaceholder, extractCitations, isValidCitationFormat } from './unified-validation';
+import { safeLog } from './pii-redactor';
+import { validateLegalOutput, extractCitations, isValidCitationFormat } from './unified-validation';
 
 // Supported jurisdictions
 export const SUPPORTED_JURISDICTIONS = new Set([
@@ -24,7 +24,12 @@ export interface ValidationResult {
   valid: boolean;
   errors: string[];
   warnings: string[];
-  data?: any;
+  data?: unknown;
+  statuteIssues?: Array<{
+    statute: string;
+    isVerified: boolean;
+    confidence: number;
+  }>;
 }
 
 // Safety Validator functions
@@ -42,7 +47,7 @@ export class SafetyValidator {
     }
 
     // 2. Parse and validate JSON structure
-    let data: any;
+    let data: Record<string, unknown>;
     try {
       data = JSON.parse(analysisText);
     } catch (e) {
@@ -108,7 +113,7 @@ export class SafetyValidator {
     };
     
     // Add a virtual property for the critique loop tests
-    (result as any).statuteIssues = citations.map(c => ({
+    result.statuteIssues = citations.map(c => ({
       statute: c,
       isVerified: !fakePatterns.some(p => p.test(c)),
       confidence: fakePatterns.some(p => p.test(c)) ? 0.2 : 0.9
