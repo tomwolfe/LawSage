@@ -76,7 +76,10 @@ export async function POST(req: NextRequest) {
     safeLog(`[Audit API] Starting independent audit for ${jurisdiction} (stateId: ${stateId || 'unknown'})`);
 
     // Load jurisdiction rules for enhanced verification
-    const rules = await loadJurisdictionRules(jurisdiction);
+    // Pass researchContext as userInput for vector search fallback
+    const rules = await loadJurisdictionRules(jurisdiction, { 
+      userInput: researchContext || analysis.substring(0, 500) 
+    });
 
     // SHADOW CITATION CHECK: Server-side verification before streaming
     safeLog('[Audit API] Running shadow citation check...');

@@ -128,25 +128,35 @@ export default function TimelineView({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="region" aria-label="Procedural timeline">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Procedural Timeline</h2>
           <p className="text-sm text-slate-500 mt-1">{jurisdiction} • {roadmap.length} milestones</p>
         </div>
         <div className="flex items-center gap-3">
-          {/* Progress indicator */}
-          <div className="bg-slate-100 rounded-full px-4 py-2 text-sm font-semibold">
+          {/* Progress indicator - accessible */}
+          <div 
+            className="bg-slate-100 rounded-full px-4 py-2 text-sm font-semibold"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+          >
             <span className="text-indigo-600">{progressPercentage}%</span> Complete
           </div>
-          {/* View toggle */}
-          <div className="flex border border-slate-200 rounded-lg overflow-hidden">
+          {/* View toggle - accessible */}
+          <div 
+            className="flex border border-slate-200 rounded-lg overflow-hidden"
+            role="group"
+            aria-label="Timeline view mode"
+          >
             <button
               onClick={() => setViewMode('timeline')}
               className={cn(
                 'px-3 py-2 text-sm font-medium transition-colors',
                 viewMode === 'timeline' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
               )}
+              aria-pressed={viewMode === 'timeline'}
             >
               Timeline
             </button>
@@ -156,6 +166,7 @@ export default function TimelineView({
                 'px-3 py-2 text-sm font-medium transition-colors',
                 viewMode === 'list' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
               )}
+              aria-pressed={viewMode === 'list'}
             >
               List
             </button>

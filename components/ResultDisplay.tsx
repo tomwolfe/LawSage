@@ -283,6 +283,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
     status_message?: string;
     loading: boolean;
   }}>({});
+  const [isPlainEnglish, setIsPlainEnglish] = useState(false);
 
   // Quality Audit: Log low-quality responses to localStorage for monitoring
   useEffect(() => {
@@ -1185,6 +1186,19 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
           Legal Sources
         </button>
         <div className="flex-1"></div>
+        {/* Plain English Toggle */}
+        <button
+          onClick={() => setIsPlainEnglish(prev => !prev)}
+          className={cn(
+            "px-4 py-2 text-sm font-medium flex items-center gap-2 border border-slate-200 rounded-lg transition-colors mr-2",
+            isPlainEnglish ? "bg-indigo-100 text-indigo-700 border-indigo-300" : "bg-white text-slate-600 hover:bg-slate-50"
+          )}
+          aria-pressed={isPlainEnglish}
+          title="Toggle plain English translation"
+        >
+          <span className="text-lg" aria-hidden="true">📖</span>
+          Plain English
+        </button>
         <div className="px-6 py-4 flex items-center gap-2">
           <button
             onClick={async () => {

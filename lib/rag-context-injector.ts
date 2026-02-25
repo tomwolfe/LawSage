@@ -5,14 +5,16 @@
  * 
  * When a user selects a jurisdiction, this utility:
  * 1. Loads the actual jurisdiction-specific rules file (e.g., CA.json)
- * 2. Injects it into the System Prompt as "Mandatory Source of Truth"
- * 3. Explicitly tells the LLM: "If the provided JSON rules conflict with your 
+ * 2. Falls back to vector similarity search if static rules aren't available
+ * 3. Injects it into the System Prompt as "Mandatory Source of Truth"
+ * 4. Explicitly tells the LLM: "If the provided JSON rules conflict with your 
  *    training data, the JSON is the absolute truth."
  * 
  * This prevents hallucination of local rules and procedures.
  */
 
 import { safeLog, safeError, safeWarn } from './pii-redactor';
+import { searchLegalRules, isVectorConfigured, type VectorSearchResult } from './vector';
 
 /**
  * Jurisdiction rules interface
@@ -61,30 +63,29 @@ export interface Deadline {
 
 /**
  * Load jurisdiction-specific rules from filesystem
- * 
- * Dynamic Context Injection: Instead of static legal_lookup.json,
- * this loads the actual jurisdiction rules file (e.g., CA.json, NY.json)
+ * Falls back to vector search if static files aren't available
  */
-export async function loadJurisdictionRules(jurisdiction: string): Promise<JurisdictionRules | null> {
+export async function loadJurisdictionRules(
+  jurisdiction: string,
+  options?: {
+    userInput?: string;
+    category?: string;
+  }
+): Promise<JurisdictionRules | null> {
+  const { userInput, category } = options || {};
+  
   try {
     // Map jurisdiction names to file codes
     const jurisdictionMap: Record<string, string> = {
-      'california': 'CA',
-      'ca': 'CA',
-      'new york': 'NY',
-      'ny': 'NY',
-      'texas': 'TX',
-      'tx': 'TX',
-      'florida': 'FL',
-      'fl': 'FL',
-      'illinois': 'IL',
-      'il': 'IL',
-      'pennsylvania': 'PA',
-      'pa': 'PA',
+      'california': 'CA', 'ca': 'CA',
+      'new york': 'NY', 'ny': 'NY',
+      'texas': 'TX', 'tx': 'TX',
+      'florida': 'FL', 'fl': 'FL',
+      'illinois': 'IL', 'il': 'IL',
+      'pennsylvania': 'PA', 'pa': 'PA',
       'ohio': 'OH',
       'georgia': 'GA',
-      'wisconsin': 'WI',
-      'wi': 'WI',
+      'wisconsin': 'WI', 'wi': 'WI',
     };
 
     const stateCode = jurisdictionMap[jurisdiction.toLowerCase()] || jurisdiction.substring(0, 2).toUpperCase();
@@ -97,23 +98,85 @@ export async function loadJurisdictionRules(jurisdiction: string): Promise<Juris
     // In browser/edge runtime, fetch from public directory
     const response = await fetch(rulesPath);
     
-    if (!response.ok) {
-      if (response.status === 404) {
-        safeWarn(`[RAG Injector] Jurisdiction rules file not found: ${rulesPath}`);
-        return null;
-      }
-      throw new Error(`Failed to load jurisdiction rules: ${response.status}`);
+    if (response.ok) {
+      const rules: JurisdictionRules = await response.json();
+      safeLog(`[RAG Injector] Loaded ${rules.rules?.length || 0} rules for ${stateCode}`);
+      return rules;
     }
-
-    const rules: JurisdictionRules = await response.json();
     
-    safeLog(`[RAG Injector] Loaded ${rules.rules?.length || 0} rules for ${stateCode}`);
+    // Static file not found - try vector search as fallback
+    safeWarn(`[RAG Injector] Static rules not found for ${stateCode}, attempting vector search...`);
     
-    return rules;
+    if (isVectorConfigured() && userInput) {
+      const vectorResults = await performVectorRAG(jurisdiction, userInput, category);
+      if (vectorResults && vectorResults.rules.length > 0) {
+        safeLog(`[RAG Injector] Vector search returned ${vectorResults.rules.length} rules`);
+        return vectorResults;
+      }
+    }
+    
+    safeWarn(`[RAG Injector] No rules found for jurisdiction: ${jurisdiction}`);
+    return null;
   } catch (error) {
+    // On error, try vector search as fallback
     safeError('[RAG Injector] Failed to load jurisdiction rules:', error);
+    
+    if (isVectorConfigured() && userInput) {
+      try {
+        const vectorResults = await performVectorRAG(jurisdiction, userInput, category);
+        if (vectorResults && vectorResults.rules.length > 0) {
+          safeLog('[RAG Injector] Vector search fallback successful');
+          return vectorResults;
+        }
+      } catch (vectorError) {
+        safeError('[RAG Injector] Vector search fallback failed:', vectorError);
+      }
+    }
+    
     return null;
   }
+}
+
+/**
+ * Perform vector similarity search as RAG fallback
+ */
+async function performVectorRAG(
+  jurisdiction: string,
+  userInput: string,
+  category?: string
+): Promise<JurisdictionRules | null> {
+  const searchQuery = `${jurisdiction} ${userInput}`.substring(0, 500);
+  
+  const vectorResults = await searchLegalRules(searchQuery, {
+    jurisdiction,
+    category,
+    topK: 10,
+    threshold: 30
+  });
+  
+  if (vectorResults.length === 0) {
+    return null;
+  }
+  
+  // Convert vector results to JurisdictionRules format
+  const rules: Rule[] = vectorResults.map((result: VectorSearchResult) => ({
+    id: String(result.id),
+    title: result.metadata.title || 'Untitled Rule',
+    description: result.metadata.description || '',
+    category: result.metadata.category || 'General',
+    statuteNumber: result.metadata.rule_number,
+    text: result.metadata.full_text || result.metadata.description || '',
+    effectiveDate: undefined
+  }));
+  
+  return {
+    jurisdiction,
+    state: jurisdiction.substring(0, 2).toUpperCase(),
+    rules,
+    localRules: [],
+    forms: [],
+    deadlines: []
+  };
 }
 
 /**

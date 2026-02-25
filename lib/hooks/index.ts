@@ -8,6 +8,7 @@
  * - useEvidenceVault: Manages document storage (migrating to IndexedDB)
  * - useCaseLedger: Manages procedural timeline
  * - useOCRProcessing: Handles document OCR with verification
+ * - usePlainEnglish: Translates legal content to plain English
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';

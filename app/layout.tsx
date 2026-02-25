@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 
@@ -7,6 +7,19 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "LawSage - The Pro Se Architect",
   description: "Legal democratization platform for the people.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "LawSage",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#4f46e5",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
@@ -16,6 +29,26 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js')
+                    .then(function(registration) {
+                      console.log('ServiceWorker registered: ', registration.scope);
+                    })
+                    .catch(function(error) {
+                      console.log('ServiceWorker registration failed: ', error);
+                    });
+                });
+              }
+            `,
+          }}
+        />
+      </head>
       <body className={`${inter.className} bg-slate-50 text-slate-900 min-h-screen flex flex-col`}>
         <header className="bg-white border-b border-slate-200 py-4 px-6 flex justify-between items-center sticky top-0 z-50">
           <div className="flex items-center gap-2">

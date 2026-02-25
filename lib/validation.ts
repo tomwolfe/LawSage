@@ -1,5 +1,21 @@
+/**
+ * Legacy Validation Module
+ * 
+ * DEPRECATED: This module is maintained for backward compatibility only.
+ * 
+ * All new code should use:
+ * - lib/validation-middleware.ts for unified validation with repair-or-retry
+ * - lib/unified-validation.ts for Zod-based validation
+ * 
+ * This module now acts as a thin wrapper that delegates to validation-middleware.ts
+ */
+
 import { safeLog } from './pii-redactor';
-import { validateLegalOutput, extractCitations, isValidCitationFormat } from './unified-validation';
+import { 
+  validateLegalOutput, 
+  extractCitations, 
+  isValidCitationFormat 
+} from './unified-validation';
 
 // Supported jurisdictions
 export const SUPPORTED_JURISDICTIONS = new Set([
