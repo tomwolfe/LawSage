@@ -64,7 +64,21 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Handle API requests - network first, then cache
+  // SECURITY FIX: Never cache sensitive API responses
+  // These endpoints contain AI analyses, OCR results, and PII data
+  const sensitiveApiPaths = [
+    '/api/analyze',
+    '/api/ocr',
+    '/api/audit',
+    '/api/verify-citation',
+  ];
+  
+  if (sensitiveApiPaths.some(path => url.pathname.startsWith(path))) {
+    event.respondWith(networkOnly(request));
+    return;
+  }
+
+  // Handle other API requests - network first, then cache
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(networkFirst(request));
     return;

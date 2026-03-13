@@ -43,7 +43,7 @@ interface AuthorityVerifierProps {
 
 /**
  * AuthorityVerifier Component
- * 
+ *
  * Features:
  * 1. Citation verification with CourtListener
  * 2. Strict mode support (no AI fallback)
@@ -60,7 +60,15 @@ export function AuthorityVerifier({
 
   const verifyCitation = useCallback(async (citationText: string): Promise<VerificationStatus> => {
     try {
-      const currentApiKey = apiKey || localStorage.getItem('lawsage_gemini_api_key') || '';
+      // SECURITY FIX: Removed localStorage fallback for API keys.
+      // API key must be provided via props from secure server-side source.
+      const currentApiKey = apiKey || '';
+
+      if (!currentApiKey) {
+        // In production, API key should always be provided from server-side
+        // For development/testing, allow empty key but log warning
+        console.warn('No API key provided for citation verification. Provide via apiKey prop.');
+      }
       
       const response = await fetch('/api/verify-citation', {
         method: 'POST',

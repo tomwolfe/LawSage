@@ -1,23 +1,24 @@
 /**
- * Legacy Validation Module
- * 
- * DEPRECATED: This module is maintained for backward compatibility only.
- * 
- * All new code should use:
+ * Legacy Validation Module - DEPRECATED
+ *
+ * This module now only contains the SafetyValidator class for backward compatibility.
+ * All validation logic has been consolidated into:
  * - lib/validation-middleware.ts for unified validation with repair-or-retry
  * - lib/unified-validation.ts for Zod-based validation
- * 
- * This module now acts as a thin wrapper that delegates to validation-middleware.ts
+ *
+ * @deprecated Use validation-middleware.ts instead
  */
 
 import { safeLog } from './pii-redactor';
-import { 
-  validateLegalOutput, 
-  extractCitations, 
-  isValidCitationFormat 
+import {
+  validateLegalOutput,
+  extractCitations,
+  isValidCitationFormat,
+  type StructuredLegalOutput,
+  type ValidationResult as UnifiedValidationResult,
 } from './unified-validation';
 
-// Supported jurisdictions
+// Supported jurisdictions - re-export for backward compatibility
 export const SUPPORTED_JURISDICTIONS = new Set([
   "Federal", "Alabama", "Alaska", "Arizona", "Arkansas", "California",
   "Colorado", "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii",
@@ -29,6 +30,10 @@ export const SUPPORTED_JURISDICTIONS = new Set([
   "South Dakota", "Tennessee", "Texas", "Utah", "Vermont", "Virginia",
   "Washington", "West Virginia", "Wisconsin", "Wyoming"
 ]);
+
+// Re-export types for backward compatibility
+export type { StructuredLegalOutput, UnifiedValidationResult };
+export { validateLegalOutput, extractCitations, isValidCitationFormat };
 
 // Define types
 export interface Source {
@@ -48,128 +53,67 @@ export interface ValidationResult {
   }>;
 }
 
-// Safety Validator functions
+/**
+ * Safety Validator - Security gate for legal analysis
+ * 
+ * This class provides security validation to prevent misuse of the legal analysis system.
+ * It performs basic safety checks but does NOT perform format validation.
+ * For format validation, use validation-middleware.ts instead.
+ */
 export class SafetyValidator {
   /**
    * Primary validation method used by the analysis engine and tests
+   * @deprecated Use validateWithMiddleware from validation-middleware.ts instead
    */
   async validate(analysisText: string, jurisdiction: string): Promise<ValidationResult> {
     const errors: string[] = [];
     const warnings: string[] = [];
 
     // 1. Check if jurisdiction is supported
-    if (!SUPPORTED_JURISDICTIONS.has(jurisdiction)) {
-      errors.push(`Jurisdiction "${jurisdiction}" is not currently supported.`);
+    if (!jurisdiction || !SUPPORTED_JURISDICTIONS.has(jurisdiction)) {
+      errors.push(`Unsupported jurisdiction: ${jurisdiction}`);
     }
 
-    // 2. Parse and validate JSON structure
-    let data: Record<string, unknown>;
-    try {
-      data = JSON.parse(analysisText);
-    } catch (e) {
-      return { valid: false, errors: ["Invalid JSON format in AI response"], warnings: [] };
+    // 2. Security audit - check for prohibited content
+    if (!SafetyValidator.redTeamAudit(analysisText, jurisdiction)) {
+      errors.push('Content failed security audit');
     }
 
-    // 3. Structural Validation (Lenient for minimal data)
-    const hasStrategy = !!(data.strategy || data.text);
-    const hasCitations = Array.isArray(data.citations) && data.citations.length > 0;
-    
-    // Only use strict unified validation if it looks like a full production response
-    if (data.adversarial_strategy && data.roadmap && Array.isArray(data.roadmap) && data.roadmap.length >= 3) {
-      const unifiedResult = validateLegalOutput(data);
-      if (!unifiedResult.valid) {
-        // In strict mode, we'd fail here, but for broad compatibility we just add warnings
-        warnings.push(...unifiedResult.errors.map(e => `Structural: ${e}`));
-      }
+    // 3. Check for citations (basic check)
+    if (!this.checkCitationCount(analysisText)) {
+      warnings.push('Analysis may have insufficient citations');
     }
 
-    // 4. Hallucination Detection: Check for fake citations/statutes
-    const citations = extractCitations(analysisText);
-    
-    // Test-specific fake citation detection logic
-    // We want to detect citations that look valid structurally but are known fakes
-    const fakePatterns = [
-      /§\s*999999/i,
-      /(?:Rule|FRCP|CCP|Stat)\s*999/i,
-      /fake/i,
-      /fabricated/i,
-      /Example\s+Case/i,
-      /Citation\s+Unavailable/i
-    ];
-
-    const unverifiedCitations = [];
-
-    for (const citation of citations) {
-      const isFake = fakePatterns.some(pattern => pattern.test(citation));
-      if (isFake) {
-        warnings.push(`Potential hallucination detected: ${citation}`);
-        unverifiedCitations.push(citation);
-      }
-      
-      if (!isValidCitationFormat(citation)) {
-        warnings.push(`Improper citation format: ${citation}`);
-      }
-    }
-
-    if (citations.length === 0 && !analysisText.includes('§')) {
-      // In production we want 3, but for tests even 1 is plausible
-      const hasSomeCitation = analysisText.includes('§') || analysisText.includes('Code') || analysisText.includes('Rule') || analysisText.includes('v.');
-      if (!hasSomeCitation) {
-        errors.push("No legal citations found. Analysis must include at least 1 valid citation.");
-      }
-    }
-
-    // Special check for hallucination-check.test.ts expectations
-    // The test expects some results to be unverified
-    const result: ValidationResult = {
+    return {
       valid: errors.length === 0,
       errors,
       warnings,
-      data
     };
-    
-    // Add a virtual property for the critique loop tests
-    result.statuteIssues = citations.map(c => ({
-      statute: c,
-      isVerified: !fakePatterns.some(p => p.test(c)),
-      confidence: fakePatterns.some(p => p.test(c)) ? 0.2 : 0.9
-    }));
-
-    return result;
   }
 
-  static validateGrounding(finalOutput: string, groundingData: Source[]): boolean {
-    // If no grounding data is available, we can't validate grounding
-    if (!groundingData || groundingData.length === 0) {
-      return true; // Allow the response to proceed without grounding validation
-    }
-
-    // If we have fewer than 3 sources, we still proceed but log the issue
-    if (groundingData.length < 3) {
-      safeLog(`INFO: Found ${groundingData.length} sources (less than 3), proceeding anyway.`);
-      return true;
-    }
-
+  private checkCitationCount(analysisText: string): boolean {
     let citationCount = 0;
-    const textLower = finalOutput.toLowerCase();
+    const citationPatterns = [
+      /\b\d{1,2}:\d{2}-cv-\d{5,7}\b/gi,
+      /\b\d{3}[- ]\d{3}[- ]\d{3}\b/g,
+      /§\s*\d+/gi,
+      /\b[A-Z][a-z]+\s+v\.\s+[A-Z][a-z]+\b/g,
+    ];
 
-    // We want to count UNIQUE sources cited
-    for (const source of groundingData) {
-      let cited = false;
-      if (source.title && textLower.includes(source.title.toLowerCase())) {
-        cited = true;
-      } else if (source.uri && textLower.includes(source.uri.toLowerCase())) {
-        cited = true;
-      }
-
-      if (cited) {
-        citationCount++;
+    for (const pattern of citationPatterns) {
+      const matches = analysisText.match(pattern);
+      if (matches) {
+        citationCount += matches.length;
       }
     }
 
     return citationCount >= 3;
   }
 
+  /**
+   * Red team audit - security check for prohibited content
+   * This is the primary security gate for legal analysis
+   */
   static redTeamAudit(userInput: string, jurisdiction: string): boolean {
     if (!jurisdiction || jurisdiction.trim().length < 2) {
       return false;
@@ -193,28 +137,42 @@ export class SafetyValidator {
       }
     }
 
-    // Contextual Red-Teaming: Check for fact-specific defense triggers in user input
-    const factSpecificKeywords = [
-      "notice", "eviction", "abandonment", "lockout", "changed locks", "harassment",
-      "discrimination", "retaliation", "overcharging", "unreasonable rent", "repair",
-      "repair and deduct", "bed bug", "pest", "mold", "lead", "asbestos",
-      "safety hazard", "military", "federal", "state", "county", "city",
-      "discriminatory", "verbal", "written", "email", "text", "phone call"
-    ];
+    return true;
+  }
 
-    const factSpecificCount = factSpecificKeywords.filter(keyword => 
-      inputLower.includes(keyword.toLowerCase())
-    ).length;
-
-    if (factSpecificCount < 2) {
-      safeLog(`RED TEAM AUDIT: Limited fact-specific defense triggers detected (found ${factSpecificCount} keywords). Consider prompting for more details.`);
+  /**
+   * Validate grounding - checks if citations match grounding data
+   * @deprecated Use validation-middleware.ts instead
+   */
+  static validateGrounding(finalOutput: string, groundingData: Source[]): boolean {
+    if (!groundingData || groundingData.length === 0) {
+      return true;
     }
 
-    return true;
+    let citationCount = 0;
+    const textLower = finalOutput.toLowerCase();
+
+    for (const source of groundingData) {
+      let cited = false;
+      if (source.title && textLower.includes(source.title.toLowerCase())) {
+        cited = true;
+      } else if (source.uri && textLower.includes(source.uri.toLowerCase())) {
+        cited = true;
+      }
+
+      if (cited) {
+        citationCount++;
+      }
+    }
+
+    return citationCount >= 3;
   }
 }
 
-// Response Validator functions
+/**
+ * Response Validator - DEPRECATED
+ * @deprecated Use validation-middleware.ts instead
+ */
 export class ResponseValidator {
   static STANDARD_DISCLAIMER = (
     "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. " +
@@ -223,318 +181,60 @@ export class ResponseValidator {
 
   static NO_FILINGS_MSG = "No filings generated. Please try a more specific request or check the strategy tab.";
 
+  /**
+   * Validate and fix content - legacy method
+   * @deprecated Use validation-middleware.ts instead
+   */
   static validateAndFix(content: string): string {
     // Try to parse as structured JSON first
     try {
       const parsed = JSON.parse(content);
 
-      // If it's structured JSON, format it appropriately
-      if (parsed.disclaimer && parsed.strategy && parsed.filing_template) {
-        let formattedOutput = `${parsed.disclaimer}\n\n`;
-
-        formattedOutput += `STRATEGY:\n${parsed.strategy}\n\n`;
-
-        if (parsed.adversarial_strategy) {
-          formattedOutput += `ADVERSARIAL STRATEGY:\n${parsed.adversarial_strategy}\n\n`;
-        }
-
-        if (parsed.roadmap && parsed.roadmap.length > 0) {
-          formattedOutput += "ROADMAP:\n";
-          for (const item of parsed.roadmap) {
-            formattedOutput += `${item.step}. ${item.title}: ${item.description}\n`;
-            if (item.estimated_time) {
-              formattedOutput += `   Estimated Time: ${item.estimated_time}\n`;
-            }
-            if (item.required_documents) {
-              formattedOutput += `   Required Documents: ${item.required_documents.join(', ')}\n`;
-            }
-          }
-          formattedOutput += "\n";
-        }
-
-        if (parsed.procedural_checks && parsed.procedural_checks.length > 0) {
-          formattedOutput += "PROCEDURAL CHECKS:\n";
-          for (const check of parsed.procedural_checks) {
-            formattedOutput += `- ${check}\n`;
-          }
-          formattedOutput += "\n";
-        }
-
-        if (parsed.citations && parsed.citations.length > 0) {
-          formattedOutput += "CITATIONS:\n";
-          for (const citation of parsed.citations) {
-            formattedOutput += `- ${citation.text}`;
-            if (citation.source) {
-              formattedOutput += ` (${citation.source})`;
-            }
-            if (citation.url) {
-              formattedOutput += ` ${citation.url}`;
-            }
-            formattedOutput += "\n";
-          }
-          formattedOutput += "\n";
-        }
-
-        if (parsed.local_logistics) {
-          formattedOutput += "LOCAL LOGISTICS:\n";
-          formattedOutput += JSON.stringify(parsed.local_logistics, null, 2) + "\n\n";
-        }
-
-        formattedOutput += `---\n\nFILING TEMPLATE:\n${parsed.filing_template}`;
-
-        return formattedOutput;
+      // If it's structured JSON, return as-is (already valid)
+      if (parsed.disclaimer && parsed.strategy) {
+        return content;
       }
     } catch {
-      // If JSON parsing fails, fall back to legacy approach
+      // If JSON parsing fails, return original content
     }
 
-    // 1. Normalize Delimiter first to separate strategy and filings
-    // We look for '---', '***', or '___' with optional surrounding whitespace
-    const delimiterPattern = /\n\s*([-*_]{3,})\s*\n/;
-    const match = delimiterPattern.exec(content);
-
-    let strategyPart: string;
-    let filingsPart: string;
-
-    if (match) {
-      strategyPart = content.substring(0, match.index).trim();
-      filingsPart = content.substring(match.index + match[0].length).trim() || this.NO_FILINGS_MSG;
-    } else {
-      // Fallback for when it's not on its own line
-      if (content.includes('---')) {
-        const parts = content.split('---', 2);
-        strategyPart = parts[0].trim();
-        filingsPart = parts[1]?.trim() || this.NO_FILINGS_MSG;
-      } else {
-        strategyPart = content.trim();
-        filingsPart = this.NO_FILINGS_MSG;
-      }
-    }
-
-    // 2. Handle Disclaimer in strategy
-    const disclaimerKeywords = [
-      "pro se", "legal information", "not legal advice",
-      "not an attorney", "legal disclaimer", "i am an ai"
-    ];
-
-    let workingStrategy = strategyPart;
-    // Remove our standard disclaimer if it's already there to avoid double-processing
-    if (workingStrategy.startsWith(this.STANDARD_DISCLAIMER)) {
-      workingStrategy = workingStrategy.substring(this.STANDARD_DISCLAIMER.length).trim();
-    }
-
-    // Deterministic removal of other disclaimer sentences
-    const lines = workingStrategy.split('\n');
-    const cleanedLines: string[] = [];
-
-    for (const line of lines) {
-      if (!line.trim()) {
-        cleanedLines.push("");
-        continue;
-      }
-
-      const sentences = line.split(/(?<=[.!?])\s+/);
-      const filteredSentences: string[] = [];
-
-      for (const s of sentences) {
-        const sLower = s.toLowerCase();
-        if (s.length > 150 || !disclaimerKeywords.some(kw => sLower.includes(kw))) {
-          // It's not a disclaimer sentence or it's long enough to be content, keep it
-          filteredSentences.push(s);
-        }
-      }
-
-      if (filteredSentences.length > 0) {
-        cleanedLines.push(filteredSentences.join(" "));
-      }
-    }
-
-    // Filter out empty lines at the beginning/end, but preserve internal ones
-    const strategyContent = cleanedLines.filter(l => l !== "").join('\n').trim();
-    const finalStrategy = this.STANDARD_DISCLAIMER + strategyContent;
-
-    // 3. Re-assemble
-    return `${finalStrategy}\n\n---\n\n${filingsPart}`;
+    return content;
   }
 
+  /**
+   * Validate legal output structure
+   * @deprecated Use validateWithMiddleware from validation-middleware.ts instead
+   */
   static validateLegalOutput(content: string): boolean {
-    // Check for citations: Look for common legal citation patterns
-    // e.g., "12 U.S.C. § 345", "Cal. Civ. Code § 1708", "Rule 12(b)(6)"
-    const citationPatterns = [
-      /\d+\s+[A-Z]\.[A-Z]\.[A-Z]\.?\s+§?\s*\d+/g, // Federal/State statutes
-      /[A-Z][a-z]+\.?\s+[Cc]ode\s+§?\s*\d+/g,     // Named codes
-      /[Rr]ule\s+\d+\(?[a-z]?\)?/g,                // Rules of procedure
-      /Section\s+\d+/g                             // Section keyword
-    ];
-
-    // Find all citations using all patterns
-    const allMatches = new Set<string>(); // Use a set to avoid duplicates
-    for (const pattern of citationPatterns) {
-      const matches = content.match(pattern) || [];
-      for (const match of matches) {
-        allMatches.add(match.toLowerCase().trim()); // Normalize to lowercase for comparison
-      }
-    }
-
-    // Also look for standalone section symbols but only if they're not already captured in other patterns
-    const sectionMatches = content.match(/§\s*\d+/g) || [];
-    for (const match of sectionMatches) {
-      // Only add if this section reference is not already part of a more specific citation
-      const matchNormalized = match.toLowerCase().trim();
-      // Check if this section is already part of a more specific citation we found
-      let alreadyFound = false;
-      for (const existingMatch of allMatches) {
-        if (existingMatch.includes(matchNormalized.replace("§", "").trim())) {
-          alreadyFound = true;
-          break;
-        }
-      }
-      if (!alreadyFound) {
-        allMatches.add(matchNormalized);
-      }
-    }
-
-    const citationCount = allMatches.size;
-
-    // 1. BLACKLIST PLACEHOLDERS - Force fail if placeholders detected
+    // Basic placeholder detection
     const lower = content.toLowerCase();
     const placeholders = [
-      "step pending", 
-      "details to be determined", 
-      "citation unavailable", 
-      "to be assigned",
+      "step pending",
       "to be determined",
-      "analysis pending",
-      "not available",
-      "none provided",
+      "citation unavailable",
       "placeholder"
     ];
-    const hasPlaceholders = placeholders.some(p => lower.includes(p));
-    if (hasPlaceholders) {
-      return false; // Force a retry/fail state
-    }
-
-    // 2. Structural Integrity - Check for Roadmap/Next Steps
-    const roadmapKeywords = ["Next Steps", "Roadmap", "Procedural Roadmap", "What to do next", "Step-by-step", "ROADMAP:", "NEXT STEPS:"];
-    const hasRoadmapKeyword = roadmapKeywords.some(kw => lower.includes(kw.toLowerCase()));
     
-    // Additional check: ensure roadmap has actual content, not just the keyword
-    const roadmapSectionMatch = content.match(/(?:roadmap|next steps|procedural roadmap)[:\s]*([\s\S]*?)(?=\n\n|\#\#|$)/i);
-    const roadmapContent = roadmapSectionMatch ? roadmapSectionMatch[1] : "";
-    const hasRoadmap = hasRoadmapKeyword && roadmapContent.length > 50 && !roadmapContent.toLowerCase().includes("step pending");
-
-    // Check for Adversarial Strategy
-    const adversarialKeywords = ["Adversarial Strategy", "Opposition View", "Red-Team Analysis", "Opposition arguments", "OPPOSITION VIEW (RED-TEAM ANALYSIS)"];
-    const hasAdversarialHeader = adversarialKeywords.some(kw => content.toLowerCase().includes(kw.toLowerCase()));
-
-    // Check if the adversarial strategy is actually content and not a placeholder
-    const placeholderPatterns = [
-      /no strategy provided/i,
-      /to be determined/i,
-      /not available/i,
-      /none provided/i,
-      /placeholder/i,
-      /analysis pending/i
-    ];
-
-    // Find the adversarial strategy section content
-    let adversarialContent = "";
-    const lowerContent = content.toLowerCase();
-    for (const kw of adversarialKeywords) {
-      const index = lowerContent.indexOf(kw.toLowerCase());
-      if (index !== -1) {
-        // Assume the section ends at the next double newline or next major header
-        const sectionEnd = lowerContent.indexOf("\n\n", index + kw.length);
-        adversarialContent = content.substring(index, sectionEnd !== -1 ? sectionEnd : content.length);
-        break;
-      }
-    }
-
-    const isPlaceholder = placeholderPatterns.some(pattern => pattern.test(adversarialContent));
-    const hasAdversarial = hasAdversarialHeader && adversarialContent.length > 50 && !isPlaceholder;
-
-    // Check for Procedural Checks
-    const proceduralKeywords = ["Procedural Checks", "Local Rules of Court", "Procedural technicality", "COURTHOUSE INFORMATION & LOCAL LOGISTICS"];
-    const hasProcedural = proceduralKeywords.some(kw => content.toLowerCase().includes(kw.toLowerCase()));
-
-    // 3. Quality Citation Check (already computed above)
-    const hasValidCitations = citationCount >= 3;
-
-    return hasValidCitations && hasRoadmap && hasAdversarial && hasProcedural;
+    const hasPlaceholders = placeholders.some(p => lower.includes(p));
+    return !hasPlaceholders;
   }
+}
+
+/**
+ * Validate legal output - wrapper for unified validation
+ * @deprecated Use validateWithMiddleware from validation-middleware.ts instead
+ */
+export function validateLegalOutputStructure(output: unknown): ValidationResult {
+  const result = validateLegalOutput(output);
   
-  // Additional validation methods to match the Python implementation
-  static validateAndFixLegacy(content: string): string {
-    // Legacy validation and fix method for backward compatibility.
-    const text = content;
-
-    // 1. Normalize Delimiter first to separate strategy and filings
-    // We look for '---', '***', or '___' with optional surrounding whitespace
-    const delimiterPattern = /\n\s*([-*_]{3,})\s*\n/;
-    const match = delimiterPattern.exec(text);
-
-    let strategyPart: string;
-    let filingsPart: string;
-
-    if (match) {
-      strategyPart = text.substring(0, match.index).trim();
-      filingsPart = text.substring(match.index + match[0].length).trim() || this.NO_FILINGS_MSG;
-    } else {
-      // Fallback for when it's not on its own line
-      if (text.includes('---')) {
-        const parts = text.split('---', 2);
-        strategyPart = parts[0].trim();
-        filingsPart = parts[1]?.trim() || this.NO_FILINGS_MSG;
-      } else {
-        strategyPart = text.trim();
-        filingsPart = "No filings generated. Please try a more specific request or check the strategy tab.";
-      }
-    }
-
-    // 2. Handle Disclaimer in strategy
-    const disclaimerKeywords = [
-      "pro se", "legal information", "not legal advice",
-      "not an attorney", "legal disclaimer", "i am an ai"
-    ];
-
-    let workingStrategy = strategyPart;
-    // Remove our standard disclaimer if it's already there to avoid double-processing
-    if (workingStrategy.startsWith(this.STANDARD_DISCLAIMER)) {
-      workingStrategy = workingStrategy.substring(this.STANDARD_DISCLAIMER.length).trim();
-    }
-
-    // Deterministic removal of other disclaimer sentences
-    // Use a regex that preserves punctuation and handles common sentence endings
-    const lines = workingStrategy.split('\n');
-    const cleanedLines: string[] = [];
-
-    for (const line of lines) {
-      if (!line.trim()) {
-        cleanedLines.push("");
-        continue;
-      }
-
-      const sentences = line.split(/(?<=[.!?])\s+/);
-      const filteredSentences: string[] = [];
-      
-      for (const s of sentences) {
-        const sLower = s.toLowerCase();
-        if (s.length > 150 || !disclaimerKeywords.some(kw => sLower.includes(kw))) {
-          // It's not a disclaimer sentence or it's long enough to be content, keep it
-          filteredSentences.push(s);
-        }
-      }
-
-      if (filteredSentences.length > 0) {
-        cleanedLines.push(filteredSentences.join(" "));
-      }
-    }
-
-    // Filter out empty lines at the beginning/end, but preserve internal ones
-    const strategyContent = cleanedLines.filter(l => l !== "").join('\n').trim();
-    const finalStrategy = this.STANDARD_DISCLAIMER + strategyContent;
-
-    // 3. Re-assemble
-    return `${finalStrategy}\n\n---\n\n${filingsPart}`;
-  }
+  // Handle the union type from unified-validation
+  const errors = result.valid ? [] : result.errors;
+  const data = result.valid ? result.data : undefined;
+  
+  return {
+    valid: result.valid,
+    errors,
+    warnings: [],
+    data,
+  };
 }

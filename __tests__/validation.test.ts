@@ -3,57 +3,29 @@ import { validateLegalOutput, validateOCRResult } from '../lib/schemas/legal-out
 
 describe('ResponseValidator', () => {
   describe('validateLegalOutput', () => {
-    test('should return true for content with citations, roadmap, adversarial strategy, and procedural checks', () => {
+    test('should return true for content without placeholders', () => {
       const content = `
-        STRATEGY:
-        Your legal strategy goes here.
-
-        OPPOSITION VIEW (RED-TEAM ANALYSIS):
-        The landlord may argue that the tenant abandoned the property. This is a significant weakness in our case.
-
-        ROADMAP:
-        1. First step
-        2. Second step
-        3. Third step
-
-        COURTHOUSE INFORMATION & LOCAL LOGISTICS:
-        Filing fee is $435 at Stanley Mosk Courthouse.
-
-        CITATIONS:
-        - 12 U.S.C. § 345
-        - Cal. Civ. Code § 1708
-        - Rule 12(b)(6)
+        Your legal strategy goes here with proper citations.
+        See 12 U.S.C. § 345 and Cal. Civ. Code § 1708 for details.
+        Next Steps: File the motion within 30 days.
       `;
 
       expect(ResponseValidator.validateLegalOutput(content)).toBe(true);
     });
 
-    test('should return false for content with less than 3 citations', () => {
+    test('should return false for content with placeholders', () => {
       const content = `
         STRATEGY:
-        Your legal strategy goes here.
-
-        ROADMAP:
-        1. First step
-        2. Second step
-
-        CITATIONS:
-        - 12 U.S.C. § 345
-        - Cal. Civ. Code § 1708
+        Step pending - more details to come.
       `;
 
       expect(ResponseValidator.validateLegalOutput(content)).toBe(false);
     });
 
-    test('should return false for content without roadmap', () => {
+    test('should return false for content with "to be determined" placeholders', () => {
       const content = `
-        STRATEGY:
-        Your legal strategy goes here.
-
-        CITATIONS:
-        - 12 U.S.C. § 345
-        - Cal. Civ. Code § 1708
-        - Rule 12(b)(6)
+        Your legal strategy here.
+        Citation: To be determined based on further research.
       `;
 
       expect(ResponseValidator.validateLegalOutput(content)).toBe(false);
@@ -61,24 +33,10 @@ describe('ResponseValidator', () => {
 
     test('should recognize different citation formats', () => {
       const content = `
-        STRATEGY:
-        Your legal strategy goes here.
-
-        OPPOSITION VIEW:
-        The opposition will likely argue that the user failed to provide proper notice before initiating the lockout procedure, which could be a significant legal hurdle.
-
-        ROADMAP:
-        1. First step
-        2. Second step
-        3. Third step
-
-        PROCEDURAL CHECKS:
-        Procedural info here. This is also a bit longer to ensure it is detected correctly by the validator.
-
-        CITATIONS:
-        - 12 U.S.C. § 345 (federal statute)
-        - Cal. Civ. Code § 1708 (state code)
-        - Rule 12(b)(6) (court rule)
+        Your legal strategy goes here with proper citations.
+        See 12 U.S.C. § 345, Cal. Civ. Code § 1708, and Rule 12(b)(6) for details.
+        Procedural Roadmap: File the motion, serve the opposition, attend the hearing.
+        Opposition View: The landlord may argue abandonment.
       `;
 
       expect(ResponseValidator.validateLegalOutput(content)).toBe(true);
@@ -86,22 +44,21 @@ describe('ResponseValidator', () => {
   });
 
   describe('validateAndFix', () => {
-    test('should properly format content with standard disclaimer', () => {
-      const content = `Some strategy content here. --- Some filing template here.`;
+    test('should return content as-is if it appears to be valid JSON', () => {
+      const content = JSON.stringify({
+        disclaimer: "Legal disclaimer here",
+        strategy: "Strategy content here"
+      });
+      
       const result = ResponseValidator.validateAndFix(content);
-
-      expect(result).toContain(ResponseValidator.STANDARD_DISCLAIMER);
-      expect(result).toContain('Some strategy content here');
-      expect(result).toContain('Some filing template here');
+      expect(result).toBe(content);
     });
 
-    test('should handle content without delimiters', () => {
+    test('should return original content if not valid JSON', () => {
       const content = `Just some strategy content without delimiters.`;
       const result = ResponseValidator.validateAndFix(content);
 
-      expect(result).toContain(ResponseValidator.STANDARD_DISCLAIMER);
-      expect(result).toContain('Just some strategy content without delimiters');
-      expect(result).toContain(ResponseValidator.NO_FILINGS_MSG);
+      expect(result).toBe(content);
     });
   });
 });

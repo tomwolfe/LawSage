@@ -398,11 +398,76 @@ export interface UseOfflineVaultReturn {
   storageUsed: number;
 }
 
-export function createOfflineVault(caseId: string): OfflineEvidenceVault {
-  const encryptionKey = sessionStorage.getItem(`lawsage_vault_key_${caseId}`) 
-    || crypto.randomUUID();
-  
-  sessionStorage.setItem(`lawsage_vault_key_${caseId}`, encryptionKey);
-  
+/**
+ * Create offline vault with encryption key derived from user password.
+ * 
+ * SECURITY FIX: Encryption keys are no longer stored in sessionStorage.
+ * The key must be derived from user password via PBKDF2 and passed in from memory.
+ * 
+ * @param caseId - The case identifier
+ * @param encryptionKey - The encryption key derived from user password (via PBKDF2)
+ * @returns OfflineEvidenceVault instance
+ */
+export function createOfflineVault(caseId: string, encryptionKey: string): OfflineEvidenceVault {
+  if (!encryptionKey) {
+    throw new Error('Encryption key is required. Derive key from user password using PBKDF2.');
+  }
+
   return new OfflineEvidenceVault(caseId, encryptionKey);
+}
+
+/**
+ * Helper to create vault with password-derived key.
+ * This is the recommended way to create a vault - it derives the key from password.
+ * 
+ * @param caseId - The case identifier
+ * @param password - User password for key derivation
+ * @param salt - Salt for key derivation (generate new for first-time use)
+ * @returns Promise resolving to vault instance and salt (store salt for future logins)
+ */
+export async function createOfflineVaultWithPassword(
+  caseId: string,
+  password: string,
+  salt?: Uint8Array
+): Promise<{ vault: OfflineEvidenceVault; salt: Uint8Array }> {
+  // Generate salt if not provided
+  const keySalt = salt || crypto.getRandomValues(new Uint8Array(16));
+  
+  // Derive key from password using PBKDF2
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  );
+
+  const encryptionKey = await crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: keySalt.buffer as ArrayBuffer,
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    keyMaterial,
+    {
+      name: 'AES-GCM',
+      length: 256,
+    },
+    false,
+    ['encrypt', 'decrypt']
+  );
+
+  // Export key for storage in memory (not persisted)
+  const exportedKey = await crypto.subtle.exportKey('raw', encryptionKey);
+  const keyArray = new Uint8Array(exportedKey);
+  const keyHex = Array.from(keyArray)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+
+  return {
+    vault: new OfflineEvidenceVault(caseId, keyHex),
+    salt: keySalt,
+  };
 }

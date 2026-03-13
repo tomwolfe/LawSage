@@ -733,13 +733,6 @@ CRITICAL INSTRUCTIONS:
             let lineBuffer = "";
             let lastEmittedSectionCount = 0;
 
-            // Atomic section parser for progressive rendering
-            const { AtomicSectionParser } = await import('../../../lib/atomic-section-stream');
-            const sectionParser = new AtomicSectionParser((section, content) => {
-              // Callback when a section is complete
-              safeLog(`[Atomic Stream] Section complete: ${section}`);
-            });
-
             const reader = response.body?.getReader();
             if (!reader) {
               throw new Error('ReadableStream not supported');
@@ -789,19 +782,6 @@ CRITICAL INSTRUCTIONS:
                           content: toolCall.function.arguments
                         }) + '\n'));
 
-                        // ATOMIC SECTION PARSING: Process section delimiters
-                        const sectionResults = sectionParser.processChunk(toolCall.function.arguments);
-                        
-                        for (const result of sectionResults) {
-                          if (result.complete) {
-                            controller.enqueue(encoder.encode(JSON.stringify({
-                              type: 'section_complete',
-                              section: result.section,
-                              content: result.content
-                            }) + '\n'));
-                          }
-                        }
-
                         // PROGRESSIVE RENDERING: Try to parse and emit completed sections
                         try {
                           const { parsePartialJSON } = await import('../../../lib/streaming-json-parser');
@@ -847,18 +827,6 @@ CRITICAL INSTRUCTIONS:
                         type: 'chunk',
                         content: content
                       }) + '\n'));
-
-                      // Also process through atomic section parser
-                      const sectionResults = sectionParser.processChunk(content);
-                      for (const result of sectionResults) {
-                        if (result.complete) {
-                          controller.enqueue(encoder.encode(JSON.stringify({
-                            type: 'section_complete',
-                            section: result.section,
-                            content: result.content
-                          }) + '\n'));
-                        }
-                      }
                     }
                   } catch (parseError) {
                     safeWarn(`Failed to parse GLM chunk. Raw line: ${trimmedLine.substring(0, 100)}`, parseError);
@@ -897,48 +865,9 @@ CRITICAL INSTRUCTIONS:
                 throw new Error('Empty response from GLM API');
               }
 
-              // ATOMIC SECTION PARSING: First try to parse using section delimiters
-              const { parseDelimitedContent } = await import('../../../lib/atomic-section-stream');
-              const delimitedResult = parseDelimitedContent<Record<string, unknown>>(accumulatedToolArgs);
-
-              // Check if we got any complete sections from delimiters
-              const hasDelimitedSections = Object.keys(delimitedResult).length > 0;
-
-              if (hasDelimitedSections) {
-                // Use delimited content, fill in missing fields with JSON parse
-                parsedOutput = {
-                  disclaimer: (delimitedResult.disclaimer as string) || '',
-                  strategy: (delimitedResult.strategy as string) || '',
-                  adversarial_strategy: (delimitedResult.adversarial_strategy as string) || '',
-                  roadmap: (delimitedResult.roadmap as Array<{ step: number; title: string; description: string; estimated_time?: string; required_documents?: string[]; counter_measure?: string }>) || [],
-                  filing_template: (delimitedResult.filing_template as string) || '',
-                  citations: (delimitedResult.citations as Array<{ text: string; source?: string; url?: string }>) || [],
-                  local_logistics: (delimitedResult.local_logistics as Record<string, unknown>) || {},
-                  procedural_checks: (delimitedResult.procedural_checks as string[]) || [],
-                };
-
-                // Fill in any missing sections from JSON parse
-                if (!parsedOutput.disclaimer || !parsedOutput.strategy) {
-                  const { parsePartialJSON } = await import('../../../lib/streaming-json-parser');
-                  const jsonParsed = parsePartialJSON<LegalOutput>(accumulatedToolArgs);
-                  if (jsonParsed) {
-                    parsedOutput = {
-                      disclaimer: parsedOutput.disclaimer || jsonParsed.disclaimer || '',
-                      strategy: parsedOutput.strategy || jsonParsed.strategy || '',
-                      adversarial_strategy: parsedOutput.adversarial_strategy || jsonParsed.adversarial_strategy || '',
-                      roadmap: parsedOutput.roadmap && parsedOutput.roadmap.length > 0 ? parsedOutput.roadmap : (jsonParsed.roadmap || []),
-                      filing_template: parsedOutput.filing_template || jsonParsed.filing_template || '',
-                      citations: parsedOutput.citations && parsedOutput.citations.length > 0 ? parsedOutput.citations : (jsonParsed.citations || []),
-                      local_logistics: Object.keys(parsedOutput.local_logistics || {}).length > 0 ? parsedOutput.local_logistics : (jsonParsed.local_logistics || {}),
-                      procedural_checks: parsedOutput.procedural_checks && parsedOutput.procedural_checks.length > 0 ? parsedOutput.procedural_checks : (jsonParsed.procedural_checks || []),
-                    };
-                  }
-                }
-              } else {
-                // No delimiters found, fall back to JSON parsing
-                const { parsePartialJSON } = await import('../../../lib/streaming-json-parser');
-                parsedOutput = parsePartialJSON<LegalOutput>(accumulatedToolArgs);
-              }
+              // Parse the accumulated tool arguments as JSON
+              const { parsePartialJSON } = await import('../../../lib/streaming-json-parser');
+              parsedOutput = parsePartialJSON<LegalOutput>(accumulatedToolArgs);
 
               if (!parsedOutput) {
                 throw new Error("Could not recover any usable data from AI response");

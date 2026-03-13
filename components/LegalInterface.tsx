@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Download, Save, FolderOpen, Info, Upload } from 'lucide-react';
-import { updateUrlWithState, watchStateAndSyncToUrl, createVirtualCaseFolderState, restoreVirtualCaseFolderState, cleanupLocalStorage } from '../src/utils/state-sync';
+import { watchStateAndSyncToUrl, getCaseIdFromUrl } from '../src/utils/state-sync';
 import { exportCaseFile, importCaseFile, saveCaseToLocalStorage } from '../src/utils/case-file-manager';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -150,77 +150,87 @@ export default function LegalInterface() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const ocrFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Initialize state from URL fragment on component mount
+  // Initialize state from IndexedDB on component mount
   useEffect(() => {
-    // Cleanup old localStorage entries
-    cleanupLocalStorage();
+    async function loadState() {
+      try {
+        // Use the new IndexedDB-based state loading
+        const { loadCurrentCaseState } = await import('../src/utils/state-sync');
+        const { caseId, state, isNewCase } = await loadCurrentCaseState();
 
-    const hash = window.location.hash.substring(1);
-    const savedState = restoreVirtualCaseFolderState(hash);
+        if (!isNewCase && state && typeof state === 'object') {
+          const stateRecord = state as Record<string, unknown>;
+          const caseFolder = stateRecord.caseFolder as CaseFolderState | undefined;
+          const analysisResult = stateRecord.analysisResult;
+          const ledger = stateRecord.ledger;
 
-    if (savedState && typeof savedState === 'object' && savedState !== null) {
-      const savedStateRecord = savedState as Record<string, unknown>;
-      const caseFolder = savedStateRecord.caseFolder as CaseFolderState | undefined;
-      const analysisResult = savedStateRecord.analysisResult;
-      const ledger = savedStateRecord.ledger;
+          // Check if this is the enhanced Virtual Case Folder state format
+          if (caseFolder && analysisResult !== undefined) {
+            // Restore from Virtual Case Folder state
+            if (caseFolder.userInput !== undefined) setUserInput(caseFolder.userInput);
+            if (caseFolder.jurisdiction !== undefined) setJurisdiction(caseFolder.jurisdiction);
+            if (caseFolder.activeTab !== undefined) setActiveTab(caseFolder.activeTab as "strategy" | "filings" | "sources" | "survival-guide" | "opposition-view" | "roadmap" | "battle-plan");
+            if (caseFolder.history !== undefined) setHistory(caseFolder.history);
+            if (caseFolder.selectedHistoryItem !== undefined) setSelectedHistoryItem(caseFolder.selectedHistoryItem);
+            if (caseFolder.backendUnreachable !== undefined) setBackendUnreachable(caseFolder.backendUnreachable);
+            if (caseFolder.evidence !== undefined && Array.isArray(caseFolder.evidence)) setEvidence(caseFolder.evidence);
 
-      // Check if this is the enhanced Virtual Case Folder state format
-      if (caseFolder && analysisResult !== undefined) {
-        // Restore from Virtual Case Folder state
+            if (analysisResult !== undefined) setResult(analysisResult as LegalResult);
 
-        if (caseFolder.userInput !== undefined) setUserInput(caseFolder.userInput);
-        if (caseFolder.jurisdiction !== undefined) setJurisdiction(caseFolder.jurisdiction);
-        if (caseFolder.activeTab !== undefined) setActiveTab(caseFolder.activeTab as "strategy" | "filings" | "sources" | "survival-guide" | "opposition-view" | "roadmap" | "battle-plan");
-        if (caseFolder.history !== undefined) setHistory(caseFolder.history);
-        if (caseFolder.selectedHistoryItem !== undefined) setSelectedHistoryItem(caseFolder.selectedHistoryItem);
-        if (caseFolder.backendUnreachable !== undefined) setBackendUnreachable(caseFolder.backendUnreachable);
-        if (caseFolder.evidence !== undefined && Array.isArray(caseFolder.evidence)) setEvidence(caseFolder.evidence);
-
-        if (analysisResult !== undefined) setResult(analysisResult as LegalResult);
-
-        // Restore case ledger if present
-        if (ledger !== undefined && Array.isArray(ledger)) {
-          // Convert timestamp strings back to Date objects if needed
-          const ledgerWithDates = ledger.map((entry: unknown) => {
-            if (typeof entry === 'object' && entry !== null && 'timestamp' in entry) {
-              const entryRecord = entry as Record<string, unknown>;
-              return {
-                ...entryRecord,
-                timestamp: new Date(entryRecord.timestamp as string),
-                dueDate: entryRecord.dueDate ? new Date(entryRecord.dueDate as string) : undefined
-              };
+            // Restore case ledger if present
+            if (ledger !== undefined && Array.isArray(ledger)) {
+              // Convert timestamp strings back to Date objects if needed
+              const ledgerWithDates = ledger.map((entry: unknown) => {
+                if (typeof entry === 'object' && entry !== null && 'timestamp' in entry) {
+                  const entryRecord = entry as Record<string, unknown>;
+                  return {
+                    ...entryRecord,
+                    timestamp: new Date(entryRecord.timestamp as string),
+                    dueDate: entryRecord.dueDate ? new Date(entryRecord.dueDate as string) : undefined
+                  };
+                }
+                return entry;
+              });
+              setCaseLedger(ledgerWithDates as CaseLedgerEntry[]);
             }
-            return entry;
-          });
-          setCaseLedger(ledgerWithDates as CaseLedgerEntry[]);
-        }
-      } else {
-        // Restore from legacy state format
-        const legacyState = savedStateRecord;
-        if (legacyState.userInput !== undefined) setUserInput(legacyState.userInput as string);
-        if (legacyState.jurisdiction !== undefined) setJurisdiction(legacyState.jurisdiction as string);
-        if (legacyState.result !== undefined) setResult(legacyState.result as LegalResult);
-        if (legacyState.activeTab !== undefined) setActiveTab(legacyState.activeTab as "strategy" | "filings" | "sources" | "survival-guide" | "opposition-view" | "roadmap" | "battle-plan");
-        if (legacyState.history !== undefined) setHistory(legacyState.history as CaseHistoryItem[]);
-        if (legacyState.selectedHistoryItem !== undefined) setSelectedHistoryItem(legacyState.selectedHistoryItem as string | null);
-        if (legacyState.backendUnreachable !== undefined) setBackendUnreachable(legacyState.backendUnreachable as boolean);
-      }
+          } else {
+            // Restore from legacy state format
+            const legacyState = stateRecord;
+            if (legacyState.userInput !== undefined) setUserInput(legacyState.userInput as string);
+            if (legacyState.jurisdiction !== undefined) setJurisdiction(legacyState.jurisdiction as string);
+            if (legacyState.result !== undefined) setResult(legacyState.result as LegalResult);
+            if (legacyState.activeTab !== undefined) setActiveTab(legacyState.activeTab as "strategy" | "filings" | "sources" | "survival-guide" | "opposition-view" | "roadmap" | "battle-plan");
+            if (legacyState.history !== undefined) setHistory(legacyState.history as CaseHistoryItem[]);
+            if (legacyState.selectedHistoryItem !== undefined) setSelectedHistoryItem(legacyState.selectedHistoryItem as string | null);
+            if (legacyState.backendUnreachable !== undefined) setBackendUnreachable(legacyState.backendUnreachable as boolean);
+          }
 
-      // Note: We don't restore file selection as that would require re-reading the file
+          // Note: We don't restore file selection as that would require re-reading the file
+        }
+      } catch (error) {
+        console.error('Error loading state from IndexedDB:', error);
+      }
     }
+
+    loadState();
   }, []);
 
-  // Set up URL state synchronization
+  // Set up IndexedDB state synchronization
   useEffect(() => {
-    const getStateToSync = () => createVirtualCaseFolderState({
-      userInput,
-      jurisdiction,
-      activeTab,
-      history,
-      selectedHistoryItem,
-      backendUnreachable,
-      evidence
-    }, result, caseLedger);
+    const getStateToSync = () => ({
+      caseFolder: {
+        userInput,
+        jurisdiction,
+        activeTab,
+        history,
+        selectedHistoryItem,
+        backendUnreachable,
+        evidence
+      },
+      analysisResult: result,
+      ledger: caseLedger,
+      timestamp: Date.now(),
+    });
 
     // Use debounced watcher for ongoing state changes
     const debouncedUpdate = watchStateAndSyncToUrl(getStateToSync, 1000);
@@ -229,7 +239,12 @@ export default function LegalInterface() {
     // Return cleanup function
     return () => {
       // On unmount, ensure latest state is saved immediately
-      updateUrlWithState(getStateToSync());
+      const state = getStateToSync();
+      const { saveCurrentState, getCaseIdFromUrl } = require('../src/utils/state-sync');
+      const caseId = getCaseIdFromUrl();
+      if (caseId) {
+        saveCurrentState(state).catch(console.error);
+      }
     };
   }, [userInput, jurisdiction, result, activeTab, history, selectedHistoryItem, backendUnreachable, caseLedger, evidence]);
 

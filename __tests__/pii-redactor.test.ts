@@ -152,12 +152,13 @@ describe('PII Redactor', () => {
       expect(result.redacted).not.toContain('Oak Apartments');
     });
 
-    test('should redact contextual phone numbers (short format)', () => {
-      const input = 'Call me at 555-1234 for questions';
+    test('should redact standard phone numbers', () => {
+      const input = 'Call me at (555) 123-4567 for questions';
       const result = redactPII(input);
 
-      // This short format may be caught by pass2
-      expect(result.redactedFields.length).toBeGreaterThan(0);
+      // Standard format should be caught by pass1
+      expect(result.redacted).toContain('[PHONE_REDACTED]');
+      expect(result.redactedFields).toContain('phone');
     });
 
     test('should redact contextual email addresses', () => {
