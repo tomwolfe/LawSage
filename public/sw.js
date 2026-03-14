@@ -219,12 +219,13 @@ self.addEventListener('notificationclick', (event) => {
 
 // Message handler for client communication
 self.addEventListener('message', (event) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { type, payload } = event.data || {};
-  
+
   if (type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
-  
+
   if (type === 'GET_VERSION') {
     event.ports[0]?.postMessage({ version: CACHE_NAME });
   }

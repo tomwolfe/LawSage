@@ -72,7 +72,7 @@ async function seedVector() {
         full_text: `${rule.courthouse} (${rule.jurisdiction}): ${rule.rule}. Notice time: ${rule.notice_time}`,
       });
     }
-  } catch (error) {
+  } catch {
     console.warn('⚠️ Could not load legal_lookup.json, skipping...');
   }
 

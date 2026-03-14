@@ -308,7 +308,7 @@ export function AuthorityVerifier({
         <div className="grid grid-cols-3 gap-4 text-center">
           <div className="bg-green-100 rounded-lg p-3">
             <div className="text-2xl font-bold text-green-700">
-              {citations.filter((c, i) => {
+              {citations.filter((c) => {
                 const status = verificationStatus[c.text];
                 return status?.is_verified === true || (!status && c.is_verified === true);
               }).length}
@@ -317,7 +317,7 @@ export function AuthorityVerifier({
           </div>
           <div className="bg-red-100 rounded-lg p-3">
             <div className="text-2xl font-bold text-red-700">
-              {citations.filter((c, i) => {
+              {citations.filter((c) => {
                 const status = verificationStatus[c.text];
                 return status?.is_verified === false;
               }).length}
@@ -326,7 +326,7 @@ export function AuthorityVerifier({
           </div>
           <div className="bg-amber-100 rounded-lg p-3">
             <div className="text-2xl font-bold text-amber-700">
-              {citations.filter((c, i) => {
+              {citations.filter((c) => {
                 const status = verificationStatus[c.text];
                 return status?.loading === true;
               }).length}

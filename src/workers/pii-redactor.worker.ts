@@ -16,6 +16,7 @@
  */
 
 // Import shared PII redaction logic to avoid code duplication
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { redactPII, type RedactionResult } from '../../lib/pii-core';
 
 /**

@@ -9,6 +9,7 @@ import { getDatabase } from '../../lib/offline-vault';
 import { safeLog, safeError } from '../../lib/pii-redactor';
 
 // IndexedDB table name for state storage
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const STATE_STORE_NAME = 'cases';
 
 /**

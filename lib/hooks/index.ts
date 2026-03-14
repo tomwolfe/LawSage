@@ -233,7 +233,7 @@ export function useLegalAnalysis() {
         }
 
         throw new Error('Unexpected checkpoint status');
-      } catch (error) {
+      } catch {
         retries++;
         if (retries >= maxRetries) {
           setError('Analysis timed out and could not be resumed. Please try again with a simpler query.');
@@ -440,6 +440,33 @@ export function useOCRProcessing() {
  * useHistory Hook
  * Manages case analysis history with persistence
  */
+function parseHistoryFromStorage(): Array<{
+  id: string;
+  timestamp: Date;
+  jurisdiction: string;
+  userInput: string;
+  result: LegalResult;
+}> {
+  const savedHistory = localStorage.getItem('lawsage_history');
+  if (savedHistory) {
+    try {
+      const parsed = JSON.parse(savedHistory);
+      if (Array.isArray(parsed)) {
+        return parsed.map((item: Record<string, unknown>) => ({
+          id: (item as { id: string }).id || '',
+          timestamp: new Date((item as { timestamp: string }).timestamp),
+          jurisdiction: (item as { jurisdiction: string }).jurisdiction || '',
+          userInput: (item as { userInput: string }).userInput || '',
+          result: (item as { result: LegalResult }).result || { text: '', sources: [] }
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to parse history:', err);
+    }
+  }
+  return [];
+}
+
 export function useHistory() {
   const [history, setHistory] = useState<Array<{
     id: string;
@@ -447,27 +474,7 @@ export function useHistory() {
     jurisdiction: string;
     userInput: string;
     result: LegalResult;
-  }>>([]);
-
-  useEffect(() => {
-    const savedHistory = localStorage.getItem('lawsage_history');
-    if (savedHistory) {
-      try {
-        const parsed = JSON.parse(savedHistory);
-        if (Array.isArray(parsed)) {
-          setHistory(parsed.map((item: Record<string, unknown>) => ({
-            id: (item as { id: string }).id || '',
-            timestamp: new Date((item as { timestamp: string }).timestamp),
-            jurisdiction: (item as { jurisdiction: string }).jurisdiction || '',
-            userInput: (item as { userInput: string }).userInput || '',
-            result: (item as { result: LegalResult }).result || { text: '', sources: [] }
-          })));
-        }
-      } catch (err) {
-        console.error('Failed to parse history:', err);
-      }
-    }
-  }, []);
+  }>>(parseHistoryFromStorage);
 
   const addToHistory = useCallback((item: {
     id: string;

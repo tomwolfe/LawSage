@@ -54,7 +54,8 @@ export function CaseHeader({
   // Determine verification status
   const isVerified = critiqueMetadata?.audit_passed === true;
   const isFailed = critiqueMetadata?.audit_passed === false;
-  const hasIssues = (critiqueMetadata?.statute_issues_count || 0) > 0 || 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const hasIssues = (critiqueMetadata?.statute_issues_count || 0) > 0 ||
                     (critiqueMetadata?.roadmap_issues_count || 0) > 0;
 
   return (

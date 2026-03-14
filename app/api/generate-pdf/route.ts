@@ -326,7 +326,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const totalPagesBeforeSignature = doc.bufferedPageRange().count;
+    // const totalPagesBeforeSignature = doc.bufferedPageRange().count;
 
     // Add signature block if pleading paper
     if (usePleadingPaper) {

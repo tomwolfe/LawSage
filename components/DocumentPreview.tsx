@@ -14,6 +14,7 @@ import remarkGfm from 'remark-gfm';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -223,7 +224,7 @@ export function DocumentPreview({
   const handleExportToWord = async () => {
     try {
       const docxModule = await import('docx');
-      const { Packer, Document, Paragraph, TextRun, HeadingLevel, AlignmentType } = docxModule;
+      const { Packer, Document, Paragraph, HeadingLevel, AlignmentType } = docxModule;
 
       const doc = new Document({
         sections: [{

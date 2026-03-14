@@ -29,7 +29,9 @@ import {
   encryptCaseData,
   decryptCaseData,
   generateCaseId,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   verifyPassword,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   generatePasswordHash,
   isCryptoSupported,
 } from './case-encryption';

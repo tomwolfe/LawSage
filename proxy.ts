@@ -210,6 +210,7 @@ function applySecurityHeaders(response: NextResponse | Response) {
 /**
  * Handle security headers for a request
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function handleSecurityHeaders(request: NextRequest): Promise<NextResponse> {
   const response = NextResponse.next();
   applySecurityHeaders(response);

@@ -162,6 +162,7 @@ Generate clarifying questions. Focus on gaps in the information provided. If the
  * Static question generation fallback
  * Used when AI is unavailable or as a base template
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function generateStaticQuestions(userInput: string, _jurisdiction?: string): InterviewQuestion[] {
   const lower = userInput.toLowerCase();
   const questions: InterviewQuestion[] = [];

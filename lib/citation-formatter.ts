@@ -15,6 +15,7 @@
  * - New York Law Report Style Manual (for New York state courts)
  */
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { safeLog, safeWarn } from './pii-redactor';
 
 /**
@@ -380,6 +381,7 @@ function formatCaseCitation(parsed: ParsedCitation, style: CitationStyle): strin
 /**
  * Format a federal statute citation
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function formatFederalStatute(parsed: ParsedCitation, style: CitationStyle): string {
   const { statuteNumber, year } = parsed;
 
@@ -423,6 +425,7 @@ function formatStateStatute(parsed: ParsedCitation, style: CitationStyle): strin
 /**
  * Format a court rule citation
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function formatCourtRule(parsed: ParsedCitation, style: CitationStyle): string {
   const { ruleName, ruleNumber } = parsed;
 

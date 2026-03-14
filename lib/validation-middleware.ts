@@ -15,7 +15,8 @@
 
 import { z } from 'zod';
 import { safeLog, safeWarn } from './pii-redactor';
-import { 
+/* eslint-disable @typescript-eslint/no-unused-vars -- Re-exported below */
+import {
   validateLegalOutput as zodValidateLegalOutput,
   extractCitations,
   isValidCitationFormat,
@@ -25,6 +26,7 @@ import {
   triggerSelfCorrection,
   type ValidationResult
 } from './unified-validation';
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 // ============================================================================
 // ZOD SCHEMAS - Single Source of Truth
@@ -358,6 +360,7 @@ function generateWarningSuggestions(errors: string[]): string[] {
  * Backward compatibility wrapper
  * Falls back to legacy validation for non-JSON outputs
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function validateWithFallback(content: string, jurisdiction: string): UnifiedValidationResult {
   // Try to parse as JSON first
   try {

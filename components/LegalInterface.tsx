@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Download, Save, FolderOpen, Info, Upload } from 'lucide-react';
-import { watchStateAndSyncToUrl, getCaseIdFromUrl } from '../src/utils/state-sync';
+import { watchStateAndSyncToUrl } from '../src/utils/state-sync';
 import { exportCaseFile, importCaseFile, saveCaseToLocalStorage } from '../src/utils/case-file-manager';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -146,6 +146,7 @@ export default function LegalInterface() {
   const [streamingPreview, setStreamingPreview] = useState<{ strategy?: string; roadmap?: string } | null>(null);
   /** Current state version for drift prevention */
   const [currentStateId, setCurrentStateId] = useState<string>('');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [currentStateHash, setCurrentStateHash] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const ocrFileInputRef = useRef<HTMLInputElement>(null);
@@ -156,6 +157,7 @@ export default function LegalInterface() {
       try {
         // Use the new IndexedDB-based state loading
         const { loadCurrentCaseState } = await import('../src/utils/state-sync');
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { caseId, state, isNewCase } = await loadCurrentCaseState();
 
         if (!isNewCase && state && typeof state === 'object') {
@@ -240,11 +242,12 @@ export default function LegalInterface() {
     return () => {
       // On unmount, ensure latest state is saved immediately
       const state = getStateToSync();
-      const { saveCurrentState, getCaseIdFromUrl } = require('../src/utils/state-sync');
-      const caseId = getCaseIdFromUrl();
-      if (caseId) {
-        saveCurrentState(state).catch(console.error);
-      }
+      import('../src/utils/state-sync').then(({ saveCurrentState, getCaseIdFromUrl }) => {
+        const caseId = getCaseIdFromUrl();
+        if (caseId) {
+          saveCurrentState(state).catch(console.error);
+        }
+      });
     };
   }, [userInput, jurisdiction, result, activeTab, history, selectedHistoryItem, backendUnreachable, caseLedger, evidence]);
 

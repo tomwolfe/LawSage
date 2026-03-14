@@ -11,6 +11,7 @@
  * This approach ensures both precise legal citations AND semantic understanding.
  */
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { getVectorClient, searchLegalRules, type VectorSearchResult, type LegalRuleVector } from './vector';
 
 /**
@@ -226,7 +227,9 @@ export class HybridSearchEngine {
     const maxBm25Score = Math.max(...bm25Results.map(r => r.score), 1);
 
     // Create score maps for quick lookup
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const vectorScoreMap = new Map<string, number>(vectorResults.map(r => [r.id.toString(), r.score / maxVectorScore]));
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const bm25ScoreMap = new Map<string, number>(bm25Results.map(r => [r.id, r.score / maxBm25Score]));
 
     // Get unique document IDs from both searches
@@ -252,7 +255,7 @@ export class HybridSearchEngine {
         combinedScore,
         vectorScore,
         bm25Score,
-        metadata: vectorResult?.metadata || bm25Result?.metadata!
+        metadata: vectorResult?.metadata ?? bm25Result!.metadata
       });
     }
 

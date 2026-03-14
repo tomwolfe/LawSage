@@ -14,6 +14,7 @@
  * - Sticky header display data for deadline countdown
  */
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { safeLog, safeWarn } from './pii-redactor';
 import { calculateLegalDeadline, isCourtDay, Jurisdiction } from '../src/utils/legal-calendar';
 
@@ -612,6 +613,7 @@ function getRequiredDocuments(documentType: DocumentType): string[] {
 /**
  * Get filing requirements for document type
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function getFilingRequirements(documentType: DocumentType, jurisdiction: string): FilingRequirement[] {
   const requirements: Record<DocumentType, FilingRequirement[]> = {
     [DocumentType.NOTICE_OF_MOTION]: [
@@ -679,6 +681,7 @@ function getFilingRequirements(documentType: DocumentType, jurisdiction: string)
 /**
  * Get hearing requirements for document type
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function getHearingRequirements(documentType: DocumentType, jurisdiction: string): HearingRequirement[] {
   const requirements: Record<DocumentType, HearingRequirement[]> = {
     [DocumentType.NOTICE_OF_MOTION]: [

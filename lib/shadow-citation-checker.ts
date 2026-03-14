@@ -9,6 +9,7 @@
  * This provides a "hard-gate" that can block downloads if citations are unverified.
  */
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { safeLog, safeWarn, safeError } from './pii-redactor';
 import type { JurisdictionRules } from './rag-context-injector';
 

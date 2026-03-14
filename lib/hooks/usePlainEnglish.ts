@@ -80,7 +80,7 @@ export function usePlainEnglish(): UsePlainEnglishReturn {
         const plainContent = await simpleClientSideTranslation(content);
         setTranslatedContent(plainContent);
         return plainContent;
-      } catch (fallbackError) {
+      } catch {
         const errorMsg = err instanceof Error ? err.message : 'Translation failed';
         setError(errorMsg);
         return content;

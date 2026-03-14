@@ -10,6 +10,7 @@
  * contradict the evidence in their case.
  */
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { safeLog, safeError } from './pii-redactor';
 
 export interface UserClaim {

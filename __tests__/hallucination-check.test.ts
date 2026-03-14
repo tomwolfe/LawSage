@@ -264,7 +264,7 @@ describe('Hallucination Detection', () => {
 describe('Hallucination Prevention - Integration', () => {
   it('should prevent hallucination from reaching final output', async () => {
     // Simulate full analysis pipeline with fake citation
-    const fakeInput = 'I want to evict my tenant using California Civil Code § 999999';
+    // const fakeInput = 'I want to evict my tenant using California Civil Code § 999999';
     
     // First pass: Generate analysis (simulated)
     const generatedAnalysis = JSON.stringify({

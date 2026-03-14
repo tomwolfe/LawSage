@@ -4,6 +4,7 @@
  * are matched to the correct version of the case state.
  */
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import type { EvidenceItem, VaultMetadata } from '../lib/evidence-vault';
 
 /**

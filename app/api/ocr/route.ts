@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { safeLog, safeError, safeWarn } from '../../../lib/pii-redactor';
 import { validateOCRResult } from '../../../lib/schemas/legal-output';
 import { calculateLegalDeadline, Jurisdiction } from '../../../src/utils/legal-calendar';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { readFile, access } from 'fs/promises';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import path from 'path';
 import crypto from 'crypto';
 import { redis, KEY_PREFIX } from '../../../lib/redis';
