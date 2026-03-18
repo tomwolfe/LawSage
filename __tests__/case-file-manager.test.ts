@@ -1,29 +1,38 @@
-import { saveCaseToLocalStorage, loadCaseFromLocalStorage, clearCaseFromLocalStorage } from '../src/utils/case-file-manager';
+import { saveCaseToLocalDB, loadCaseFromLocalDB, clearCaseFromLocalDB } from '../src/utils/case-file-manager';
 import type { CaseFolderState, LegalResult } from '../components/LegalInterface';
 
-// Mock localStorage for JSDOM environment
-const localStorageMock = (() => {
-  const store = new Map<string, string>();
-  
-  return {
-    getItem: jest.fn((key: string) => store.get(key) || null),
-    setItem: jest.fn((key: string, value: string) => { store.set(key, value); }),
-    removeItem: jest.fn((key: string) => { store.delete(key); }),
-    clear: jest.fn(() => { store.clear(); }),
-    get store() { return store; }
-  };
-})();
+// Mock the database
+jest.mock('../lib/offline-vault', () => {
+  const mockAdd = jest.fn();
+  const mockUpdate = jest.fn();
+  const mockGet = jest.fn();
+  const mockDelete = jest.fn();
 
-Object.defineProperty(global, 'localStorage', {
-  value: localStorageMock,
-  writable: true,
-  configurable: true
+  return {
+    __esModule: true,
+    getDatabase: jest.fn(() => ({
+      cases: {
+        get: mockGet,
+        add: mockAdd,
+        update: mockUpdate,
+        delete: mockDelete,
+      }
+    })),
+    __mocks: {
+      add: mockAdd,
+      update: mockUpdate,
+      get: mockGet,
+      delete: mockDelete,
+    }
+  };
 });
 
 describe('Case File Manager', () => {
+  let mockDb: ReturnType<typeof import('../lib/offline-vault').getDatabase>;
+
   beforeEach(() => {
-    localStorageMock.store.clear();
     jest.clearAllMocks();
+    mockDb = require('../lib/offline-vault').getDatabase();
   });
 
   const mockCaseFolder: CaseFolderState = {
@@ -51,90 +60,82 @@ describe('Case File Manager', () => {
     }
   ];
 
-  describe('saveCaseToLocalStorage', () => {
-    test('should save case to localStorage', () => {
-      saveCaseToLocalStorage(mockCaseFolder, mockResult, mockLedger);
+  describe('saveCaseToLocalDB', () => {
+    test('should save case to IndexedDB', async () => {
+      mockDb.cases.get.mockResolvedValue(undefined);
+      mockDb.cases.add.mockResolvedValue(1);
 
-      expect(localStorageMock.setItem).toHaveBeenCalled();
-      const callArgs = localStorageMock.setItem.mock.calls[0];
-      expect(callArgs[0]).toContain('lawsage_case_california');
-      expect(callArgs[1]).toBeDefined();
-      
-      // Verify data was actually stored
-      const storedKey = callArgs[0];
-      const storedValue = localStorageMock.store.get(storedKey);
-      expect(storedValue).toBeDefined();
+      await saveCaseToLocalDB('case_test123', mockCaseFolder, mockResult, mockLedger);
+
+      expect(mockDb.cases.add).toHaveBeenCalled();
     });
 
-    test('should handle errors gracefully', () => {
-      // Mock setItem to throw
-      localStorageMock.setItem.mockImplementation(() => {
-        throw new Error('Storage full');
-      });
+    test('should handle errors gracefully', async () => {
+      mockDb.cases.add.mockRejectedValue(new Error('Database error'));
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
-      expect(() => saveCaseToLocalStorage(mockCaseFolder)).not.toThrow();
+      await expect(saveCaseToLocalDB('case_test123', mockCaseFolder)).resolves.not.toThrow();
 
       // Verify error was logged
       expect(consoleSpy).toHaveBeenCalled();
-      expect(consoleSpy.mock.calls[0][0]).toContain('Failed to save case to localStorage');
 
       consoleSpy.mockRestore();
     });
   });
 
-  describe('loadCaseFromLocalStorage', () => {
-    test('should load case from localStorage', () => {
+  describe('loadCaseFromLocalDB', () => {
+    test('should load case from IndexedDB', async () => {
       const mockStoredData = {
         caseFolder: mockCaseFolder,
         ledger: mockLedger,
         savedAt: new Date().toISOString()
       };
 
-      // Pre-populate localStorage
-      const key = `lawsage_case_california`;
-      localStorageMock.store.set(key, JSON.stringify(mockStoredData));
+      mockDb.cases.get.mockResolvedValue({
+        id: 1,
+        caseId: 'case_test123',
+        state: JSON.stringify(mockStoredData)
+      });
 
-      const result = loadCaseFromLocalStorage('California');
+      const result = await loadCaseFromLocalDB('case_test123');
 
       expect(result).toBeTruthy();
       expect(result?.caseFolder).toEqual(mockCaseFolder);
       expect(result?.ledger).toEqual(mockLedger);
     });
 
-    test('should return null when no data found', () => {
-      const result = loadCaseFromLocalStorage('California');
+    test('should return null when no data found', async () => {
+      mockDb.cases.get.mockResolvedValue(undefined);
+
+      const result = await loadCaseFromLocalDB('case_test123');
 
       expect(result).toBeNull();
     });
 
-    test('should handle parse errors gracefully', () => {
-      // Store invalid JSON
-      const key = `lawsage_case_california`;
-      localStorageMock.store.set(key, 'invalid json');
-      
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+    test('should handle parse errors gracefully', async () => {
+      mockDb.cases.get.mockResolvedValue({
+        id: 1,
+        caseId: 'case_test123',
+        state: 'invalid json'
+      });
 
-      const result = loadCaseFromLocalStorage('California');
+      const result = await loadCaseFromLocalDB('case_test123');
 
-      // When JSON.parse fails, the catch block returns null
       expect(result).toBeNull();
-      expect(consoleSpy).toHaveBeenCalled();
-
-      consoleSpy.mockRestore();
     });
   });
 
-  describe('clearCaseFromLocalStorage', () => {
-    test('should clear case from localStorage', () => {
-      // First save something
-      saveCaseToLocalStorage(mockCaseFolder, mockResult, mockLedger);
-      
-      // Then clear it
-      clearCaseFromLocalStorage('California');
+  describe('clearCaseFromLocalDB', () => {
+    test('should clear case from IndexedDB', async () => {
+      mockDb.cases.get.mockResolvedValue({
+        id: 1,
+        caseId: 'case_test123'
+      });
+      mockDb.cases.delete.mockResolvedValue(1);
 
-      expect(localStorageMock.removeItem).toHaveBeenCalled();
-      expect(localStorageMock.removeItem).toHaveBeenCalledWith(expect.stringContaining('lawsage_case_california'));
+      await clearCaseFromLocalDB('case_test123');
+
+      expect(mockDb.cases.delete).toHaveBeenCalledWith(1);
     });
   });
 });

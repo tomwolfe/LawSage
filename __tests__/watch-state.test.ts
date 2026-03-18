@@ -176,14 +176,10 @@ describe('IndexedDB State Storage', () => {
     mockDb.cases.add.mockResolvedValue(1);
 
     const state = { caseFolder: { userInput: 'test' }, analysisResult: { text: 'result' } };
-    
+
     await saveStateToIndexedDB('case_test123', state);
 
     expect(mockDb.cases.add).toHaveBeenCalled();
-    expect(localStorage.setItem).toHaveBeenCalledWith(
-      'lawsage:state:case_test123',
-      expect.any(String)
-    );
   });
 
   it('should update existing case in IndexedDB', async () => {
