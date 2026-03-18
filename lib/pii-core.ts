@@ -5,6 +5,10 @@
  * - lib/pii-redactor.ts (server-side/main redaction utility)
  * - src/workers/pii-redactor.worker.ts (client-side web worker)
  *
+ * BROWSER-ONLY MODULE: This file must NOT contain any Node.js-specific imports
+ * (fs, path, crypto, stream, http, https, net, tls, child_process) or references
+ * to process.env. This ensures it can be bundled and executed in browser Web Workers.
+ *
  * By extracting this shared logic, we eliminate code duplication and ensure
  * consistent redaction behavior across both environments.
  */

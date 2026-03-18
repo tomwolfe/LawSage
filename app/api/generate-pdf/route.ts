@@ -384,6 +384,19 @@ export async function POST(req: NextRequest) {
 
     const pdfBuffer = Buffer.concat(chunks);
 
+    // Check buffer size against Vercel serverless limit (4.5MB)
+    const VERCEL_PAYLOAD_LIMIT = 4 * 1024 * 1024; // 4MB safety margin
+    if (pdfBuffer.length > VERCEL_PAYLOAD_LIMIT) {
+      return NextResponse.json(
+        {
+          error: 'Document too large for PDF generation',
+          detail: `Generated PDF is ${(pdfBuffer.length / (1024 * 1024)).toFixed(2)}MB, which exceeds the ${VERCEL_PAYLOAD_LIMIT / (1024 * 1024)}MB serverless limit. Please reduce content size or use browser print function.`,
+          sizeMB: (pdfBuffer.length / (1024 * 1024)).toFixed(2)
+        },
+        { status: 413 }
+      );
+    }
+
     // Return PDF as response
     return new NextResponse(pdfBuffer, {
       headers: {
@@ -395,7 +408,20 @@ export async function POST(req: NextRequest) {
 
   } catch (error) {
     console.error('PDF generation error:', error);
-    
+
+    // Handle specific error types
+    if (error instanceof Error) {
+      if (error.message.includes('memory') || error.message.includes('heap')) {
+        return NextResponse.json(
+          {
+            error: 'Document too large',
+            detail: 'The document exceeded available memory. Please reduce content size or use browser print function.'
+          },
+          { status: 413 }
+        );
+      }
+    }
+
     return NextResponse.json(
       {
         error: 'PDF generation failed',

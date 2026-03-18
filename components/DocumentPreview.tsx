@@ -9,6 +9,7 @@
 
 import { useState } from 'react';
 import { Copy, Download, FileText, FileDown, Printer } from 'lucide-react';
+import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { clsx, type ClassValue } from 'clsx';
@@ -216,7 +217,7 @@ export function DocumentPreview({
 
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('Failed to generate PDF. Please try again or use the browser print option.');
+      toast.error('Failed to generate PDF. Please try again or use the browser print option.');
       window.print();
     }
   };
@@ -261,7 +262,7 @@ export function DocumentPreview({
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error exporting to Word:', error);
-      alert('Failed to export to Word. Please try again.');
+      toast.error('Failed to export to Word. Please try again.');
     }
   };
 

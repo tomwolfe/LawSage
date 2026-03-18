@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SafetyValidator } from '../../../lib/validation';
+import { SafetyValidator } from '../../../lib/validation-middleware';
 import { safeLog, safeError, safeWarn, redactPII } from '../../../lib/pii-redactor';
 import { withRateLimit } from '../../../lib/rate-limiter';
 import { getLegalLookupResponse, searchExParteRules } from '../../../src/utils/legal-lookup';

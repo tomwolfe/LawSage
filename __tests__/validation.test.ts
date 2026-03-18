@@ -1,4 +1,4 @@
-import { ResponseValidator, SafetyValidator } from '../lib/validation';
+import { ResponseValidator, SafetyValidator } from '../lib/validation-middleware';
 import { validateLegalOutput, validateOCRResult } from '../lib/schemas/legal-output';
 
 describe('ResponseValidator', () => {

@@ -2,6 +2,7 @@
 
 import React, { useRef } from 'react';
 import { Download, Upload } from 'lucide-react';
+import { toast } from 'sonner';
 import { safeError } from '../lib/pii-redactor';
 
 interface Source {
@@ -33,7 +34,7 @@ export default function HistoryActions({ onImport }: Omit<HistoryActionsProps, '
   const handleExport = () => {
     const savedHistory = localStorage.getItem('lawsage_history');
     if (!savedHistory) {
-      alert('No history found to export.');
+      toast.error('No history found to export.');
       return;
     }
 
@@ -114,14 +115,14 @@ export default function HistoryActions({ onImport }: Omit<HistoryActionsProps, '
 
         localStorage.setItem('lawsage_history', JSON.stringify(mergedHistory));
         onImport(mergedHistory);
-        
+
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
-        alert('History imported successfully!');
+        toast.success('History imported successfully!');
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error during import';
-        alert(`Failed to import history: ${message}`);
+        toast.error(`Failed to import history: ${message}`);
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }

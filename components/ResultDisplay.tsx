@@ -4,6 +4,7 @@ import { Copy, Download, FileText, Gavel, Link as LinkIcon, FileDown, CheckCircl
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { validateLegalStructure } from '../src/utils/reliability';
@@ -505,7 +506,8 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
   // Function to verify a citation
   const verifyCitation = async (citationText: string) => {
     try {
-      const currentApiKey = apiKey || localStorage.getItem('lawsage_gemini_api_key') || '';
+      // Use only the securely provided apiKey prop - no localStorage fallback
+      const currentApiKey = apiKey || '';
       return await verifyCitationWithCache(citationText, jurisdiction, undefined, currentApiKey);
     } catch (error: unknown) {
       safeError('Error verifying citation:', error);
@@ -630,7 +632,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
 
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('Failed to generate PDF. Please try again or use the browser print option.');
+      toast.error('Failed to generate PDF. Please try again or use the browser print option.');
       // Fallback to browser print
       window.print();
     }

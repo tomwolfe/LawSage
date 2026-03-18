@@ -11,7 +11,7 @@
  */
 
 import { runCritiqueLoop } from '../lib/critique-agent';
-import { SafetyValidator } from '../lib/validation';
+import { SafetyValidator } from '../lib/validation-middleware';
 
 describe('Hallucination Detection', () => {
   describe('Fake Statute Detection', () => {

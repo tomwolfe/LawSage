@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import { FileDown, Check, AlertCircle, Calendar, User, Building } from 'lucide-react';
+import { toast } from 'sonner';
 import { useProofOfService, ProofOfServiceOptions, CaseInfo, ServiceInfo, extractDocumentsFromAnalysis, validateProofOfServiceData } from '../src/utils/proof-of-service';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -93,7 +94,7 @@ export default function ProofOfServiceGenerator({
     // Validate before generating
     const validation = validateProofOfServiceData(options);
     if (!validation.valid) {
-      alert(`Please fill in required fields:\n${validation.errors.join('\n')}`);
+      toast.error(`Please fill in required fields: ${validation.errors.join(', ')}`);
       return;
     }
 

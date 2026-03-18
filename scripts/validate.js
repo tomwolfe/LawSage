@@ -168,29 +168,29 @@ function validateConstants() {
 }
 
 /**
- * Validate proxy exists for server-side rate limiting
+ * Validate middleware exists for server-side rate limiting
  */
 function validateProxy() {
-  info('Validating proxy configuration...');
-  
-  const proxyPath = path.join(ROOT_DIR, 'proxy.ts');
-  
+  info('Validating middleware configuration...');
+
+  const proxyPath = path.join(ROOT_DIR, 'middleware.ts');
+
   if (!fs.existsSync(proxyPath)) {
-    error('proxy.ts not found - server-side rate limiting required');
+    error('middleware.ts not found - server-side rate limiting required');
     return;
   }
-  
+
   const content = fs.readFileSync(proxyPath, 'utf8');
-  
+
   if (!content.includes('checkRateLimit')) {
-    error('proxy.ts: Missing rate limiting implementation');
+    error('middleware.ts: Missing rate limiting implementation');
   }
-  
+
   if (!content.includes('redis')) {
-    warn('proxy.ts: Ensure Redis is used for distributed rate limiting');
+    warn('middleware.ts: Ensure Redis is used for distributed rate limiting');
   }
-  
-  success('Proxy validated');
+
+  success('Middleware validated');
 }
 
 /**

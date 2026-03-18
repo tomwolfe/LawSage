@@ -188,13 +188,13 @@ export async function createNewCase(): Promise<string> {
  */
 export async function getOrCreateCaseId(): Promise<string> {
   let caseId = getCaseIdFromUrl();
-  
+
   if (!caseId) {
     caseId = generateCaseId();
     updateUrlWithCaseId(caseId);
     safeLog(`Generated new case ID: ${caseId}`);
   }
-  
+
   return caseId;
 }
 
@@ -208,7 +208,7 @@ export async function loadCurrentCaseState(): Promise<{
 }> {
   const caseId = await getOrCreateCaseId();
   const existingState = await getStateFromIndexedDB(caseId);
-  
+
   if (existingState) {
     return {
       caseId,
@@ -216,16 +216,16 @@ export async function loadCurrentCaseState(): Promise<{
       isNewCase: false,
     };
   }
-  
+
   // No existing state - create new case
   const newState = {
     caseId,
     timestamp: Date.now(),
     version: '2.0',
   };
-  
+
   await saveStateToIndexedDB(caseId, newState);
-  
+
   return {
     caseId,
     state: newState,
@@ -238,73 +238,13 @@ export async function loadCurrentCaseState(): Promise<{
  */
 export async function saveCurrentState(state: unknown): Promise<void> {
   const caseId = getCaseIdFromUrl();
-  
+
   if (!caseId) {
     safeError('No case ID in URL, cannot save state');
     throw new Error('No case ID found in URL');
   }
-  
+
   await saveStateToIndexedDB(caseId, state);
-}
-
-/**
- * Legacy compatibility - deprecated methods
- * These are kept for backward compatibility during migration
- */
-
-/** @deprecated Use IndexedDB methods instead */
-export function shouldUseLocalStorage(): boolean {
-  console.warn('DEPRECATED: shouldUseLocalStorage is deprecated. Always use IndexedDB.');
-  return true;
-}
-
-/** @deprecated Use IndexedDB methods instead */
-export function saveStateToLocalStorage(): string {
-  console.warn('DEPRECATED: saveStateToLocalStorage is deprecated. Use saveStateToIndexedDB.');
-  return '';
-}
-
-/** @deprecated Use IndexedDB methods instead */
-export function getStateFromLocalStorage(): unknown {
-  console.warn('DEPRECATED: getStateFromLocalStorage is deprecated. Use getStateFromIndexedDB.');
-  return null;
-}
-
-/** @deprecated Use IndexedDB methods instead */
-export function cleanupLocalStorage(): void {
-  console.warn('DEPRECATED: cleanupLocalStorage is deprecated. Use IndexedDB cleanup.');
-}
-
-/** @deprecated Use IndexedDB methods instead */
-export function updateUrlWithState(): void {
-  console.warn('DEPRECATED: updateUrlWithState is deprecated. Use updateUrlWithCaseId.');
-}
-
-/** @deprecated Use IndexedDB methods instead */
-export function getStateFromUrl(): unknown {
-  console.warn('DEPRECATED: getStateFromUrl is deprecated. Use loadCurrentCaseState.');
-  return null;
-}
-
-/** @deprecated Use IndexedDB methods instead */
-export function createVirtualCaseFolderState(
-  caseFolder: unknown,
-  analysisResult: unknown,
-  ledger?: unknown[]
-): Record<string, unknown> {
-  console.warn('DEPRECATED: createVirtualCaseFolderState is deprecated. Use plain object.');
-  return {
-    caseFolder,
-    analysisResult,
-    ledger: ledger || [],
-    timestamp: Date.now(),
-  };
-}
-
-/** @deprecated Use IndexedDB methods instead */
-export function restoreVirtualCaseFolderState(): unknown {
-  console.warn('DEPRECATED: restoreVirtualCaseFolderState is deprecated. Use loadCurrentCaseState.');
-  return null;
 }
 
 let globalWatcherTimeoutId: unknown = null;

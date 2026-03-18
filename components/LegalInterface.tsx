@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Download, Save, FolderOpen, Info, Upload } from 'lucide-react';
+import { toast } from 'sonner';
 import { watchStateAndSyncToUrl, getCaseIdFromUrl, getOrCreateCaseId } from '../src/utils/state-sync';
 import { exportCaseFile, importCaseFile, saveCaseToLocalDB } from '../src/utils/case-file-manager';
 import { clsx, type ClassValue } from 'clsx';
@@ -271,7 +272,7 @@ export default function LegalInterface() {
 
   const handleVoice = () => {
     if (!('webkitSpeechRecognition' in window)) {
-      alert('Voice recognition is not supported in this browser.');
+      toast.error('Voice recognition is not supported in this browser.');
       return;
     }
 
