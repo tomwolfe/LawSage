@@ -647,9 +647,9 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
       if (options.children) {
         return new Paragraph({
           children: options.children,
-          alignment: options.alignment === 'center' ? AlignmentType.CENTER : 
-                     options.alignment === 'right' ? AlignmentType.RIGHT : 
-                     options.alignment === 'justified' ? AlignmentType.BOTH : 
+          alignment: options.alignment === 'center' ? AlignmentType.CENTER :
+                     options.alignment === 'right' ? AlignmentType.RIGHT :
+                     options.alignment === 'justified' ? AlignmentType.BOTH :
                      AlignmentType.LEFT
         });
       }
@@ -657,7 +657,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
     };
 
     const newTextRun = (options: { text?: string; bold?: boolean }) => {
-      return new TextRun({ text: options.text || '', bold: options.bold || false });
+      return new TextRun({ text: options.text || '', bold: options.bold || false }) as docx.ParagraphChild;
     };
 
     return [
@@ -667,7 +667,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
           newTextRun({ text: caseInfo.attorneyName || "[NAME]", bold: true }),
           newTextRun({ text: `, Bar No. ${caseInfo.barNumber || "[BAR NO]"}` }),
         ],
-      }),
+      }) as docx.FileChild,
       newParagraph({ text: caseInfo.firmName || "[FIRM NAME]" }),
       newParagraph({ text: "[ADDRESS]" }),
       newParagraph({ text: "[PHONE]" }),
@@ -749,7 +749,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
       }),
       newParagraph({ text: "________________________)" }),
       newParagraph({ text: "" }),
-    ] as unknown[];
+    ] as docx.FileChild[];
   };
 
   // Helper function to create a standard document

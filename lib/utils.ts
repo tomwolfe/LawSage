@@ -174,3 +174,43 @@ export function formatTime(ms: number): string {
   
   return `${seconds} second${seconds !== 1 ? 's' : ''}`;
 }
+
+/**
+ * Generate a client fingerprint for rate limiting
+ * Uses a combination of browser properties to create a unique identifier
+ */
+export function generateClientFingerprint(): string {
+  // Use stored fingerprint if available
+  const stored = typeof window !== 'undefined' ? localStorage.getItem('client_fingerprint') : null;
+  if (stored) return stored;
+
+  // Generate fingerprint from browser properties
+  const nav = navigator as any;
+  const fingerprintData = [
+    navigator.userAgent,
+    navigator.language,
+    screen.colorDepth,
+    screen.width,
+    screen.height,
+    new Date().getTimezoneOffset(),
+    nav.hardwareConcurrency || 'unknown',
+    nav.deviceMemory || 'unknown',
+  ].join('|');
+
+  // Simple hash function
+  let hash = 0;
+  for (let i = 0; i < fingerprintData.length; i++) {
+    const char = fingerprintData.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+
+  const fingerprint = Math.abs(hash).toString(16).padStart(16, '0');
+
+  // Store for future use
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('client_fingerprint', fingerprint);
+  }
+
+  return fingerprint;
+}

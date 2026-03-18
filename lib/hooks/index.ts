@@ -15,6 +15,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { processImageForOCR } from '../../src/utils/image-processor';
 import { parsePartialJSON } from '../../lib/streaming-json-parser';
 import { createStateVersion, type StateVersion } from '../../types/state';
+import { generateClientFingerprint } from '../utils';
 
 /**
  * Result types
