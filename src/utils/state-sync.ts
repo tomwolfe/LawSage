@@ -77,6 +77,8 @@ export async function saveStateToIndexedDB(
     // Check if case already exists
     const existingCase = await db.cases.get({ caseId });
     
+    const stateJson = JSON.stringify(state);
+    
     const caseData = {
       caseId,
       caseName: existingCase?.caseName || `Case ${caseId}`,
@@ -84,21 +86,17 @@ export async function saveStateToIndexedDB(
       createdAt: existingCase?.createdAt || now,
       lastUpdated: now,
       evidenceCount: existingCase?.evidenceCount || 0,
+      state: stateJson, // Store full state in IndexedDB
     };
     
-    // Store the full state in a separate localStorage key for now
-    // TODO: Migrate to storing full state in IndexedDB
-    const stateStorageKey = `lawsage:state:${caseId}`;
-    localStorage.setItem(stateStorageKey, JSON.stringify(state));
-    
-    // Store case metadata in IndexedDB
+    // Store case metadata and full state in IndexedDB
     if (existingCase) {
       await db.cases.update(existingCase.id!, caseData);
     } else {
       await db.cases.add(caseData);
     }
     
-    safeLog(`State saved for case: ${caseId}`);
+    safeLog(`State saved to IndexedDB for case: ${caseId}`);
   } catch (error) {
     safeError('Error saving state to IndexedDB:', error);
     throw error;
@@ -110,26 +108,28 @@ export async function saveStateToIndexedDB(
  */
 export async function getStateFromIndexedDB(caseId: string): Promise<unknown> {
   try {
-    // Try to get state from localStorage first (current implementation)
-    const stateStorageKey = `lawsage:state:${caseId}`;
-    const storedState = localStorage.getItem(stateStorageKey);
-    
-    if (storedState) {
-      safeLog(`State loaded for case: ${caseId}`);
-      return JSON.parse(storedState);
-    }
-    
-    // Fallback: check IndexedDB for case metadata
     const db = getDatabase();
     const caseMeta = await db.cases.get({ caseId });
     
-    if (!caseMeta) {
+    if (!caseMeta || !caseMeta.state) {
+      // Fallback: check localStorage for legacy state during migration
+      const stateStorageKey = `lawsage:state:${caseId}`;
+      const storedState = localStorage.getItem(stateStorageKey);
+      
+      if (storedState) {
+        safeLog(`Legacy state loaded from localStorage for case: ${caseId}`);
+        const state = JSON.parse(storedState);
+        // Migrate to IndexedDB
+        await saveStateToIndexedDB(caseId, state);
+        return state;
+      }
+      
       safeLog(`No state found for case: ${caseId}`);
       return null;
     }
     
-    safeLog(`Case metadata found but no state stored for: ${caseId}`);
-    return null;
+    safeLog(`State loaded from IndexedDB for case: ${caseId}`);
+    return JSON.parse(caseMeta.state);
   } catch (error) {
     safeError('Error getting state from IndexedDB:', error);
     return null;
@@ -153,7 +153,7 @@ export async function deleteStateFromIndexedDB(caseId: string): Promise<void> {
       safeLog(`Case not found for deletion: ${caseId}`);
     }
     
-    // Also remove from localStorage
+    // Also remove from localStorage (legacy cleanup)
     const stateStorageKey = `lawsage:state:${caseId}`;
     localStorage.removeItem(stateStorageKey);
   } catch (error) {
@@ -251,18 +251,6 @@ export async function saveCurrentState(state: unknown): Promise<void> {
  * Legacy compatibility - deprecated methods
  * These are kept for backward compatibility during migration
  */
-
-/** @deprecated Use IndexedDB methods instead */
-export function compressStateToUrlFragment(): string {
-  console.warn('DEPRECATED: compressStateToUrlFragment is deprecated. Use IndexedDB.');
-  return '';
-}
-
-/** @deprecated Use IndexedDB methods instead */
-export function decompressStateFromUrlFragment(): unknown {
-  console.warn('DEPRECATED: decompressStateFromUrlFragment is deprecated. Use IndexedDB.');
-  return null;
-}
 
 /** @deprecated Use IndexedDB methods instead */
 export function shouldUseLocalStorage(): boolean {

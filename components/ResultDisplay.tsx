@@ -13,6 +13,7 @@ import { safeError } from '../lib/pii-redactor';
 import { CaseLedgerEntry } from './LegalInterface';
 import { StrengthMeter } from './StrengthMeter';
 import { motion, AnimatePresence } from 'framer-motion';
+import type * as docx from 'docx';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -537,7 +538,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
   // Function to download as Word document
   const handleExportToWord = async () => {
     // Check if the result contains a structured motion
-    let doc: unknown;
+    let doc: docx.Document | null = null;
     if (structured && structured.filing_template) {
       // Try to parse the filing template as a motion schema
       try {
@@ -560,11 +561,12 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
       doc = await createStandardDocument();
     }
 
+    if (!doc) return;
+
     // Export the document
     const docxModule = await import('docx');
     const { Packer } = docxModule;
-    // docx Packer.toBlob accepts a Document object - we cast to unknown first to bypass strict type checking
-    const blob = await Packer.toBlob(doc as unknown as Parameters<typeof Packer.toBlob>[0]);
+    const blob = await Packer.toBlob(doc);
     const url = URL.createObjectURL(blob);
 
     // Create a download link
@@ -638,13 +640,13 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
   const createCaliforniaFilingHeader = async (
     docxModule: typeof import('docx'),
     caseInfo: { attorneyName?: string; barNumber?: string; firmName?: string; partyName?: string; courtName?: string; caseNumber?: string; plaintiff?: string; defendant?: string; documentTitle?: string }
-  ): Promise<unknown[]> => {
+  ): Promise<docx.FileChild[]> => {
     const { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType } = docxModule;
     
-    const newParagraph = (options: { text?: string; children?: unknown[]; alignment?: string }) => {
+    const newParagraph = (options: { text?: string; children?: docx.ParagraphChild[]; alignment?: string }) => {
       if (options.children) {
         return new Paragraph({
-          children: options.children as import('docx').ParagraphChild[],
+          children: options.children,
           alignment: options.alignment === 'center' ? AlignmentType.CENTER : 
                      options.alignment === 'right' ? AlignmentType.RIGHT : 
                      options.alignment === 'justified' ? AlignmentType.BOTH : 
@@ -751,12 +753,12 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
   };
 
   // Helper function to create a standard document
-  const createStandardDocument = async (): Promise<unknown> => {
+  const createStandardDocument = async (): Promise<docx.Document> => {
     const docx = await import('docx');
     const { Document, Paragraph, TextRun, HeadingLevel, AlignmentType, Table, TableRow, TableCell, WidthType, BorderStyle } = docx;
 
     const isCalifornia = jurisdiction.toLowerCase().includes('california');
-    let children: unknown[] = [];
+    let children: docx.FileChild[] = [];
 
     if (isCalifornia) {
       const header = await createCaliforniaFilingHeader(docx, {
@@ -880,18 +882,18 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
             },
           },
         },
-        children: children as any[], // eslint-disable-line @typescript-eslint/no-explicit-any
+        children: children,
       }],
     });
   };
 
   // Helper function to create a motion document based on the schema
-  const createMotionDocument = async (motion: LegalMotion): Promise<unknown> => {
+  const createMotionDocument = async (motion: LegalMotion): Promise<docx.Document> => {
     const docx = await import('docx');
     const { Document, Paragraph, TextRun, HeadingLevel, AlignmentType } = docx;
 
     const isCalifornia = motion.caseInfo.jurisdiction.toLowerCase().includes('california');
-    let children: unknown[] = [];
+    let children: docx.FileChild[] = [];
 
     if (isCalifornia) {
       const header = await createCaliforniaFilingHeader(docx, {
@@ -1092,7 +1094,7 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
             },
           },
         },
-        children: children as any[], // eslint-disable-line @typescript-eslint/no-explicit-any
+        children: children,
       }],
     });
   };

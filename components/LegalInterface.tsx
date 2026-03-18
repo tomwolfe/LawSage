@@ -2,13 +2,12 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Download, Save, FolderOpen, Info, Upload } from 'lucide-react';
-import { watchStateAndSyncToUrl } from '../src/utils/state-sync';
-import { exportCaseFile, importCaseFile, saveCaseToLocalStorage } from '../src/utils/case-file-manager';
+import { watchStateAndSyncToUrl, getCaseIdFromUrl, getOrCreateCaseId } from '../src/utils/state-sync';
+import { exportCaseFile, importCaseFile, saveCaseToLocalDB } from '../src/utils/case-file-manager';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ResultDisplay from './ResultDisplay';
 import HistoryActions from './HistoryActions';
-import { checkClientSideRateLimit, generateClientFingerprint } from '../lib/rate-limiter-client';
 import { safeError, safeWarn } from '../lib/pii-redactor';
 import { processImageForOCR } from '../src/utils/image-processor';
 import { parsePartialJSON } from '../lib/streaming-json-parser';
@@ -270,31 +269,6 @@ export default function LegalInterface() {
     checkHealth();
   }, []);
 
-  // Load history from localStorage on component mount
-  useEffect(() => {
-    const savedHistory = localStorage.getItem('lawsage_history');
-    if (savedHistory) {
-      try {
-        const parsedHistory: unknown = JSON.parse(savedHistory);
-        // Convert timestamp strings back to Date objects
-        if (Array.isArray(parsedHistory)) {
-          const historyWithDates = parsedHistory.map((item: unknown) => {
-            if (typeof item === 'object' && item !== null && 'timestamp' in item) {
-              return {
-                ...item as CaseHistoryItem,
-                timestamp: new Date((item as { timestamp: string }).timestamp)
-              };
-            }
-            return item as CaseHistoryItem;
-          });
-          setHistory(historyWithDates);
-        }
-      } catch (error) {
-        safeError('Failed to parse history from localStorage:', error);
-      }
-    }
-  }, []);
-
   const handleVoice = () => {
     if (!('webkitSpeechRecognition' in window)) {
       alert('Voice recognition is not supported in this browser.');
@@ -351,14 +325,6 @@ export default function LegalInterface() {
       return;
     }
 
-    // Double-check rate limit on client side
-    const clientRateLimit = checkClientSideRateLimit();
-    if (!clientRateLimit.allowed) {
-      const waitMinutes = Math.ceil((clientRateLimit.resetAt - Date.now()) / (1000 * 60));
-      setError(`Rate limit exceeded. You have used all 5 free requests in the last hour. Please wait ${waitMinutes} minutes.`);
-      return;
-    }
-
     // Pre-flight validation for text input
     const validation = validateUserInput(userInput);
     if (!validation.valid) {
@@ -382,7 +348,6 @@ export default function LegalInterface() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Client-Fingerprint': generateClientFingerprint(),
           'X-Session-ID': sessionId,
         },
         body: JSON.stringify({
@@ -472,7 +437,6 @@ export default function LegalInterface() {
 
             const updatedHistory = [newHistoryItem, ...history];
             setHistory(updatedHistory);
-            localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
             addToCaseLedger('complaint_filed', `Analysis generated for user input.`);
 
             // Trigger Background Audit (Step 2) - Decoupled to avoid 60s timeout
@@ -607,9 +571,6 @@ export default function LegalInterface() {
         // Poll checkpoint endpoint for accumulated state
         const response = await fetch(`/api/analyze/checkpoint?sessionId=${sessionId}`, {
           method: 'GET',
-          headers: {
-            'X-Client-Fingerprint': generateClientFingerprint(),
-          },
         });
 
         if (!response.ok) {
@@ -640,7 +601,6 @@ export default function LegalInterface() {
 
           const updatedHistory = [newHistoryItem, ...history];
           setHistory(updatedHistory);
-          localStorage.setItem('lawsage_history', JSON.stringify(updatedHistory));
           addToCaseLedger('complaint_filed', `Analysis generated (resumed from checkpoint).`);
 
           setStreamingStatus('Analysis complete (resumed from timeout)');
@@ -730,7 +690,7 @@ export default function LegalInterface() {
     }
   };
 
-  const handleSaveToLocalStorage = () => {
+  const handleSaveToLocalDB = async () => {
     const caseFolderState = {
       userInput,
       jurisdiction,
@@ -740,8 +700,10 @@ export default function LegalInterface() {
       backendUnreachable,
       evidence
     };
-    saveCaseToLocalStorage(caseFolderState, result || undefined, caseLedger);
-    setWarning('Case saved to local storage');
+    
+    const caseId = getCaseIdFromUrl() || await getOrCreateCaseId();
+    await saveCaseToLocalDB(caseId, caseFolderState, result || undefined, caseLedger);
+    setWarning('Case saved to local IndexedDB vault');
     setTimeout(() => setWarning(''), 3000);
   };
 
@@ -882,9 +844,9 @@ export default function LegalInterface() {
             </label>
 
             <button
-              onClick={handleSaveToLocalStorage}
+              onClick={handleSaveToLocalDB}
               className="flex items-center gap-1 px-3 py-1.5 border border-slate-300 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
-              title="Save to browser local storage"
+              title="Save to local IndexedDB vault"
             >
               <Save size={16} />
               Save Local
@@ -977,6 +939,12 @@ export default function LegalInterface() {
               <p className="text-xs text-slate-500 mt-2">
                 Upload summons, complaints, motions, or other legal documents. AI will extract case details automatically.
               </p>
+              <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+                <div className="text-amber-600 mt-0.5 font-bold">⚠️</div>
+                <p className="text-xs text-amber-800">
+                  <span className="font-semibold">Privacy Warning:</span> Unlike text input, images are processed on secure cloud servers and cannot be locally redacted for PII. Please obscure sensitive information (like SSNs) before uploading.
+                </p>
+              </div>
             </div>
 
             {/* Evidence Display */}

@@ -3,10 +3,14 @@
  * Handles export/import of case files to bypass URL length limits
  */
 
-import * as LZString from 'lz-string';
 import { safeError } from '../../lib/pii-redactor';
 import type { CaseLedgerEntry, LegalResult } from '../../components/LegalInterface';
 import type { OCRResult } from '../../lib/schemas/legal-output';
+import { 
+  saveStateToIndexedDB, 
+  getStateFromIndexedDB, 
+  deleteStateFromIndexedDB 
+} from './state-sync';
 
 export interface CaseHistoryItem {
   id: string;
@@ -44,12 +48,11 @@ export function exportCaseFile(caseFolder: CaseFile['caseFolder'], analysisResul
     ledger: ledger || []
   };
 
-  // Compress the case file
+  // Convert to JSON string
   const jsonString = JSON.stringify(caseFile, null, 2);
-  const compressed = LZString.compressToBase64(jsonString);
 
   // Create blob and download
-  const blob = new Blob([compressed], { type: 'application/json' });
+  const blob = new Blob([jsonString], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   
@@ -81,16 +84,8 @@ export async function importCaseFile(file: File): Promise<CaseFile> {
           return;
         }
         
-        // Decompress the file
-        const decompressed = LZString.decompressFromBase64(content);
-        
-        if (!decompressed) {
-          reject(new Error('Failed to decompress file. File may be corrupted.'));
-          return;
-        }
-        
         // Parse JSON
-        const caseFile: CaseFile = JSON.parse(decompressed);
+        const caseFile: CaseFile = JSON.parse(content);
         
         // Validate structure
         if (!caseFile.version || !caseFile.caseFolder) {
@@ -143,16 +138,15 @@ export async function importCaseFile(file: File): Promise<CaseFile> {
 }
 
 /**
- * Saves case data to localStorage (for heavy data that shouldn't go in URL)
+ * Saves case data to IndexedDB
  */
-export function saveCaseToLocalStorage(
+export async function saveCaseToLocalDB(
+  caseId: string,
   caseFolder: CaseFile['caseFolder'],
   analysisResult?: LegalResult,
   ledger?: CaseLedgerEntry[]
-): void {
+): Promise<void> {
   try {
-    const storageKey = `lawsage_case_${caseFolder.jurisdiction.toLowerCase().replace(/\s+/g, '_')}`;
-    
     const dataToSave = {
       caseFolder,
       analysisResult,
@@ -160,29 +154,26 @@ export function saveCaseToLocalStorage(
       savedAt: new Date().toISOString()
     };
     
-    localStorage.setItem(storageKey, JSON.stringify(dataToSave));
+    await saveStateToIndexedDB(caseId, dataToSave);
   } catch (error) {
-    safeError('Failed to save case to localStorage:', error);
+    safeError('Failed to save case to IndexedDB:', error);
   }
 }
 
 /**
- * Loads case data from localStorage
+ * Loads case data from IndexedDB
  */
-export function loadCaseFromLocalStorage(jurisdiction: string): {
+export async function loadCaseFromLocalDB(caseId: string): Promise<{
   caseFolder?: CaseFile['caseFolder'];
   analysisResult?: LegalResult;
   ledger?: CaseLedgerEntry[];
-} | null {
+} | null> {
   try {
-    const storageKey = `lawsage_case_${jurisdiction.toLowerCase().replace(/\s+/g, '_')}`;
-    const stored = localStorage.getItem(storageKey);
+    const data = await getStateFromIndexedDB(caseId);
     
-    if (!stored) {
+    if (!data) {
       return null;
     }
-    
-    const data: unknown = JSON.parse(stored);
     
     // Convert timestamp strings back to Date objects
     const convertDatesInObject = (obj: unknown): unknown => {
@@ -216,15 +207,18 @@ export function loadCaseFromLocalStorage(jurisdiction: string): {
       ledger: convertDatesInObject(typedData.ledger) as CaseLedgerEntry[]
     };
   } catch (error) {
-    safeError('Failed to load case from localStorage:', error);
+    safeError('Failed to load case from IndexedDB:', error);
     return null;
   }
 }
 
 /**
- * Clears case data from localStorage
+ * Clears case data from IndexedDB
  */
-export function clearCaseFromLocalStorage(jurisdiction: string): void {
-  const storageKey = `lawsage_case_${jurisdiction.toLowerCase().replace(/\s+/g, '_')}`;
-  localStorage.removeItem(storageKey);
+export async function clearCaseFromLocalDB(caseId: string): Promise<void> {
+  try {
+    await deleteStateFromIndexedDB(caseId);
+  } catch (error) {
+    safeError('Failed to clear case from IndexedDB:', error);
+  }
 }

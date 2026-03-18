@@ -12,7 +12,6 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { generateClientFingerprint } from '../../lib/rate-limiter-client';
 import { processImageForOCR } from '../../src/utils/image-processor';
 import { parsePartialJSON } from '../../lib/streaming-json-parser';
 import { createStateVersion, type StateVersion } from '../../types/state';
@@ -85,7 +84,6 @@ export function useLegalAnalysis() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Client-Fingerprint': generateClientFingerprint(),
           'X-Session-ID': sessionId,
         },
         body: JSON.stringify({

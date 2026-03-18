@@ -44,6 +44,7 @@ export interface CaseMetadata {
   createdAt: number;
   lastUpdated: number;
   evidenceCount: number;
+  state?: string; // Serialized JSON state
 }
 
 export interface AnalysisSession {

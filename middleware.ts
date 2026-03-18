@@ -116,9 +116,9 @@ async function checkRateLimit(
 }
 
 /**
- * Proxy function - runs on every request
+ * Middleware function - runs on every request
  */
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   // 1. Security Headers (Always applied)
   const response = pathnameIsAsset(request.nextUrl.pathname) 
     ? NextResponse.next() 
