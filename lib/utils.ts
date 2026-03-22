@@ -185,7 +185,7 @@ export function generateClientFingerprint(): string {
   if (stored) return stored;
 
   // Generate fingerprint from browser properties
-  const nav = navigator as any;
+  const nav = navigator as Navigator & { hardwareConcurrency?: number; deviceMemory?: number };
   const fingerprintData = [
     navigator.userAgent,
     navigator.language,

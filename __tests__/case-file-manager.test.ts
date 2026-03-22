@@ -32,7 +32,7 @@ describe('Case File Manager', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockDb = require('../lib/offline-vault').getDatabase();
+    mockDb = jest.requireMock('../lib/offline-vault').getDatabase();
   });
 
   const mockCaseFolder: CaseFolderState = {
