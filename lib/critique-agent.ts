@@ -9,6 +9,9 @@
 
 import { safeLog, safeError } from './pii-redactor';
 
+const GLM_API_URL = 'https://api.z.ai/api/paas/v4/chat/completions';
+const CORRECTION_MODEL = process.env.NEXT_PUBLIC_DEFAULT_MODEL || 'glm-4.7-flash';
+
 interface CritiqueConfig {
   jurisdiction: string;
   researchContext: string;
@@ -347,11 +350,14 @@ export async function runCritiqueLoop(
 
 /**
  * Generate corrected output based on critique results
+ *
+ * Issues a live GLM API call to re-generate the legal analysis JSON,
+ * replacing hallucinated statutes with verified RAG context.
+ * Falls back to appending critique metadata if the API is unavailable.
  */
 export async function generateCorrectedOutput(
   originalOutput: string,
   critiqueResult: CritiqueResult,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   config: CritiqueConfig
 ): Promise<string> {
 
@@ -360,16 +366,107 @@ export async function generateCorrectedOutput(
     return originalOutput;
   }
 
-  safeLog('[Critique Agent] Generating corrected output...');
+  safeLog('[Critique Agent] Generating corrected output via live GLM call...');
 
-  // Note: In a full implementation, this would make another API call to the LLM
-  // with the critique prompt to generate a corrected version.
-  // For now, we return the original with metadata about issues.
+  const apiKey = process.env.GLM_API_KEY;
+  if (!apiKey) {
+    safeLog('[Critique Agent] GLM_API_KEY not configured - appending critique metadata only');
+    return appendCritiqueMetadata(originalOutput, critiqueResult);
+  }
 
+  try {
+    const unverifiedStatutes = critiqueResult.statuteIssues
+      .filter(s => !s.isVerified)
+      .map(s => s.statute);
+
+    const unverifiedSteps = critiqueResult.roadmapIssues
+      .filter(r => !r.isVerified)
+      .map(r => r.title);
+
+    const prompt = `You are a legal document correction agent. The "Architect" agent produced a legal analysis that failed audit because it contains unverified or hallucinated statutes. Your job is to re-generate the analysis with corrected legal grounding.
+
+VERIFIED RESEARCH CONTEXT (ONLY use statute numbers from here):
+${config.researchContext || '(no research context provided)'}
+
+CRITIQUE ISSUES TO FIX:
+${unverifiedStatutes.length > 0 ? `Unverified statutes to replace or remove: ${unverifiedStatutes.join(', ')}` : '- No unverified statutes'}
+${unverifiedSteps.length > 0 ? `Unsupported roadmap steps to ground: ${unverifiedSteps.join(', ')}` : '- No unsupported roadmap steps'}
+${critiqueResult.recommendedActions.length > 0 ? `Recommended actions: ${critiqueResult.recommendedActions.join('; ')}` : ''}
+
+ORIGINAL OUTPUT (JSON):
+${originalOutput}
+
+INSTRUCTIONS:
+1. Return ONLY valid JSON matching the generate_legal_analysis schema: disclaimer, strategy, adversarial_strategy, roadmap (array of {step, title, description, estimated_time, required_documents, counter_measure}), filing_template, citations (array of {text, source, url}, minimum 3), local_logistics (object), procedural_checks (array of strings).
+2. Replace EVERY unverified statute with a statute number present in the VERIFIED RESEARCH CONTEXT above. If no verified substitute exists, remove the statute and use general procedural guidance instead (e.g., "Check [jurisdiction] local rules").
+3. Do NOT invent new citations. Only use citations found in the verified research context.
+4. Preserve all other substantive content from the original output.
+5. Do NOT include markdown formatting or code fences.`;
+
+    const response = await fetch(GLM_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: CORRECTION_MODEL,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a legal document correction agent that returns ONLY valid JSON matching the generate_legal_analysis schema. You never invent legal citations - you only use statutes from the verified research context.',
+          },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.2,
+        max_tokens: 2048,
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!response.ok) {
+      safeError(`[Critique Agent] GLM correction request failed: ${response.status}`);
+      return appendCritiqueMetadata(originalOutput, critiqueResult);
+    }
+
+    const data = await response.json();
+    const responseText = data.choices?.[0]?.message?.content || '';
+
+    // Extract JSON from the model response
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      safeError('[Critique Agent] No JSON found in correction response');
+      return appendCritiqueMetadata(originalOutput, critiqueResult);
+    }
+
+    const corrected = JSON.parse(jsonMatch[0]);
+
+    // Attach critique metadata so downstream audit consumers see the correction
+    corrected._critique_metadata = {
+      audit_passed: false,
+      confidence: critiqueResult.overallConfidence,
+      statute_issues_count: critiqueResult.statuteIssues.filter(s => !s.isVerified).length,
+      roadmap_issues_count: critiqueResult.roadmapIssues.filter(r => !r.isVerified).length,
+      corrected_by: 'live-glm',
+      corrected_at: new Date().toISOString(),
+    };
+
+    safeLog('[Critique Agent] Corrected output generated via GLM');
+    return JSON.stringify(corrected);
+  } catch (error) {
+    safeError('[Critique Agent] Correction failed, returning metadata-only output:', error);
+    return appendCritiqueMetadata(originalOutput, critiqueResult);
+  }
+}
+
+/**
+ * Fallback: append critique metadata to the original output
+ * without modifying content (used when GLM API is unavailable)
+ */
+function appendCritiqueMetadata(originalOutput: string, critiqueResult: CritiqueResult): string {
   try {
     const parsedOutput = JSON.parse(originalOutput);
 
-    // Add critique metadata
     parsedOutput._critique_metadata = {
       audit_passed: critiqueResult.isValid,
       confidence: critiqueResult.overallConfidence,

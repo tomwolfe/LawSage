@@ -23,12 +23,19 @@
  * const vault = await EvidenceVault.open('my-case-id', userPassword);
  * const evidence = await vault.getEvidence();
  * ```
+ *
+ * SECURITY: The AES-GCM-256 key is derived via PBKDF2 (100,000 iterations,
+ * SHA-256) from the user's password and a random 16-byte salt. Only the salt
+ * is persisted (in localStorage) - never the raw password or derived key.
  */
 
 import {
   encryptCaseData,
   decryptCaseData,
   generateCaseId,
+  generateRandomSalt,
+  encodeBase64,
+  decodeBase64,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   verifyPassword,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -36,6 +43,11 @@ import {
   isCryptoSupported,
 } from './case-encryption';
 import { safeLog, safeError, safeWarn } from './pii-redactor';
+
+/**
+ * localStorage key prefix for the vault salt
+ */
+const VAULT_SALT_KEY_PREFIX = 'lawsage_vault_salt_';
 
 /**
  * Evidence item interface
@@ -93,12 +105,38 @@ export class EvidenceVault {
   private version: number = 1;
   private createdAt: number;
   private lastUpdated: number;
+  private salt: Uint8Array;
 
   private constructor(caseId: string, password: string) {
     this.caseId = caseId;
     this.password = password;
     this.createdAt = Date.now();
     this.lastUpdated = Date.now();
+    this.salt = EvidenceVault.getStoredSalt(caseId) || generateRandomSalt();
+  }
+
+  /**
+   * Get the localStorage key for a vault's salt
+   */
+  private static saltKey(caseId: string): string {
+    return `${VAULT_SALT_KEY_PREFIX}${caseId}`;
+  }
+
+  /**
+   * Retrieve the persisted salt for a vault (never the password or key)
+   */
+  static getStoredSalt(caseId: string): Uint8Array | null {
+    const saltBase64 = localStorage.getItem(this.saltKey(caseId));
+    if (!saltBase64) return null;
+    return new Uint8Array(decodeBase64(saltBase64));
+  }
+
+  /**
+   * Persist the vault salt. Only the salt is stored - never the raw
+   * password or the derived AES-GCM key.
+   */
+  private persistSalt(): void {
+    localStorage.setItem(EvidenceVault.saltKey(this.caseId), encodeBase64(this.salt.buffer as ArrayBuffer));
   }
 
   /**
@@ -110,22 +148,29 @@ export class EvidenceVault {
 
   /**
    * Create a new evidence vault
+   *
+   * @param password - User-chosen password. An AES-GCM-256 key is derived from
+   *                   this password via PBKDF2 (100,000 iterations, SHA-256)
+   *                   and a random 16-byte salt. Only the salt is persisted.
+   * @param caseId - Optional case ID (auto-generated if not provided)
    */
-  static async create(caseId?: string): Promise<EvidenceVault> {
+  static async create(caseId: string | undefined, password: string): Promise<EvidenceVault> {
     if (!this.isSupported()) {
       throw new Error('WebCrypto is not supported in this browser');
+    }
+
+    if (!password || password.trim().length === 0) {
+      throw new Error('A password is required to create an evidence vault');
     }
 
     const id = caseId || generateCaseId();
     safeLog(`[EvidenceVault] Creating new vault: ${id}`);
 
-    // Generate a secure temporary password (user should set their own)
-    const password = crypto.getRandomValues(new Uint8Array(32))
-      .toString()
-      .replace(/,/g, '')
-      .substring(0, 32);
-
     const vault = new EvidenceVault(id, password);
+
+    // Persist the random 16-byte salt (never the password or derived key)
+    vault.persistSalt();
+
     await vault.save();
 
     return vault;
@@ -133,6 +178,7 @@ export class EvidenceVault {
 
   /**
    * Open an existing vault with password
+   * Retrieves the persisted salt and re-derives the AES-GCM-256 key
    */
   static async open(caseId: string, password: string): Promise<EvidenceVault> {
     if (!this.isSupported()) {
@@ -140,6 +186,13 @@ export class EvidenceVault {
     }
 
     safeLog(`[EvidenceVault] Opening vault: ${caseId}`);
+
+    // Retrieve the persisted salt so the key can be re-derived from the password.
+    // The salt (never the password/key) is stored in localStorage.
+    const salt = this.getStoredSalt(caseId);
+    if (!salt) {
+      safeWarn(`[EvidenceVault] No persisted salt found for ${caseId} - vault may be corrupted`);
+    }
 
     const vault = new EvidenceVault(caseId, password);
     await vault.load();
@@ -333,7 +386,7 @@ export class EvidenceVault {
     // Create or open target vault
     const vault = targetCaseId
       ? await EvidenceVault.open(targetCaseId, password)
-      : await EvidenceVault.create();
+      : await EvidenceVault.create(undefined, password);
 
     // Add imported evidence
     for (const item of decrypted.evidence) {
@@ -360,8 +413,12 @@ export class EvidenceVault {
         version: this.version,
       };
 
-      // Encrypt the evidence payload
-      const encrypted = await encryptCaseData(payload, this.password, this.caseId);
+      // Encrypt the evidence payload with the vault's persisted salt
+      // (key derived via PBKDF2 100k SHA-256 from password + salt)
+      const encrypted = await encryptCaseData(payload, this.password, this.caseId, this.salt);
+
+      // Persist the salt for future key re-derivation
+      this.persistSalt();
 
       // Store encrypted data
       const encryptedKey = `lawsage_vault_${this.caseId}`;
@@ -433,6 +490,7 @@ export class EvidenceVault {
 
     localStorage.removeItem(encryptedKey);
     localStorage.removeItem(metadataKey);
+    localStorage.removeItem(EvidenceVault.saltKey(this.caseId));
 
     safeLog(`[EvidenceVault] Deleted vault: ${this.caseId}`);
   }
@@ -503,7 +561,7 @@ export interface VaultState {
   vault: EvidenceVault | null;
   isLoading: boolean;
   error: string | null;
-  createVault: () => Promise<void>;
+  createVault: (caseId: string | undefined, password: string) => Promise<void>;
   openVault: (caseId: string, password: string) => Promise<void>;
   closeVault: () => void;
   addEvidence: (evidence: Omit<EvidenceItem, 'id' | 'createdAt' | 'updatedAt' | 'encryptionVersion'>) => Promise<EvidenceItem>;

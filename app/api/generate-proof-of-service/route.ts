@@ -73,6 +73,8 @@ interface ServiceInfo {
   };
   mailingAddress?: string; // For mail service
   cityStateZip?: string; // e.g., "Los Angeles, CA 90012"
+  deliveryTime?: string; // For personal service: exact time of delivery
+  deliveryLocation?: string; // For personal service: physical address/location of hand-delivery
 }
 
 interface GenerateProofOfServiceRequest {
@@ -488,6 +490,170 @@ function generateFL335(doc: PDFDoc, caseInfo: CaseInfo, serviceInfo: ServiceInfo
 }
 
 /**
+ * Generate FL-330 (Proof of Personal Service - Family Law)
+ * California personal (hand) service form.
+ *
+ * Personal service requires: exact delivery time, physical address/location
+ * of the hand-delivery, and the server's personal delivery declaration.
+ */
+function generateFL330(doc: PDFDoc, caseInfo: CaseInfo, serviceInfo: ServiceInfo, documents: string[]) {
+  const pageWidth = doc.page.width;
+  const margin = 72;
+  let yPosition = drawProofOfServiceCaption(doc, caseInfo, 'FL-330');
+
+  doc.fontSize(10).font('Helvetica').fillColor('#000000');
+
+  // Notice
+  doc.font('Helvetica-Bold').text('NOTICE:', margin, yPosition, {
+    width: pageWidth - margin * 2
+  });
+  doc.font('Helvetica');
+  yPosition += 18;
+
+  doc.text('This form proves that the documents listed below were handed directly to the person served. The person serving the documents must be over 18 and cannot be a party to this case.', margin, yPosition, {
+    width: pageWidth - margin * 2,
+    lineGap: 8
+  });
+  yPosition += 50;
+
+  // Server information
+  doc.font('Helvetica-Bold').text('1. SERVER INFORMATION', margin, yPosition, {
+    width: pageWidth - margin * 2
+  });
+  doc.font('Helvetica');
+  yPosition += 18;
+
+  doc.text(`Name: ${serviceInfo.servedBy.name}`, margin, yPosition, {
+    width: pageWidth - margin * 2
+  });
+  yPosition += 18;
+
+  doc.text(`Address: ${serviceInfo.servedBy.address}`, margin, yPosition, {
+    width: pageWidth - margin * 2
+  });
+  yPosition += 18;
+
+  doc.text(`City, State, ZIP: ${serviceInfo.mailingAddress || serviceInfo.cityStateZip || ''}`, margin, yPosition, {
+    width: pageWidth - margin * 2
+  });
+  yPosition += 18;
+
+  doc.text(`Telephone: ${serviceInfo.servedBy.phone || '(PHONE)'}`, margin, yPosition, {
+    width: pageWidth - margin * 2
+  });
+  yPosition += 18;
+
+  doc.text(`Email: ${serviceInfo.servedBy.email || '(EMAIL)'}`, margin, yPosition, {
+    width: pageWidth - margin * 2
+  });
+  yPosition += 30;
+
+  // Party served
+  doc.font('Helvetica-Bold').text('2. PARTY SERVED', margin, yPosition, {
+    width: pageWidth - margin * 2
+  });
+  doc.font('Helvetica');
+  yPosition += 18;
+
+  doc.text(`Name: ${serviceInfo.servedTo.name}`, margin, yPosition, {
+    width: pageWidth - margin * 2
+  });
+  yPosition += 18;
+
+  doc.text(`Address: ${serviceInfo.servedTo.address.join(', ')}`, margin, yPosition, {
+    width: pageWidth - margin * 2
+  });
+  yPosition += 18;
+
+  doc.text(`City, State, ZIP: ${serviceInfo.mailingAddress || serviceInfo.cityStateZip || ''}`, margin, yPosition, {
+    width: pageWidth - margin * 2
+  });
+  yPosition += 30;
+
+  // Documents served
+  doc.font('Helvetica-Bold').text('3. DOCUMENTS SERVED', margin, yPosition, {
+    width: pageWidth - margin * 2
+  });
+  doc.font('Helvetica');
+  yPosition += 18;
+
+  documents.forEach((docTitle) => {
+    doc.text(`☐ ${docTitle}`, margin + 10, yPosition, {
+      width: pageWidth - margin * 2 - 10
+    });
+    yPosition += 18;
+  });
+  yPosition += 25;
+
+  // Personal service details
+  doc.font('Helvetica-Bold').text('4. PERSONAL SERVICE DETAILS', margin, yPosition, {
+    width: pageWidth - margin * 2
+  });
+  doc.font('Helvetica');
+  yPosition += 18;
+
+  doc.text(`Date of Service: ${formatDate(serviceInfo.serviceDate)}`, margin, yPosition, {
+    width: pageWidth - margin * 2
+  });
+  yPosition += 18;
+
+  doc.text(`Exact Time of Delivery: ${serviceInfo.deliveryTime || '(EXACT TIME)'}`, margin, yPosition, {
+    width: pageWidth - margin * 2
+  });
+  yPosition += 18;
+
+  doc.text(`Physical Location of Hand-Delivery: ${serviceInfo.deliveryLocation || '(STREET ADDRESS/CITY)'}`, margin, yPosition, {
+    width: pageWidth - margin * 2
+  });
+  yPosition += 25;
+
+  doc.text(`☐ Personal delivery: On the date and time shown above, I personally handed the documents listed above to ${serviceInfo.servedTo.name} at ${serviceInfo.deliveryLocation || 'the location shown above'}.`, margin, yPosition, {
+    width: pageWidth - margin * 2,
+    lineGap: 8
+  });
+  yPosition += 50;
+
+  // Declaration
+  doc.font('Helvetica-Bold').text('5. DECLARATION', margin, yPosition, {
+    width: pageWidth - margin * 2
+  });
+  doc.font('Helvetica');
+  yPosition += 18;
+
+  doc.text('I declare under penalty of perjury under the laws of the State of California that the above is true and correct, and that I am over 18 years of age and not a party to this case.', margin, yPosition, {
+    width: pageWidth - margin * 2,
+    lineGap: 8
+  });
+  yPosition += 40;
+
+  // Signature
+  const today = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  doc.text(`Date: ${today}`, margin, yPosition, {
+    width: pageWidth - margin * 2
+  });
+  yPosition += 30;
+
+  doc.text('_'.repeat(60), margin, yPosition, {
+    width: pageWidth - margin * 2
+  });
+  yPosition += 20;
+
+  doc.text('Signature of Server', margin, yPosition, {
+    width: pageWidth - margin * 2
+  });
+  yPosition += 25;
+
+  doc.text(serviceInfo.servedBy.name, margin, yPosition, {
+    width: pageWidth - margin * 2
+  });
+}
+
+/**
  * Generate generic Proof of Service (for jurisdictions without specific forms)
  */
 function generateGenericProofOfService(doc: PDFDoc, caseInfo: CaseInfo, serviceInfo: ServiceInfo, documents: string[]) {
@@ -727,8 +893,7 @@ export async function POST(req: NextRequest) {
         generateFL335(doc, caseInfo!, serviceInfo!, servedDocuments!);
         break;
       case 'FL-330':
-        // Similar to FL-335 but for personal service
-        generateFL335(doc, caseInfo!, serviceInfo!, servedDocuments!);
+        generateFL330(doc, caseInfo!, serviceInfo!, servedDocuments!);
         break;
       default:
         generateGenericProofOfService(doc, caseInfo!, serviceInfo!, servedDocuments!);

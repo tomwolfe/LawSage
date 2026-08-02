@@ -6,6 +6,7 @@ import { getLegalLookupResponse, searchExParteRules } from '../../../src/utils/l
 import { searchLegalRules, isVectorConfigured } from '../../../lib/vector';
 import { saveCheckpoint, generateSessionId } from '../../../lib/analysis-checkpoint';
 import { verifyCitationsLive } from '../../../lib/shadow-citation-checker';
+import { checkContradictions, type EvidenceItem } from '../../../lib/contradiction-check';
 import { CITATION_VERIFICATION } from '../../../config/constants';
 import templateManifest from '../../../public/templates/manifest.json';
 import { readFile } from 'fs/promises';
@@ -75,11 +76,26 @@ const CASE_CATEGORIES = {
 } as const;
 
 /**
+ * Parse an OCR document string (as sent from the client) into an EvidenceItem
+ * suitable for cross-evidence contradiction checking.
+ */
+function parseEvidenceItem(doc: string): EvidenceItem {
+  const documentTypeMatch = doc.match(/\[Document:\s*([^\]]+)\]/);
+  const contentMatch = doc.match(/Content:\s*([\s\S]*)/);
+  const extractedText = contentMatch?.[1]?.trim() || doc;
+
+  return {
+    documentType: documentTypeMatch?.[1]?.trim() || 'Legal Document',
+    extractedText,
+    isProofOfService: /proof\s+of\s+service|affidavit\s+of\s+service|certificate\s+of\s+service|service\s+by\s+(mail|publication|certified)/i.test(extractedText),
+  };
+}
+
+/**
  * Detect case category from user input for RAG metadata filtering
  * Prevents cross-contamination between unrelated legal domains
  */
-function detectCaseCategory(userInput: string): keyof typeof CASE_CATEGORIES | 'General' {
-  const inputLower = userInput.toLowerCase();
+function detectCaseCategory(userInput: string): keyof typeof CASE_CATEGORIES | 'General' {  const inputLower = userInput.toLowerCase();
   
   // Count matches for each category
   let bestMatch: { category: keyof typeof CASE_CATEGORIES; score: number } | null = null;
@@ -509,6 +525,31 @@ export async function POST(req: NextRequest) {
         documentsText += "CRITICAL: These are official court documents. Use them to fact-check the user's description.\n\n";
       }
 
+      // CROSS-EVIDENCE CONTRADICTION DETECTION
+      // Flags user claims that contradict OCR-extracted evidence BEFORE the
+      // analysis is generated, and injects a warning the model must honor.
+      let contradictionWarning = '';
+      if (documents && documents.length > 0) {
+        try {
+          const evidenceItems = documents.map(parseEvidenceItem);
+          const contradictionResult = checkContradictions(safeInput, evidenceItems);
+
+          if (contradictionResult.hasContradictions) {
+            contradictionWarning = "CONTRADICTION WARNING (CRITICAL):\n";
+            contradictionWarning += "The user's description conflicts with the OCR-extracted evidence:\n";
+            for (const c of contradictionResult.contradictions) {
+              contradictionWarning += `- [${c.severity.toUpperCase()}] ${c.category}: ${c.description}\n`;
+              contradictionWarning += `  User claim: "${c.userClaim}" | Evidence: "${c.evidenceFound}"\n`;
+              contradictionWarning += `  Recommendation: ${c.recommendation}\n`;
+            }
+            contradictionWarning += "\nYou MUST explicitly flag this discrepancy in your strategy and adversarial_strategy, and instruct the user on how to address it.\n";
+            safeLog(`[Contradiction Check] ${contradictionResult.contradictions.length} contradiction(s) detected`);
+          }
+        } catch (contradictionError) {
+          safeWarn('Contradiction check failed:', contradictionError);
+        }
+      }
+
       const legalAnalysisTool = {
         type: 'function' as const,
         function: {
@@ -606,57 +647,23 @@ You have been provided with OCR-extracted text from official documents in the 'd
 4. Cross-reference the user's claims against the extracted evidence to identify contradictions.
 5. If evidence documents exist, your adversarial_strategy should address how the opposition might use these documents.
 
+${contradictionWarning}
+
 ${exParteRulesText}
 
 ${documentsText || ''}
 
 ${templateContent ? "Use this template as a reference for formatting." : ""}`;
 
-      const userPrompt = `Jurisdiction: ${jurisdiction}
+       const userPrompt = `Jurisdiction: ${jurisdiction}
 
 Situation: ${safeInput}
 
 ${documents && documents.length > 0 ? `\nEVIDENCE DOCUMENTS PROVIDED: ${documents.length} document(s) have been uploaded. Cross-reference the user's claims against these official court documents. Identify any contradictions and use specific case details from the evidence in your analysis.\n` : ''}
 
-${researchContext ? `
-${researchContext}
+${researchContext ? `\n${researchContext}\n\nCRITICAL: You MUST use the statute numbers provided in the RESEARCH CONTEXT above. This is verified legal data from Upstash Vector (RAG). If the context mentions Wis. Stat. § 823.01, do NOT use other numbers for nuisance. This is a mandatory source priority rule.\n` : ""}
 
-CRITICAL: You MUST use the statute numbers and legal rules provided in the RESEARCH CONTEXT above. This is verified legal data from Upstash Vector (RAG). If the context mentions Wis. Stat. § 823.01, do NOT use other numbers for nuisance. This is a mandatory source priority rule.
-` : ""}
-
-Return a COMPLETE response with ALL required fields. Use the following EXACT section delimiters to wrap each part of your response:
-
-[[DISCLAIMER_START]]
-<disclaimer content>
-[[DISCLAIMER_END]]
-
-[[STRATEGY_START]]
-<strategy content>
-[[STRATEGY_END]]
-
-[[ADVERSARIAL_START]]
-<adversarial strategy content with red-team analysis>
-[[ADVERSARIAL_END]]
-
-[[ROADMAP_START]]
-[{"step": 1, "title": "...", "description": "...", "counter_measure": "..."}, ...]
-[[ROADMAP_END]]
-
-[[FILING_TEMPLATE_START]]
-<filing template content>
-[[FILING_TEMPLATE_END]]
-
-[[CITATIONS_START]]
-[{"text": "...", "source": "...", "url": "..."}, ...]
-[[CITATIONS_END]]
-
-[[LOCAL_LOGISTICS_START]]
-{"courthouse_address": "...", "filing_fees": "...", ...}
-[[LOCAL_LOGISTICS_END]]
-
-[[PROCEDURAL_CHECKS_START]]
-["check 1", "check 2", ...]
-[[PROCEDURAL_CHECKS_END]]
+Generate a COMPLETE response using ONLY the generate_legal_analysis function. Provide all required fields: disclaimer, strategy, adversarial_strategy, roadmap (with step, title, description, counter_measure), filing_template, citations (minimum 3), local_logistics, and procedural_checks.
 
 CRITICAL INSTRUCTIONS:
 1. You MUST use the statute numbers provided in the RESEARCH CONTEXT above. This is verified legal data from RAG (Retrieval Augmented Generation).
@@ -664,8 +671,7 @@ CRITICAL INSTRUCTIONS:
 3. Ensure "procedural_checks" is strictly an ARRAY OF STRINGS, not objects.
 4. You are under oath to provide substantive, non-placeholder content for every field.
 5. Do NOT use placeholders. Provide substantive content for all fields. If you lack specific information, provide exact instructions on WHERE the user can find it (e.g., "Check Milwaukee County Local Rule 3.15 regarding noise").
-6. MANDATORY: For each roadmap step, include a "counter_measure" field that explains how the opposition will likely respond and how to prepare for that counter-move.
-7. MANDATORY: Wrap each section with the exact delimiters shown above. This is critical for proper parsing.`;
+6. MANDATORY: For each roadmap step, include a "counter_measure" field that explains how the opposition will likely respond and how to prepare for that counter-move.`;
 
       const encoder = new TextEncoder();
 
@@ -902,41 +908,41 @@ CRITICAL INSTRUCTIONS:
                 }) + '\n'));
 
                 const citationTexts = parsedOutput.citations.map(c => c.text);
-                const baseUrl = req.nextUrl.origin;
-                
-                const verificationResults = await verifyCitationsLive(citationTexts, jurisdiction, baseUrl);
-                
-                let redactionCount = 0;
+
+                const verificationResults = await verifyCitationsLive(citationTexts, jurisdiction);
+
+                let unverifiedCount = 0;
                 verificationResults.forEach((v, index) => {
                   if (!v.is_verified) {
                     safeWarn(`Citation verification FAILED: ${v.citation}`);
-                    
+
                     if (isStrictMode && parsedOutput) {
-                      redactionCount++;
-                      const placeholder = `[Citation Removed: Verification Failed - ${v.citation}]`;
-                      
-                      // Redact from strategy
+                      unverifiedCount++;
+                      const flagged = `${v.citation} [UNVERIFIED]`;
+
+                      // Flag in strategy
                       if (parsedOutput.strategy) {
-                        parsedOutput.strategy = parsedOutput.strategy.split(v.citation).join(placeholder);
+                        parsedOutput.strategy = parsedOutput.strategy.split(v.citation).join(flagged);
                       }
-                      
-                      // Redact from filing template
+
+                      // Flag in filing template
                       if (parsedOutput.filing_template) {
-                        parsedOutput.filing_template = parsedOutput.filing_template.split(v.citation).join(placeholder);
+                        parsedOutput.filing_template = parsedOutput.filing_template.split(v.citation).join(flagged);
                       }
-                      
+
                       // Mark in citations list
                       if (parsedOutput.citations && parsedOutput.citations[index]) {
-                        parsedOutput.citations[index].text = placeholder;
+                        parsedOutput.citations[index].text = flagged;
                         parsedOutput.citations[index].url = undefined;
                       }
                     }
                   }
                 });
 
-                if (redactionCount > 0) {
-                  safeLog(`Hard-Gate: Redacted ${redactionCount} unverified citations.`);
-                  parsedOutput.disclaimer = (parsedOutput.disclaimer || "") + `\n\nWARNING: ${redactionCount} citation(s) were removed because they could not be verified in official legal databases. Manual verification is required.`;
+                if (unverifiedCount > 0) {
+                  safeLog(`Hard-Gate: Flagged ${unverifiedCount} unverified citation(s).`);
+                  parsedOutput.can_download = false;
+                  parsedOutput.disclaimer = (parsedOutput.disclaimer || "") + `\n\nWARNING: ${unverifiedCount} citation(s) could not be verified in official legal databases and are marked [UNVERIFIED]. Download of filing documents has been disabled until manual verification is completed.`;
                 }
               }
 

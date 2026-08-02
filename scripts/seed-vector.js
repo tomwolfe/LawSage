@@ -10,9 +10,54 @@
 import { readFile, readdir } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { batchIndexLegalRules, isVectorConfigured, getIndexStats } from '../lib/vector.js';
+import { Index } from '@upstash/vector';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Self-contained vector helpers (mirrors lib/vector.ts but imports the plain-JS
+ * @upstash/vector package directly so this script runs on plain Node without a
+ * TypeScript transpiler).
+ */
+function isVectorConfigured() {
+  return !!(process.env.UPSTASH_VECTOR_URL && process.env.UPSTASH_VECTOR_TOKEN);
+}
+
+function getVectorClient() {
+  return new Index({
+    url: process.env.UPSTASH_VECTOR_URL,
+    token: process.env.UPSTASH_VECTOR_TOKEN,
+  });
+}
+
+async function getIndexStats() {
+  try {
+    const info = await getVectorClient().info();
+    return { totalVectors: info.vectorCount || 0 };
+  } catch (error) {
+    console.error('Failed to get index stats:', error);
+    return { totalVectors: 0 };
+  }
+}
+
+async function batchIndexLegalRules(rules) {
+  const client = getVectorClient();
+  let successCount = 0;
+  for (const rule of rules) {
+    try {
+      const textToEmbed = `${rule.rule_number} ${rule.title} ${rule.description} ${rule.full_text}`.trim();
+      await client.upsert({
+        id: rule.id,
+        data: textToEmbed,
+        metadata: rule,
+      });
+      successCount++;
+    } catch (error) {
+      console.error(`Failed to index rule ${rule.id}:`, error);
+    }
+  }
+  return successCount;
+}
 
 /**
  * Generate a unique ID for a rule
@@ -27,8 +72,9 @@ async function seedVector() {
 
   // Check if vector is configured
   if (!isVectorConfigured()) {
-    console.error('❌ Upstash Vector not configured.');
-    process.exit(1);
+    console.warn('⚠️  Upstash Vector not configured. Skipping seed (no-op).');
+    console.warn('   Set UPSTASH_VECTOR_URL and UPSTASH_VECTOR_TOKEN to enable.');
+    process.exit(0);
   }
 
   console.log('✅ Vector configuration detected');

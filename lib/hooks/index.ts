@@ -282,6 +282,7 @@ export function useLegalAnalysis() {
     submitAnalysis,
     triggerBackgroundAudit,
     clearResult,
+    setResult,
     setError,
     setStreamingStatus
   };
@@ -446,6 +447,7 @@ function parseHistoryFromStorage(): Array<{
   userInput: string;
   result: LegalResult;
 }> {
+  if (typeof window === 'undefined') return [];
   const savedHistory = localStorage.getItem('lawsage_history');
   if (savedHistory) {
     try {
@@ -511,7 +513,8 @@ export function useHistory() {
     history,
     addToHistory,
     loadFromHistory,
-    clearHistory
+    clearHistory,
+    setHistory
   };
 }
 

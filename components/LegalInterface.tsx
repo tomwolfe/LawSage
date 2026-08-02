@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Mic, Send, Loader2, AlertCircle, Clock, Trash2, Download, Save, FolderOpen, Info, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { watchStateAndSyncToUrl, getCaseIdFromUrl, getOrCreateCaseId } from '../src/utils/state-sync';
@@ -9,32 +9,16 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ResultDisplay from './ResultDisplay';
 import HistoryActions from './HistoryActions';
-import { safeError, safeWarn } from '../lib/pii-redactor';
-import { processImageForOCR } from '../src/utils/image-processor';
-import { parsePartialJSON } from '../lib/streaming-json-parser';
+import InterviewMode from './InterviewMode';
+import { safeWarn } from '../lib/pii-redactor';
 import { createStateVersion } from '../types/state';
+import { useLegalAnalysis, useCaseLedger, useOCRProcessing, useHistory, useBackendHealth } from '../lib/hooks';
+import type { LegalResult, CaseLedgerEntry, OCRResult } from '../lib/hooks';
+
+export type { LegalResult, CaseLedgerEntry, OCRResult } from '../lib/hooks';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
-}
-
-interface Source {
-  title: string | null;
-  uri: string | null;
-}
-
-export interface LegalResult {
-  text: string;
-  sources: Source[];
-}
-
-export interface CaseLedgerEntry {
-  id: string;
-  timestamp: Date;
-  eventType: 'complaint_filed' | 'answer_due' | 'motion_submitted' | 'discovery_served' | 'trial_date_set' | 'other';
-  description: string;
-  status: 'pending' | 'completed' | 'overdue';
-  dueDate?: Date;
 }
 
 export interface CaseFolderState {
@@ -53,21 +37,6 @@ interface CaseHistoryItem {
   jurisdiction: string;
   userInput: string;
   result: LegalResult;
-}
-
-export interface OCRResult {
-  extracted_text: string;
-  document_type?: string;
-  case_number?: string;
-  court_name?: string;
-  parties?: string[];
-  important_dates?: string[];
-  legal_references?: string[];
-  calculated_deadline?: {
-    date: string;
-    daysRemaining: number;
-    rule: string;
-  };
 }
 
 const US_STATES = [
@@ -131,25 +100,57 @@ export default function LegalInterface() {
   const [userInput, setUserInput] = useState('');
   const [jurisdiction, setJurisdiction] = useState('California');
   const [isListening, setIsListening] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<LegalResult | null>(null);
   const [activeTab, setActiveTab] = useState<'strategy' | 'filings' | 'sources' | 'survival-guide' | 'opposition-view' | 'roadmap' | 'battle-plan'>('strategy');
-  const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
-  const [history, setHistory] = useState<CaseHistoryItem[]>([]);
+  const [formError, setFormError] = useState('');
+  const [auditStatus, setAuditStatus] = useState('');
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<string | null>(null);
-  const [backendUnreachable, setBackendUnreachable] = useState(false);
-  const [caseLedger, setCaseLedger] = useState<CaseLedgerEntry[]>([]);
-  const [streamingStatus, setStreamingStatus] = useState<string>('');
-  const [rateLimitInfo, setRateLimitInfo] = useState<{ remaining: number; resetAt: Date | null } | null>(null);
   const [evidence, setEvidence] = useState<OCRResult[]>([]);
-  const [streamingPreview, setStreamingPreview] = useState<{ strategy?: string; roadmap?: string } | null>(null);
+  /** Set to true to show the clarifying-questions interview before analysis */
+  const [showInterview, setShowInterview] = useState(false);
   /** Current state version for drift prevention */
   const [currentStateId, setCurrentStateId] = useState<string>('');
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [currentStateHash, setCurrentStateHash] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const ocrFileInputRef = useRef<HTMLInputElement>(null);
+
+  const {
+    result,
+    loading: analysisLoading,
+    error: analysisError,
+    streamingStatus: analysisStreamingStatus,
+    streamingPreview,
+    rateLimitInfo,
+    submitAnalysis,
+    setResult
+  } = useLegalAnalysis();
+
+  const {
+    caseLedger,
+    addEntry,
+    setCaseLedger
+  } = useCaseLedger();
+
+  const {
+    loading: ocrLoading,
+    error: ocrError,
+    streamingStatus: ocrStreamingStatus,
+    processDocument,
+    fileInputRef: ocrFileInputRef
+  } = useOCRProcessing();
+
+  const {
+    history,
+    addToHistory,
+    loadFromHistory: getHistoryItem,
+    clearHistory: clearPersistedHistory,
+    setHistory
+  } = useHistory();
+
+  const { isReachable } = useBackendHealth();
+
+  const loading = analysisLoading || ocrLoading;
+  const error = analysisError || ocrError || formError;
+  const streamingStatus = analysisStreamingStatus || ocrStreamingStatus || auditStatus;
+  const backendUnreachable = !isReachable;
 
   // Initialize state from IndexedDB on component mount
   useEffect(() => {
@@ -174,7 +175,6 @@ export default function LegalInterface() {
             if (caseFolder.activeTab !== undefined) setActiveTab(caseFolder.activeTab as "strategy" | "filings" | "sources" | "survival-guide" | "opposition-view" | "roadmap" | "battle-plan");
             if (caseFolder.history !== undefined) setHistory(caseFolder.history);
             if (caseFolder.selectedHistoryItem !== undefined) setSelectedHistoryItem(caseFolder.selectedHistoryItem);
-            if (caseFolder.backendUnreachable !== undefined) setBackendUnreachable(caseFolder.backendUnreachable);
             if (caseFolder.evidence !== undefined && Array.isArray(caseFolder.evidence)) setEvidence(caseFolder.evidence);
 
             if (analysisResult !== undefined) setResult(analysisResult as LegalResult);
@@ -204,7 +204,6 @@ export default function LegalInterface() {
             if (legacyState.activeTab !== undefined) setActiveTab(legacyState.activeTab as "strategy" | "filings" | "sources" | "survival-guide" | "opposition-view" | "roadmap" | "battle-plan");
             if (legacyState.history !== undefined) setHistory(legacyState.history as CaseHistoryItem[]);
             if (legacyState.selectedHistoryItem !== undefined) setSelectedHistoryItem(legacyState.selectedHistoryItem as string | null);
-            if (legacyState.backendUnreachable !== undefined) setBackendUnreachable(legacyState.backendUnreachable as boolean);
           }
 
           // Note: We don't restore file selection as that would require re-reading the file
@@ -215,6 +214,7 @@ export default function LegalInterface() {
     }
 
     loadState();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Set up IndexedDB state synchronization
@@ -251,25 +251,6 @@ export default function LegalInterface() {
     };
   }, [userInput, jurisdiction, result, activeTab, history, selectedHistoryItem, backendUnreachable, caseLedger, evidence]);
 
-  useEffect(() => {
-    const checkHealth = async (retries = 3, delay = 1000) => {
-      try {
-        const response = await fetch('/api/health');
-        if (!response.ok) {
-          throw new Error('Health check failed');
-        }
-        setBackendUnreachable(false);
-      } catch {
-        if (retries > 0) {
-          setTimeout(() => checkHealth(retries - 1, delay * 2), delay);
-        } else {
-          setBackendUnreachable(true);
-        }
-      }
-    };
-    checkHealth();
-  }, []);
-
   const handleVoice = () => {
     if (!('webkitSpeechRecognition' in window)) {
       toast.error('Voice recognition is not supported in this browser.');
@@ -294,42 +275,38 @@ export default function LegalInterface() {
     recognition.start();
   };
 
-  const handleRateLimitInfo = async () => {
-    try {
-      const response = await fetch('/api/analyze', {
-        method: 'HEAD',
-      });
-
-      const remaining = response.headers.get('X-RateLimit-Remaining');
-      const reset = response.headers.get('X-RateLimit-Reset');
-
-      if (remaining && reset) {
-        setRateLimitInfo({
-          remaining: parseInt(remaining, 10),
-          resetAt: new Date(parseInt(reset, 10)),
-        });
-      }
-    } catch (error) {
-      safeError('Failed to fetch rate limit info:', error);
-    }
-  };
-
-  const handleSubmit = async () => {
+  /**
+   * Handle analysis submission.
+   * If the input is too sparse (< 40 words), the clarifying-questions
+   * interview is shown first to gather critical details.
+   *
+   * @param bypassInterview - Skip the interview gate (e.g. after completing or skipping it)
+   * @param overrideInput - Use this input instead of the current userInput state
+   */
+  const handleSubmit = async (bypassInterview = false, overrideInput?: string) => {
     if (loading) return; // Prevent multiple submissions
 
-    setError('');
+    setFormError('');
     setWarning('');
-    setStreamingStatus('');
 
-    if (!userInput.trim()) {
-      setError('Please describe your legal situation.');
+    const effectiveInput = overrideInput ?? userInput;
+
+    if (!effectiveInput.trim()) {
+      setFormError('Please describe your legal situation.');
+      return;
+    }
+
+    // Interview gate: sparse input triggers the clarifying-questions flow
+    const wordCount = effectiveInput.trim().split(/\s+/).filter(Boolean).length;
+    if (!bypassInterview && wordCount < 40) {
+      setShowInterview(true);
       return;
     }
 
     // Pre-flight validation for text input
-    const validation = validateUserInput(userInput);
+    const validation = validateUserInput(effectiveInput);
     if (!validation.valid) {
-      setError(validation.warning || 'Input validation failed');
+      setFormError(validation.warning || 'Input validation failed');
       return;
     }
     if (validation.warning) {
@@ -337,188 +314,123 @@ export default function LegalInterface() {
       // Don't block submission, just warn
     }
 
-    setLoading(true);
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 55000); // 55s timeout (before Vercel's 60s limit)
+    // Delegate the API call, streaming, timeout handling, checkpoint resume,
+    // and rate-limit parsing to the useLegalAnalysis hook.
+    const submission = await submitAnalysis(effectiveInput, jurisdiction, evidence);
 
-    // Generate session ID for checkpoint resume
-    const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-
-    try {
-      const response = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Session-ID': sessionId,
-        },
-        body: JSON.stringify({
-          user_input: userInput.trim(),
-          jurisdiction,
-          // NEW: Map evidence objects to strings for the AI
-          documents: evidence.map(e => `[Document: ${e.document_type || 'Unknown'}] Case No: ${e.case_number || 'N/A'} | Court: ${e.court_name || 'N/A'} | Content: ${e.extracted_text}`)
-        }),
-        signal: controller.signal,
-      });
-
-      handleRateLimitInfo();
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        if (response.status === 429) {
-          setError('Rate limit exceeded. Please wait and try again later.');
-          return;
-        } else if (response.status === 504) {
-          // VERCEL TIMEOUT: Initiate checkpoint resume flow
-          setStreamingStatus('Request timed out. Resuming from checkpoint...');
-          await handleCheckpointResume(sessionId);
-          return;
-        } else {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || 'Failed to generate response');
-        }
-      }
-
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/x-ndjson')) {
-        const reader = response.body?.getReader();
-        if (!reader) throw new Error('ReadableStream not supported');
-
-        const decoder = new TextDecoder();
-        let finalResult: LegalResult | null = null;
-        let accumulatedContent = '';
-
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n').filter(line => line.trim());
-
-            for (const line of lines) {
-              try {
-                const message = JSON.parse(line);
-                if (message.type === 'status') {
-                  setStreamingStatus(message.message);
-                } else if (message.type === 'chunk') {
-                  // Accumulate content for partial JSON parsing
-                  accumulatedContent += message.content || '';
-                  
-                  // Try to parse partial JSON to show streaming updates
-                  const partialData = parsePartialJSON<{ strategy?: string; roadmap?: string; adversarial_strategy?: string }>(accumulatedContent);
-                  if (partialData) {
-                    setStreamingPreview({
-                      strategy: partialData.strategy,
-                      roadmap: partialData.roadmap ? JSON.stringify(partialData.roadmap, null, 2) : undefined
-                    });
-                  }
-                } else if (message.type === 'complete') {
-                  finalResult = message.result;
-                  setStreamingPreview(null); // Clear preview when complete
-                } else if (message.type === 'error') {
-                  throw new Error(message.error);
-                }
-              } catch (parseError) {
-                safeWarn('Failed to parse stream chunk:', parseError);
-              }
-            }
-          }
-
-          if (finalResult) {
-            setResult(finalResult);
-            setActiveTab('strategy');
-
-            const newHistoryItem: CaseHistoryItem = {
-              id: Date.now().toString(),
-              timestamp: new Date(),
-              jurisdiction,
-              userInput: userInput.trim(),
-              result: finalResult
-            };
-
-            const updatedHistory = [newHistoryItem, ...history];
-            setHistory(updatedHistory);
-            addToCaseLedger('complaint_filed', `Analysis generated for user input.`);
-
-            // Trigger Background Audit (Step 2) - Decoupled to avoid 60s timeout
-            // This runs asynchronously so the user sees results immediately
-            // STATE DRIFT PREVENTION: Include stateId and stateHash
-            const currentState = { userInput, jurisdiction, evidence, activeTab };
-            const stateVersion = await createStateVersion(currentState);
-            setCurrentStateId(stateVersion.stateId);
-            setCurrentStateHash(stateVersion.stateHash);
-
-            const auditPayload = {
-              analysis: finalResult.text,
-              jurisdiction,
-              researchContext: '',
-              stateId: stateVersion.stateId,
-              stateHash: stateVersion.stateHash
-            };
-
-            // Fire-and-forget: Don't await, let it run in background
-            fetch('/api/audit', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(auditPayload)
-            })
-              .then(res => res.json())
-              .then(auditData => {
-                // STATE DRIFT CHECK: Reject audit if state has changed
-                if (auditData.stateId && auditData.stateId !== currentStateId) {
-                  safeWarn('[State Drift] Audit result rejected - state has changed');
-                  return; // Reject stale audit result
-                }
-
-                // Update the result with audit metadata
-                setResult(prev => {
-                  if (!prev) return null;
-                  try {
-                    const parsedText = JSON.parse(prev.text);
-                    parsedText._critique_metadata = auditData;
-                    return { ...prev, text: JSON.stringify(parsedText) };
-                  } catch {
-                    return prev;
-                  }
-                });
-
-                // Show audit completion status
-                const statusMessage = auditData.audit_passed
-                  ? 'Audit complete: Statutes verified.'
-                  : `Audit complete: ${auditData.recommended_actions?.length || 0} issue(s) found.`;
-                setStreamingStatus(statusMessage);
-                setTimeout(() => setStreamingStatus(''), 5000);
-              })
-              .catch(auditError => {
-                safeWarn('Background audit failed:', auditError);
-                // Don't show error to user - audit is optional enhancement
-              });
-          } else {
-            throw new Error('No complete response received from server');
-          }
-        } catch (streamError) {
-          if (streamError instanceof Error && streamError.name === 'AbortError') {
-            throw new Error('Request timed out. Please try again.');
-          }
-          throw streamError;
-        }
-      }
-    } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') {
-        setError('Request timed out. Please try again.');
-      } else {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
-      }
-    } finally {
-      setLoading(false);
-      setStreamingStatus('');
+    if (!submission) {
+      // Any error message is surfaced via the analysis hook's error state.
+      return;
     }
+
+    const finalResult = submission.result;
+    setActiveTab('strategy');
+
+    addToHistory({
+      id: Date.now().toString(),
+      jurisdiction,
+      userInput: effectiveInput.trim(),
+      result: finalResult
+    });
+
+    addToCaseLedger('complaint_filed', `Analysis generated for user input.`);
+
+    // Trigger Background Audit (Step 2) - Decoupled to avoid 60s timeout
+    // This runs asynchronously so the user sees results immediately
+    // STATE DRIFT PREVENTION: Include stateId and stateHash
+    const currentState = { userInput: effectiveInput, jurisdiction, evidence, activeTab };
+    const stateVersion = await createStateVersion(currentState);
+    setCurrentStateId(stateVersion.stateId);
+
+    const auditPayload = {
+      analysis: finalResult.text,
+      jurisdiction,
+      researchContext: '',
+      stateId: stateVersion.stateId,
+      stateHash: stateVersion.stateHash
+    };
+
+    // Fire-and-forget: Don't await, let it run in background
+    fetch('/api/audit', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(auditPayload)
+    })
+      .then(res => res.json())
+      .then(auditData => {
+        // STATE DRIFT CHECK: Reject audit if state has changed
+        if (auditData.stateId && auditData.stateId !== currentStateId) {
+          safeWarn('[State Drift] Audit result rejected - state has changed');
+          return; // Reject stale audit result
+        }
+
+        // Update the result with audit metadata
+        setResult(prev => {
+          if (!prev) return null;
+          try {
+            const parsedText = JSON.parse(prev.text);
+            parsedText._critique_metadata = auditData;
+            return { ...prev, text: JSON.stringify(parsedText) };
+          } catch {
+            return prev;
+          }
+        });
+
+        // Show audit completion status
+        const statusMessage = auditData.audit_passed
+          ? 'Audit complete: Statutes verified.'
+          : `Audit complete: ${auditData.recommended_actions?.length || 0} issue(s) found.`;
+        setAuditStatus(statusMessage);
+        setTimeout(() => setAuditStatus(''), 5000);
+      })
+      .catch(auditError => {
+        safeWarn('Background audit failed:', auditError);
+        // Don't show error to user - audit is optional enhancement
+      });
   };
 
+  // Keep a ref to the latest handleSubmit so the interview callbacks below
+  // always dispatch with fresh state without re-creating themselves on every
+  // render (handleSubmit is intentionally not memoized).
+  const handleSubmitRef = useRef(handleSubmit);
+  useEffect(() => {
+    handleSubmitRef.current = handleSubmit;
+  });
+
+  /**
+   * Handle interview completion: append the structured Q&A key-value pairs
+   * to the user input, then dispatch the analysis request.
+   */
+  const handleInterviewComplete = useCallback((answers: Record<string, string>) => {
+    setShowInterview(false);
+
+    const answeredEntries = Object.entries(answers).filter(([, value]) => value && value.trim());
+    const interviewSupplement = answeredEntries
+      .map(([key, value]) => `${key.replace(/_/g, ' ')}: ${value.trim()}`)
+      .join('\n');
+
+    const enrichedInput = userInput.trim() + (interviewSupplement
+      ? `\n\nADDITIONAL DETAILS FROM CLARIFYING QUESTIONS:\n${interviewSupplement}`
+      : '');
+
+    if (enrichedInput !== userInput.trim()) {
+      setUserInput(enrichedInput);
+    }
+
+    // Dispatch analysis with the enriched input (bypass the interview gate)
+    void handleSubmitRef.current(true, enrichedInput);
+  }, [userInput]);
+
+  const handleInterviewSkip = useCallback(() => {
+    setShowInterview(false);
+    // Proceed with the current input even though it is below the word threshold
+    void handleSubmitRef.current(true);
+  }, []);
+
   const loadFromHistory = (itemId: string) => {
-    const item = history.find(h => h.id === itemId);
+    const item = getHistoryItem(itemId);
     if (item) {
       setResult(item.result);
       setUserInput(item.userInput);
@@ -529,8 +441,7 @@ export default function LegalInterface() {
   };
 
   const clearHistory = () => {
-    setHistory([]);
-    localStorage.removeItem('lawsage_history');
+    clearPersistedHistory();
     setSelectedHistoryItem(null);
   };
 
@@ -544,96 +455,10 @@ export default function LegalInterface() {
     }).format(date);
   };
 
-  // Function to add an entry to the case ledger
-  const addToCaseLedger = (eventType: CaseLedgerEntry['eventType'], description: string, dueDate?: Date) => {
-    const newEntry: CaseLedgerEntry = {
-      id: Date.now().toString(),
-      timestamp: new Date(),
-      eventType,
-      description,
-      status: dueDate && dueDate < new Date() ? 'overdue' : 'pending',
-      dueDate
-    };
-
-    setCaseLedger(prev => [...prev, newEntry]);
-  };
-
-  /**
-   * Handle Vercel 60s timeout by resuming from checkpoint
-   * Implements UI polling pattern for long-running analyses
-   */
-  const handleCheckpointResume = async (sessionId: string, maxRetries = 3) => {
-    let retries = 0;
-    
-    while (retries < maxRetries) {
-      try {
-        setStreamingStatus(`Resuming analysis (attempt ${retries + 1}/${maxRetries})...`);
-        
-        // Poll checkpoint endpoint for accumulated state
-        const response = await fetch(`/api/analyze/checkpoint?sessionId=${sessionId}`, {
-          method: 'GET',
-        });
-
-        if (!response.ok) {
-          if (response.status === 404) {
-            // Checkpoint not ready yet, wait and retry
-            await new Promise(resolve => setTimeout(resolve, 3000));
-            retries++;
-            continue;
-          }
-          throw new Error('Checkpoint resume failed');
-        }
-
-        const checkpointData = await response.json();
-        
-        if (checkpointData.status === 'complete' && checkpointData.result) {
-          // Analysis complete, restore result
-          const finalResult: LegalResult = checkpointData.result;
-          setResult(finalResult);
-          setActiveTab('strategy');
-
-          const newHistoryItem: CaseHistoryItem = {
-            id: Date.now().toString(),
-            timestamp: new Date(),
-            jurisdiction,
-            userInput: userInput.trim(),
-            result: finalResult
-          };
-
-          const updatedHistory = [newHistoryItem, ...history];
-          setHistory(updatedHistory);
-          addToCaseLedger('complaint_filed', `Analysis generated (resumed from checkpoint).`);
-
-          setStreamingStatus('Analysis complete (resumed from timeout)');
-          setTimeout(() => setStreamingStatus(''), 5000);
-          return;
-        } else if (checkpointData.status === 'processing') {
-          // Still processing, continue polling
-          await new Promise(resolve => setTimeout(resolve, 3000));
-          retries++;
-          continue;
-        } else {
-          throw new Error('Unexpected checkpoint status');
-        }
-      } catch (error) {
-        safeWarn('Checkpoint resume error:', error);
-        retries++;
-        
-        if (retries >= maxRetries) {
-          setError('Analysis timed out and could not be resumed. Please try again with a simpler query.');
-          setLoading(false);
-          return;
-        }
-        
-        // Wait before retry
-        await new Promise(resolve => setTimeout(resolve, 3000));
-      }
-    }
-
-    // Max retries exceeded
-    setError('Analysis timed out after multiple resume attempts. Please try again later.');
-    setLoading(false);
-  };
+  // Function to add an entry to the case ledger (delegated to useCaseLedger)
+  const addToCaseLedger = useCallback((eventType: CaseLedgerEntry['eventType'], description: string, dueDate?: Date) => {
+    addEntry(eventType, description, dueDate);
+  }, [addEntry]);
 
   // Case File Management Functions
   const handleExportCaseFile = () => {
@@ -664,7 +489,6 @@ export default function LegalInterface() {
         setActiveTab(importedData.caseFolder.activeTab as typeof activeTab || 'strategy');
         setHistory(importedData.caseFolder.history || []);
         setSelectedHistoryItem(importedData.caseFolder.selectedHistoryItem);
-        setBackendUnreachable(importedData.caseFolder.backendUnreachable || false);
         if (importedData.caseFolder.evidence && Array.isArray(importedData.caseFolder.evidence)) {
           setEvidence(importedData.caseFolder.evidence);
         }
@@ -678,11 +502,11 @@ export default function LegalInterface() {
         setCaseLedger(importedData.ledger);
       }
 
-      setError('');
+      setFormError('');
       setWarning(`Successfully imported case file from ${new Date(importedData.exportedAt).toLocaleDateString()}`);
       addToCaseLedger('other', `Case file imported from disk`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to import case file');
+      setFormError(err instanceof Error ? err.message : 'Failed to import case file');
     } finally {
       // Reset file input
       if (fileInputRef.current) {
@@ -701,76 +525,53 @@ export default function LegalInterface() {
       backendUnreachable,
       evidence
     };
-    
+
     const caseId = getCaseIdFromUrl() || await getOrCreateCaseId();
     await saveCaseToLocalDB(caseId, caseFolderState, result || undefined, caseLedger);
     setWarning('Case saved to local IndexedDB vault');
     setTimeout(() => setWarning(''), 3000);
   };
 
-  // OCR Evidence Upload Handler
+  // OCR Evidence Upload Handler (delegated to useOCRProcessing)
   const handleOCRSubmit = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setLoading(true);
-    setStreamingStatus('Scanning document for evidence...');
+    const ocrData = await processDocument(file);
 
-    try {
-      // 1. Process and compress image (Vercel limit is 4.5MB!)
-      const base64 = await processImageForOCR(file);
-
-      // 2. Call OCR route
-      const res = await fetch('/api/ocr', {
-        method: 'POST',
-        body: JSON.stringify({ image: base64 })
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.detail || 'OCR processing failed');
-      }
-
-      const ocrData: OCRResult = await res.json();
-
-      // 3. Add to our "Evidence Vault"
+    if (ocrData) {
+      // 1. Add to our "Evidence Vault"
       setEvidence(prev => [...prev, ocrData]);
       addToCaseLedger('other', `Document scanned: ${ocrData.document_type || 'Unknown Type'}`);
       setWarning(`Document scanned successfully: ${ocrData.document_type || 'Legal Document'}`);
       setTimeout(() => setWarning(''), 3000);
-      
-      // 4. Check for calculated deadline and show urgent banner
+
+      // 2. Check for calculated deadline and show urgent banner
       if (ocrData.calculated_deadline) {
         const deadlineDate = new Date(ocrData.calculated_deadline.date);
-        const formattedDate = deadlineDate.toLocaleDateString('en-US', { 
-          weekday: 'long', 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
+        const formattedDate = deadlineDate.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
         });
-        
+
         // Add to case ledger as a critical deadline
         addToCaseLedger(
           'answer_due',
           `CRITICAL DEADLINE: ${ocrData.calculated_deadline.rule} - Due ${formattedDate}`,
           deadlineDate
         );
-        
+
         // Show urgent deadline warning (will be displayed in the UI)
         setWarning(`⚠️ CALENDAR WARNING: ${ocrData.calculated_deadline.rule} - Due in ${ocrData.calculated_deadline.daysRemaining} days (${formattedDate})`);
         setTimeout(() => setWarning(''), 10000); // Show for 10 seconds for critical deadlines
       }
+    }
 
-    } catch (err) {
-      safeError('OCR upload failed:', err);
-      setError(err instanceof Error ? err.message : 'Failed to read document.');
-    } finally {
-      setLoading(false);
-      setStreamingStatus('');
-      // Reset file input
-      if (ocrFileInputRef.current) {
-        ocrFileInputRef.current.value = '';
-      }
+    // Reset file input
+    if (ocrFileInputRef.current) {
+      ocrFileInputRef.current.value = '';
     }
   };
 
@@ -779,9 +580,28 @@ export default function LegalInterface() {
     addToCaseLedger('other', `Document evidence removed`);
   };
 
-
   return (
     <div className="space-y-8">
+      {showInterview && (
+        <div className="bg-white rounded-2xl shadow-sm border border-indigo-200 p-6">
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-slate-800">
+              A few clarifying questions before we analyze your case
+            </h2>
+            <p className="text-sm text-slate-600 mt-1">
+              Your answers will be added to your description so the analysis is grounded in complete facts.
+            </p>
+          </div>
+          <InterviewMode
+            jurisdiction={jurisdiction}
+            userInput={userInput}
+            onComplete={handleInterviewComplete}
+            onSkip={handleInterviewSkip}
+            mode="guided"
+          />
+        </div>
+      )}
+
       {backendUnreachable && (
         <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-center gap-3 text-amber-800 shadow-sm">
           <AlertCircle className="shrink-0" size={20} />
@@ -1020,7 +840,7 @@ export default function LegalInterface() {
               </button>
 
               <button
-                onClick={handleSubmit}
+                onClick={() => handleSubmit()}
                 disabled={loading}
                 className="flex items-center justify-center gap-2 py-3 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 disabled:bg-slate-300 transition-colors"
               >
@@ -1047,7 +867,7 @@ export default function LegalInterface() {
                 <p>{error}</p>
               </div>
               <button
-                onClick={handleSubmit}
+                onClick={() => handleSubmit()}
                 disabled={loading}
                 className="flex items-center gap-1 px-3 py-1 bg-red-600 text-white rounded-md font-semibold hover:bg-red-700 transition-colors disabled:bg-red-300"
               >

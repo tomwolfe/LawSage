@@ -36,6 +36,13 @@ jobs:
           GEMINI_API_KEY: test_key
           GEMINI_MODEL_ID: gemini-3-flash-preview
 
+      - name: Seed vector database
+        if: ${{ secrets.UPSTASH_VECTOR_URL != '' && secrets.UPSTASH_VECTOR_TOKEN != '' }}
+        run: node scripts/seed-vector.js
+        env:
+          UPSTASH_VECTOR_URL: ${{ secrets.UPSTASH_VECTOR_URL }}
+          UPSTASH_VECTOR_TOKEN: ${{ secrets.UPSTASH_VECTOR_TOKEN }}
+
       - name: Build application
         run: npm run build
         env:

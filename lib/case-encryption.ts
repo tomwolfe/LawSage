@@ -46,6 +46,28 @@ function generateSalt(): Uint8Array {
 }
 
 /**
+ * Generate a random 16-byte salt for a vault
+ * Exposed so EvidenceVault can persist it for key re-derivation
+ */
+export function generateRandomSalt(): Uint8Array {
+  return generateSalt();
+}
+
+/**
+ * Encode an ArrayBuffer as Base64
+ */
+export function encodeBase64(buffer: ArrayBuffer): string {
+  return arrayBufferToBase64(buffer);
+}
+
+/**
+ * Decode Base64 to an ArrayBuffer
+ */
+export function decodeBase64(base64: string): ArrayBuffer {
+  return base64ToArrayBuffer(base64);
+}
+
+/**
  * Generate a random initialization vector (IV)
  */
 function generateIV(): Uint8Array {
@@ -112,21 +134,23 @@ async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey>
  * @param data - The case data to encrypt
  * @param password - User-provided password (or device-specific key)
  * @param caseId - Unique case identifier
+ * @param salt - Optional pre-generated salt (used by EvidenceVault to persist a stable salt)
  */
 export async function encryptCaseData(
   data: unknown,
   password: string,
-  caseId: string
+  caseId: string,
+  salt?: Uint8Array
 ): Promise<EncryptedCaseData> {
   try {
     safeLog(`[Encryption] Encrypting case data for case: ${caseId}`);
 
     // Generate salt and IV
-    const salt = generateSalt();
+    const usedSalt = salt || generateSalt();
     const iv = generateIV();
 
     // Derive encryption key
-    const key = await deriveKey(password, salt);
+    const key = await deriveKey(password, usedSalt);
 
     // Serialize data to JSON
     const encoder = new TextEncoder();
@@ -145,7 +169,7 @@ export async function encryptCaseData(
     return {
       version: 1,
       algorithm: 'AES-GCM-256',
-      salt: arrayBufferToBase64(salt.buffer as ArrayBuffer),
+      salt: arrayBufferToBase64(usedSalt.buffer as ArrayBuffer),
       iv: arrayBufferToBase64(iv.buffer as ArrayBuffer),
       ciphertext: arrayBufferToBase64(ciphertext),
       timestamp: Date.now(),
