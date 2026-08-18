@@ -18,7 +18,7 @@ interface InformedConsentModalProps {
  * Addresses Unauthorized Practice of Law (UPL) liability by ensuring users
  * understand the limitations of AI-assisted legal information.
  */
-export default function InformedConsentModal({ isOpen, onAccept }: InformedConsentModalProps) {
+export default function InformedConsentModal({ isOpen, onAccept, onDecline }: InformedConsentModalProps) {
   const [allChecked, setAllChecked] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
   const firstCheckboxRef = useRef<HTMLInputElement>(null);

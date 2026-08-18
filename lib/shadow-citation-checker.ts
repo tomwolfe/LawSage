@@ -628,7 +628,7 @@ export async function verifyCitationsLive(
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
       
       try {
-        const result = await verifyCitationDirect(citation, jurisdiction, true, controller.signal);
+        const result = await verifyCitationDirect(citation, jurisdiction, true);
         clearTimeout(timeoutId);
         results[index] = {
           citation,

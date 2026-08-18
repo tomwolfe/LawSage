@@ -216,7 +216,7 @@ If any field cannot be found, omit it or use an empty array. Return ONLY valid J
     // AUTOMATED DEADLINE TRIGGER: Calculate deadlines based on document type
     const ocrData = validated.data;
     // Use client-provided jurisdiction, or infer from OCR text, or default to Federal
-    const jurisdiction = clientJurisdiction || inferJurisdictionFromText(ocrData.text || '') || 'Federal';
+    const jurisdiction = clientJurisdiction || inferJurisdictionFromText(ocrData.extracted_text || '') || 'Federal';
     let calculatedDeadline: { date: string; daysRemaining: number; rule: string } | undefined;
 
     try {

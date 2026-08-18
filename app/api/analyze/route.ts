@@ -11,7 +11,7 @@ import { CITATION_VERIFICATION } from '../../../config/constants';
 import templateManifest from '../../../public/templates/manifest.json';
 import { readFile } from 'fs/promises';
 import path from 'path';
-import { generateMotionDocument } from '../../../lib/template-assembly';
+import { generateMotionDocument, type MotionData } from '../../../lib/template-assembly';
 import { validateLegalMotion, type LegalMotion } from '../../../lib/schemas/motions';
 import { fetchWithRetry } from '../../../lib/retry';
 
@@ -857,7 +857,7 @@ CRITICAL INSTRUCTIONS:
                     const templateResult = await generateMotionDocument(
                       jurisdiction,
                       (potentialMotion as LegalMotion).type,
-                      potentialMotion as LegalMotion
+                      potentialMotion as MotionData
                     );
                     
                     if (templateResult.success && templateResult.content) {

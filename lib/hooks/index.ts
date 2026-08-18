@@ -16,7 +16,7 @@ import { processImageForOCR } from '../../src/utils/image-processor';
 import { parsePartialJSON } from '../../lib/streaming-json-parser';
 import { createStateVersion, type StateVersion } from '../../types/state';
 import { generateClientFingerprint } from '../utils';
-import { setEncryptedItem, getEncryptedItem } from '../lib/storage-encryption';
+import { setEncryptedItem, getEncryptedItem, removeEncryptedItem } from '../storage-encryption';
 
 /**
  * Result types
@@ -441,13 +441,13 @@ export function useOCRProcessing() {
  * useHistory Hook
  * Manages case analysis history with persistence
  */
-async function parseHistoryFromStorage(): Array<{
+async function parseHistoryFromStorage(): Promise<Array<{
   id: string;
   timestamp: Date;
   jurisdiction: string;
   userInput: string;
   result: LegalResult;
-}> {
+}>> {
   if (typeof window === 'undefined') return [];
   const savedHistory = await getEncryptedItem<Array<{
     id: string;
@@ -479,9 +479,13 @@ export function useHistory() {
     jurisdiction: string;
     userInput: string;
     result: LegalResult;
-  }>>(parseHistoryFromStorage);
+  }>>([]);
 
-  const addToHistory = useCallback((item: {
+  useEffect(() => {
+    parseHistoryFromStorage().then(setHistory);
+  }, []);
+
+  const addToHistory = useCallback(async (item: {
     id: string;
     jurisdiction: string;
     userInput: string;
@@ -495,11 +499,12 @@ export function useHistory() {
       result: item.result
     };
 
+    let updatedHistory: typeof history = [];
     setHistory(prev => {
-      const updated = [newItem, ...prev];
-      await setEncryptedItem('lawsage_history', updated);
-      return updated;
+      updatedHistory = [newItem, ...prev];
+      return updatedHistory;
     });
+    await setEncryptedItem('lawsage_history', updatedHistory);
 
     return newItem;
   }, []);

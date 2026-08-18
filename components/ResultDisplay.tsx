@@ -47,24 +47,27 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
   const [isPlainEnglish, setIsPlainEnglish] = useState(false);
 
   useEffect(() => {
-    if (result && result.text) {
-      try {
-        const validation = validateLegalStructure(result.text);
-        if (!validation.isValid) {
-          const log = await getEncryptedItem<Array<{timestamp: string; jurisdiction: string; input: string; missing: unknown}>>('lawsage_quality_audit') || [];
-          log.push({
-            timestamp: new Date().toISOString(),
-            jurisdiction,
-            input: result.text.substring(0, 100),
-            missing: validation
-          });
-          await setEncryptedItem('lawsage_quality_audit', log.slice(-10));
-          console.warn('LawSage Quality Audit: Low quality response detected.');
+    const auditQuality = async () => {
+      if (result && result.text) {
+        try {
+          const validation = validateLegalStructure(result.text);
+          if (!validation.isValid) {
+            const log = await getEncryptedItem<Array<{timestamp: string; jurisdiction: string; input: string; missing: unknown}>>('lawsage_quality_audit') || [];
+            log.push({
+              timestamp: new Date().toISOString(),
+              jurisdiction,
+              input: result.text.substring(0, 100),
+              missing: validation
+            });
+            await setEncryptedItem('lawsage_quality_audit', log.slice(-10));
+            console.warn('LawSage Quality Audit: Low quality response detected.');
+          }
+        } catch {
+          // Ignore parsing errors for audit logging
         }
-      } catch {
-        // Ignore parsing errors for audit logging
       }
-    }
+    };
+    auditQuality();
   }, [result, jurisdiction]);
 
   const isStepCompleted = (stepNumber: number, title: string) => {

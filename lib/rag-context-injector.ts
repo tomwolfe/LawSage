@@ -28,6 +28,12 @@
  * This prevents hallucination of local rules and procedures.
  */
 import { safeLog, safeError, safeWarn } from './pii-redactor';
+
+// Lazy-loaded Node.js modules (only available in server runtime)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let fs: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let path: any = null;
 import { searchLegalRules, isVectorConfigured, type VectorSearchResult } from './vector';
 
 /**
