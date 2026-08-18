@@ -13,6 +13,20 @@
  * This prevents hallucination of local rules and procedures.
  */
 
+/**
+ * Dynamic RAG Context Injector
+ * 
+ * Addresses Step 3: Advanced RAG (Retrieval Augmented Generation) Integration
+ * 
+ * When a user selects a jurisdiction, this utility:
+ * 1. Loads the actual jurisdiction-specific rules file (e.g., CA.json)
+ * 2. Falls back to vector similarity search if static rules aren't available
+ * 3. Injects it into the System Prompt as "Mandatory Source of Truth"
+ * 4. Explicitly tells the LLM: "If the provided JSON rules conflict with your 
+ *    training data, the JSON is the absolute truth."
+ * 
+ * This prevents hallucination of local rules and procedures.
+ */
 import { safeLog, safeError, safeWarn } from './pii-redactor';
 import { searchLegalRules, isVectorConfigured, type VectorSearchResult } from './vector';
 
@@ -87,24 +101,51 @@ export async function loadJurisdictionRules(
       'georgia': 'GA',
       'wisconsin': 'WI', 'wi': 'WI',
     };
-
+    
     const stateCode = jurisdictionMap[jurisdiction.toLowerCase()] || jurisdiction.substring(0, 2).toUpperCase();
     
-    // Try to load from public/data/jurisdictions/
-    const rulesPath = `/data/jurisdictions/${stateCode}.json`;
+    // Try to load from public/data/jurisdictions/ (Node.js or browser)
+    let rules: JurisdictionRules | null = null;
     
-    safeLog(`[RAG Injector] Loading jurisdiction rules for ${jurisdiction} (${stateCode})`);
-
-    // In browser/edge runtime, fetch from public directory
-    const response = await fetch(rulesPath);
+    // In Node.js runtime (API routes), use fs.readFile
+    if (typeof window === 'undefined') {
+      // Node.js runtime - use filesystem
+      try {
+        if (!fs) {
+          const fsModule = await import('fs/promises');
+          const pathModule = await import('path');
+          fs = fsModule;
+          path = pathModule;
+        }
+        const filePath = path.join(process.cwd(), 'public', 'data', 'jurisdictions', `${stateCode}.json`);
+        const content = await fs.readFile(filePath, 'utf-8');
+        rules = JSON.parse(content) as JurisdictionRules;
+        safeLog(`[RAG Injector] Loaded jurisdiction rules for ${jurisdiction} (${stateCode}) from filesystem`);
+      } catch (fsError) {
+        safeWarn(`[RAG Injector] Filesystem load failed for ${stateCode}:`, fsError);
+        rules = null;
+      }
+    } else {
+      // Browser runtime - use fetch
+      try {
+        const response = await fetch(`/data/jurisdictions/${stateCode}.json`);
+        if (response.ok) {
+          rules = await response.json() as JurisdictionRules;
+          safeLog(`[RAG Injector] Loaded jurisdiction rules for ${jurisdiction} (${stateCode}) from fetch`);
+        }
+      } catch (fetchError) {
+        safeWarn(`[RAG Injector] Fetch failed for ${stateCode}:`, fetchError);
+        rules = null;
+      }
+    }
     
-    if (response.ok) {
-      const rules: JurisdictionRules = await response.json();
-      safeLog(`[RAG Injector] Loaded ${rules.rules?.length || 0} rules for ${stateCode}`);
+    // If rules were loaded successfully, return them
+    if (rules && rules.rules && rules.rules.length > 0) {
+      safeLog(`[RAG Injector] Loaded ${rules.rules.length} rules for ${stateCode}`);
       return rules;
     }
     
-    // Static file not found - try vector search as fallback
+    // Static file not found or empty - try vector search as fallback
     safeWarn(`[RAG Injector] Static rules not found for ${stateCode}, attempting vector search...`);
     
     if (isVectorConfigured() && userInput) {
@@ -115,25 +156,28 @@ export async function loadJurisdictionRules(
       }
     }
     
+    // No rules found - return minimal JurisdictionRules object so the system prompt
+    // at least mentions the correct jurisdiction name
     safeWarn(`[RAG Injector] No rules found for jurisdiction: ${jurisdiction}`);
-    return null;
+    return {
+      jurisdiction,
+      state: stateCode,
+      rules: [],
+      localRules: [],
+      forms: [],
+      deadlines: []
+    };
   } catch (error) {
-    // On error, try vector search as fallback
+    // On error, return minimal rules object
     safeError('[RAG Injector] Failed to load jurisdiction rules:', error);
-    
-    if (isVectorConfigured() && userInput) {
-      try {
-        const vectorResults = await performVectorRAG(jurisdiction, userInput, category);
-        if (vectorResults && vectorResults.rules.length > 0) {
-          safeLog('[RAG Injector] Vector search fallback successful');
-          return vectorResults;
-        }
-      } catch (vectorError) {
-        safeError('[RAG Injector] Vector search fallback failed:', vectorError);
-      }
-    }
-    
-    return null;
+    return {
+      jurisdiction,
+      state: jurisdiction.substring(0, 2).toUpperCase(),
+      rules: [],
+      localRules: [],
+      forms: [],
+      deadlines: []
+    };
   }
 }
 

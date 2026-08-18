@@ -4,6 +4,7 @@ import { validateOCRResult } from '../../../lib/schemas/legal-output';
 import { calculateLegalDeadline, Jurisdiction } from '../../../src/utils/legal-calendar';
 import crypto from 'crypto';
 import { redis, KEY_PREFIX } from '../../../lib/redis';
+import { fetchWithRetry } from '../../../lib/retry';
 
 interface StandardErrorResponse {
   type: string;
@@ -12,6 +13,7 @@ interface StandardErrorResponse {
 
 interface OCRRequest {
   image: string; // base64 encoded image
+  jurisdiction?: string; // Optional jurisdiction for deadline calculation
 }
 
 /**
@@ -22,6 +24,33 @@ interface OCRRequest {
 const OCR_CACHE_TTL_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
 export const runtime = 'nodejs'; // Use Node.js runtime for fs access to rules files
+
+/**
+ * Infer jurisdiction from OCR text by looking for state names in court names
+ * Returns null if no jurisdiction can be determined
+ */
+function inferJurisdictionFromText(text: string): string | null {
+  const stateNames = [
+    'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado',
+    'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho',
+    'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana',
+    'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota',
+    'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada',
+    'New Hampshire', 'New Jersey', 'New Mexico', 'New York',
+    'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon',
+    'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota',
+    'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington',
+    'West Virginia', 'Wisconsin', 'Wyoming'
+  ];
+  
+  const textLower = text.toLowerCase();
+  for (const state of stateNames) {
+    if (textLower.includes(state.toLowerCase())) {
+      return state;
+    }
+  }
+  return null;
+}
 
 /**
  * OCR Endpoint - GLM-4V-Flash Multimodal
@@ -35,7 +64,7 @@ export const runtime = 'nodejs'; // Use Node.js runtime for fs access to rules f
  */
 export async function POST(req: NextRequest) {
   try {
-    const { image }: OCRRequest = await req.json();
+    const { image, jurisdiction: clientJurisdiction }: OCRRequest = await req.json();
 
     if (!image) {
       return NextResponse.json(
@@ -77,7 +106,7 @@ export async function POST(req: NextRequest) {
 
     safeLog('Processing OCR request with GLM-4V-Flash');
 
-    const response = await fetch("https://api.z.ai/api/paas/v4/chat/completions", {
+    const response = await fetchWithRetry("https://api.z.ai/api/paas/v4/chat/completions", {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -122,7 +151,7 @@ If any field cannot be found, omit it or use an empty array. Return ONLY valid J
         temperature: 0.1, // Low temperature for accurate OCR
         max_tokens: 4096
       })
-    });
+    }, 2, 2000); // 2 retries with 2s initial backoff
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -186,7 +215,8 @@ If any field cannot be found, omit it or use an empty array. Return ONLY valid J
 
     // AUTOMATED DEADLINE TRIGGER: Calculate deadlines based on document type
     const ocrData = validated.data;
-    const jurisdiction = 'California'; // Default to California, can be enhanced to accept jurisdiction parameter
+    // Use client-provided jurisdiction, or infer from OCR text, or default to Federal
+    const jurisdiction = clientJurisdiction || inferJurisdictionFromText(ocrData.text || '') || 'Federal';
     let calculatedDeadline: { date: string; daysRemaining: number; rule: string } | undefined;
 
     try {
@@ -237,10 +267,12 @@ If any field cannot be found, omit it or use an empty array. Return ONLY valid J
 
     safeLog('OCR processing successful');
 
-    // Return OCR data with calculated deadline if available
-    const responseData = calculatedDeadline
-      ? { ...ocrData, calculated_deadline: calculatedDeadline }
-      : ocrData;
+    // Return OCR data with calculated deadline and jurisdiction if available
+    const responseData = {
+      ...ocrData,
+      jurisdiction_used: jurisdiction,
+      ...(calculatedDeadline ? { calculated_deadline: calculatedDeadline } : {})
+    };
 
     // Cache the result for future requests
     try {

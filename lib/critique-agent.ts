@@ -64,6 +64,16 @@ function extractStatutes(content: string): string[] {
     // Case Law (e.g., 410 U.S. 113, Roe v. Wade)
     /(\d+\s+[A-Z]\.?\s+[A-Z]\.?\d?d?\s+\d+)/gi,
     /([A-Z][a-z]+\s+v\.\s+[A-Z][a-z]+)/g,
+    // Administrative regulations: 42 C.F.R. § 413.13, 29 C.F.R. § 1926.501
+    /(\d+\s+(?:C\.F\.R\.|CFR)\s+(?:tit\.\s*\d+,?\s*)?§?\s*\d+(?:\.\d+)?)/gi,
+    // State administrative codes: N.Y. Comp. Codes R. & Regs. tit. 18, § 358
+    /([A-Z][a-z]+\.?\s+Comp\.?\s+Codes?\s+R\.?\s*&?\s*Regs?\.?\s+tit\.\s*\d+,?\s*§?\s*\d+)/gi,
+    // Restatements: Restatement (Second) of Torts § 402A
+    /(Restatement\s*\((?:First|Second|Third|Fourth|Fifth)\)\s+of\s+[A-Za-z]+\s+§?\s*\d+[a-z]?)/gi,
+    // UCC: U.C.C. § 2-314
+    /(U\.?C\.?C\.?\s+§?\s*\d+-\d+)/gi,
+    // Bankruptcy code: 11 U.S.C. § 362
+    /(\d+\s+U\.?S\.?C\.?\s+(?:§\s*)?((?:Ch\.?\s*)?\d+|§\s*\d+))/gi,
   ];
 
   const statutes = new Set<string>();

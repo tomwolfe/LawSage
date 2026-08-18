@@ -1,0 +1,115 @@
+{
+  "jurisdiction": "California",
+  "state": "California",
+  "rules": [
+    {
+      "id": "ccp-412.20",
+      "title": "Answer to Complaint",
+      "description": "Answer to Complaint must be filed within 30 days after service of summons (CCP § 412.20)",
+      "category": "filing_deadline",
+      "statuteNumber": "CCP § 412.20",
+      "text": "A defendant must serve and file an answer to the complaint within 30 days after service of the summons and complaint.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "ccp-430.40",
+      "title": "Motion to Dismiss",
+      "description": "Demurrer or Motion to Dismiss must be filed within 60 days of appearance or before filing answer, whichever is earlier",
+      "category": "filing_deadline",
+      "statuteNumber": "CCP § 430.40",
+      "text": "A defendant may file a demurrer or motion to dismiss within 60 days of appearance or before filing an answer, whichever is earlier.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "ccp-2030.260",
+      "title": "Interrogatories",
+      "description": "Response to Form Interrogatories and Request for Production must be served within 30 days (CCP § 2030.260)",
+      "category": "discovery_deadline",
+      "statuteNumber": "CCP § 2030.260",
+      "text": "Responses to interrogatories and requests for production must be served within 30 days of being served on the responding party.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "ccp-2033.250",
+      "title": "Requests for Admission",
+      "description": "Response to Requests for Admission must be served within 30 days (CCP § 2033.250)",
+      "category": "discovery_deadline",
+      "statuteNumber": "CCP § 2033.250",
+      "text": "Responses to requests for admission must be served within 30 days of being served on the responding party.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "ccp-2025.270",
+      "title": "Deposition Notice",
+      "description": "Notice of deposition must be served at least 10 days before deposition date (CCP § 2025.270)",
+      "category": "discovery_deadline",
+      "statuteNumber": "CCP § 2025.270",
+      "text": "A notice of deposition must be served at least 10 days before the deposition date.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "ccp-1005",
+      "title": "Motion Filing Notice Period",
+      "description": "Notice of motion must be served at least 16 court days before hearing (CCP § 1005)",
+      "category": "filing_requirement",
+      "statuteNumber": "CCP § 1005",
+      "text": "A notice of motion must be served at least 16 court days before the hearing date.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "crc-8.104",
+      "title": "Appeal Deadline",
+      "description": "Notice of Appeal must be filed within 60 days after service of Notice of Entry of Judgment (CRC 8.104)",
+      "category": "filing_deadline",
+      "statuteNumber": "CRC 8.104",
+      "text": "A notice of appeal must be filed within 60 days after service of the notice of entry of judgment.",
+      "effectiveDate": "2024-01-01"
+    }
+  ],
+  "localRules": [
+    {
+      "court": "Superior Court of Los Angeles",
+      "ruleNumber": "Local Rule 3.5",
+      "title": "Motion Practice",
+      "text": "All motions must be accompanied by a meet-and-confer declaration.",
+      "category": "local_rule"
+    },
+    {
+      "court": "Superior Court of San Francisco",
+      "ruleNumber": "Local Rule 3.5",
+      "title": "Motion Practice",
+      "text": "All motions require a separate statement of undisputed facts.",
+      "category": "local_rule"
+    }
+  ],
+  "forms": [
+    {
+      "formNumber": "FL-100",
+      "title": "Complaint",
+      "description": "Form for initiating a civil action",
+      "required": true,
+      "url": "/forms/fl-100.pdf"
+    },
+    {
+      "formNumber": "FL-120",
+      "title": "Summons",
+      "description": "Form for notifying defendant of lawsuit",
+      "required": true,
+      "url": "/forms/fl-120.pdf"
+    }
+  ],
+  "deadlines": [
+    {
+      "action": "Answer to Complaint",
+      "days": 30,
+      "description": "Answer to Complaint deadline (30 days from service)",
+      "statuteReference": "CCP § 412.20"
+    },
+    {
+      "action": "Motion to Dismiss",
+      "days": 60,
+      "description": "Motion response deadline",
+      "statuteReference": "CCP § 430.40"
+    }
+  ]
+}

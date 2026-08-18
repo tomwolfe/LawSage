@@ -16,6 +16,7 @@ import { processImageForOCR } from '../../src/utils/image-processor';
 import { parsePartialJSON } from '../../lib/streaming-json-parser';
 import { createStateVersion, type StateVersion } from '../../types/state';
 import { generateClientFingerprint } from '../utils';
+import { setEncryptedItem, getEncryptedItem } from '../lib/storage-encryption';
 
 /**
  * Result types
@@ -371,7 +372,7 @@ export function useOCRProcessing() {
   const [pendingVerification, setPendingVerification] = useState<OCRResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const processDocument = useCallback(async (file: File): Promise<OCRResult | null> => {
+  const processDocument = useCallback(async (file: File, jurisdiction?: string): Promise<OCRResult | null> => {
     setLoading(true);
     setError('');
     setStreamingStatus('Scanning document for evidence...');
@@ -381,7 +382,7 @@ export function useOCRProcessing() {
 
       const res = await fetch('/api/ocr', {
         method: 'POST',
-        body: JSON.stringify({ image: base64 })
+        body: JSON.stringify({ image: base64, jurisdiction })
       });
 
       if (!res.ok) {
@@ -440,7 +441,7 @@ export function useOCRProcessing() {
  * useHistory Hook
  * Manages case analysis history with persistence
  */
-function parseHistoryFromStorage(): Array<{
+async function parseHistoryFromStorage(): Array<{
   id: string;
   timestamp: Date;
   jurisdiction: string;
@@ -448,26 +449,29 @@ function parseHistoryFromStorage(): Array<{
   result: LegalResult;
 }> {
   if (typeof window === 'undefined') return [];
-  const savedHistory = localStorage.getItem('lawsage_history');
+  const savedHistory = await getEncryptedItem<Array<{
+    id: string;
+    timestamp: string;
+    jurisdiction: string;
+    userInput: string;
+    result: LegalResult;
+  }>>('lawsage_history');
   if (savedHistory) {
-    try {
-      const parsed = JSON.parse(savedHistory);
-      if (Array.isArray(parsed)) {
-        return parsed.map((item: Record<string, unknown>) => ({
-          id: (item as { id: string }).id || '',
-          timestamp: new Date((item as { timestamp: string }).timestamp),
-          jurisdiction: (item as { jurisdiction: string }).jurisdiction || '',
-          userInput: (item as { userInput: string }).userInput || '',
-          result: (item as { result: LegalResult }).result || { text: '', sources: [] }
-        }));
-      }
-    } catch (err) {
-      console.error('Failed to parse history:', err);
-    }
+    return savedHistory.map((item) => ({
+      id: item.id || '',
+      timestamp: new Date(item.timestamp),
+      jurisdiction: item.jurisdiction || '',
+      userInput: item.userInput || '',
+      result: item.result || { text: '', sources: [] }
+    }));
   }
   return [];
 }
 
+/**
+ * useHistory Hook
+ * Manages case analysis history with persistence
+ */
 export function useHistory() {
   const [history, setHistory] = useState<Array<{
     id: string;
@@ -493,7 +497,7 @@ export function useHistory() {
 
     setHistory(prev => {
       const updated = [newItem, ...prev];
-      localStorage.setItem('lawsage_history', JSON.stringify(updated));
+      await setEncryptedItem('lawsage_history', updated);
       return updated;
     });
 
@@ -504,9 +508,9 @@ export function useHistory() {
     return history.find(h => h.id === id) || null;
   }, [history]);
 
-  const clearHistory = useCallback(() => {
+  const clearHistory = useCallback(async () => {
     setHistory([]);
-    localStorage.removeItem('lawsage_history');
+    await removeEncryptedItem('lawsage_history');
   }, []);
 
   return {

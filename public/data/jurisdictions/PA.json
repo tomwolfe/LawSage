@@ -1,0 +1,79 @@
+{
+  "jurisdiction": "Pennsylvania",
+  "state": "Pennsylvania",
+  "rules": [
+    {
+      "id": "pa-rccp-1028",
+      "title": "Answer to Complaint",
+      "description": "Answer must be filed within 20 days after service of complaint (Pa. R.C.P. 1028)",
+      "category": "filing_deadline",
+      "statuteNumber": "Pa. R.C.P. 1028",
+      "text": "A defendant must file an answer within 20 days after service of the complaint.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "pa-rccp-1017",
+      "title": "Motion to Dismiss",
+      "description": "Motion to dismiss for failure to state a cause of action (Pa. R.C.P. 1017)",
+      "category": "filing_deadline",
+      "statuteNumber": "Pa. R.C.P. 1017",
+      "text": "A party may move to dismiss if the complaint fails to state a cause of action.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "pa-rccp-4003.1",
+      "title": "Discovery - Interrogatories",
+      "description": "Response to interrogatories must be served within 30 days (Pa. R.C.P. 4003.1)",
+      "category": "discovery_deadline",
+      "statuteNumber": "Pa. R.C.P. 4003.1",
+      "text": "Responses to interrogatories must be served within 30 days after being served.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "pa-rccp-4003.5",
+      "title": "Notice of Deposition",
+      "description": "Notice of deposition must be served at least 10 days before deposition date (Pa. R.C.P. 4003.5)",
+      "category": "discovery_deadline",
+      "statuteNumber": "Pa. R.C.P. 4003.5",
+      "text": "A notice of deposition must be served at least 10 days before the deposition date.",
+      "effectiveDate": "2024-01-01"
+    }
+  ],
+  "localRules": [
+    {
+      "court": "Philadelphia County Court of Common Pleas",
+      "ruleNumber": "Local Rule 204.1",
+      "title": "Motion Practice",
+      "text": "All motions must include a concise statement of the claim or defense.",
+      "category": "local_rule"
+    }
+  ],
+  "forms": [
+    {
+      "formNumber": "Complaint",
+      "description": "Pennsylvania complaint form",
+      "required": true,
+      "url": "/forms/pa_complaint.pdf"
+    },
+    {
+      "formNumber": "Summons",
+      "description": "Pennsylvania summons form",
+      "required": true,
+      "url": "/forms/pa_summons.pdf"
+    }
+  ],
+  "deadlines": [
+    {
+      "action": "Answer to Complaint",
+      "days": 20,
+      "description": "Answer filing deadline (20 days from service)",
+      "statuteReference": "Pa. R.C.P. 1028"
+    },
+    {
+      "action": "Discovery Interrogatories",
+      "days": 30,
+      "description": "Response to interrogatories deadline",
+      "statuteReference": "Pa. R.C.P. 4003.1"
+    }
+  ]
+}

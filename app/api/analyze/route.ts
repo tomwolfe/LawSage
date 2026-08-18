@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { SafetyValidator } from '../../../lib/validation-middleware';
+import { SafetyValidator, validateWithMiddleware } from '../../../lib/validation-middleware';
 import { safeLog, safeError, safeWarn, redactPII } from '../../../lib/pii-redactor';
 import { withRateLimit } from '../../../lib/rate-limiter';
 import { getLegalLookupResponse, searchExParteRules } from '../../../src/utils/legal-lookup';
@@ -11,6 +11,9 @@ import { CITATION_VERIFICATION } from '../../../config/constants';
 import templateManifest from '../../../public/templates/manifest.json';
 import { readFile } from 'fs/promises';
 import path from 'path';
+import { generateMotionDocument } from '../../../lib/template-assembly';
+import { validateLegalMotion, type LegalMotion } from '../../../lib/schemas/motions';
+import { fetchWithRetry } from '../../../lib/retry';
 
 export const runtime = 'nodejs'; // Unified runtime with OCR for consistent deployment
 
@@ -49,12 +52,6 @@ interface LegalOutput {
   local_logistics?: Record<string, unknown>;
   procedural_checks?: string[];
   [key: string]: unknown;
-}
-
-interface ValidationResult {
-  valid: boolean;
-  errors?: string[];
-  missingFields?: string[];
 }
 
 /**
@@ -110,57 +107,6 @@ function detectCaseCategory(userInput: string): keyof typeof CASE_CATEGORIES | '
   
   // Return best matching category if found, otherwise 'General'
   return bestMatch ? bestMatch.category : 'General';
-}
-
-function validateLegalOutputStructure(output: LegalOutput): ValidationResult {
-  const errors: string[] = [];
-  const missingFields: string[] = [];
-
-  if (!output.disclaimer) {
-    missingFields.push('disclaimer');
-    errors.push('Missing required disclaimer');
-  }
-
-  if (!output.strategy) {
-    missingFields.push('strategy');
-    errors.push('Missing required strategy section');
-  }
-
-  if (!output.adversarial_strategy) {
-    missingFields.push('adversarial_strategy');
-    errors.push('Missing required adversarial strategy (red-team analysis)');
-  }
-
-  if (!output.roadmap || output.roadmap.length === 0) {
-    missingFields.push('roadmap');
-    errors.push('Missing required roadmap or roadmap is empty');
-  }
-
-  if (!output.filing_template) {
-    missingFields.push('filing_template');
-    errors.push('Missing required filing template');
-  }
-
-  if (!output.citations || output.citations.length < 3) {
-    missingFields.push('citations');
-    errors.push(`Insufficient citations (found ${output.citations?.length || 0}, required 3)`);
-  }
-
-  if (!output.local_logistics) {
-    missingFields.push('local_logistics');
-    errors.push('Missing required local logistics information');
-  }
-
-  if (!output.procedural_checks || output.procedural_checks.length === 0) {
-    missingFields.push('procedural_checks');
-    errors.push('Missing required procedural checks');
-  }
-
-  return {
-    valid: errors.length === 0,
-    errors: errors.length > 0 ? errors : undefined,
-    missingFields: missingFields.length > 0 ? missingFields : undefined,
-  };
 }
 
 function keywordOverlapScore(userInput: string, templateKeywords: string[]): number {
@@ -698,7 +644,7 @@ CRITICAL INSTRUCTIONS:
               abortController.abort();
             }, timeoutMs);
 
-            const response = await fetch(GLM_API_URL, {
+            const response = await fetchWithRetry(GLM_API_URL, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -717,7 +663,7 @@ CRITICAL INSTRUCTIONS:
                 stream: true
               }),
               signal: abortController.signal
-            });
+            }, 2, 2000); // 2 retries with 2s initial backoff
 
             clearTimeout(timeoutId);
 
@@ -879,25 +825,54 @@ CRITICAL INSTRUCTIONS:
                 throw new Error("Could not recover any usable data from AI response");
               }
 
-              const validation = validateLegalOutputStructure(parsedOutput);
+              const validation = await validateWithMiddleware(parsedOutput, {
+                enableSelfCorrection: false,
+              });
 
               if (!validation.valid) {
                 safeError(`Validation failed:`, validation.errors);
-                parsedOutput = {
-                  disclaimer: parsedOutput.disclaimer || "LEGAL DISCLAIMER: I am an AI helping you represent yourself Pro Se. This is legal information, not legal advice. Always consult with a qualified attorney.",
-                  strategy: parsedOutput.strategy || "Analysis incomplete. Please try again with more details.",
-                  adversarial_strategy: parsedOutput.adversarial_strategy || "Red-team analysis unavailable due to incomplete output structure.",
-                  roadmap: parsedOutput.roadmap && parsedOutput.roadmap.length > 0 ? parsedOutput.roadmap : [{ step: 1, title: "Consult an attorney", description: "Seek professional legal advice for your specific situation." }],
-                  filing_template: parsedOutput.filing_template || "Template generation failed. Please provide more specific details.",
-                  citations: parsedOutput.citations || [],
-                  local_logistics: parsedOutput.local_logistics || { courthouse_address: "Consult local court directory" },
-                  procedural_checks: parsedOutput.procedural_checks || []
-                };
+                // Return structured error instead of filling with placeholder text
+                controller.enqueue(encoder.encode(JSON.stringify({
+                  type: 'error',
+                  error: `Analysis output did not meet quality standards: ${validation.errors?.join('; ') || 'Unknown validation error'}`,
+                  validationErrors: validation.errors
+                }) + '\n'));
+                controller.close();
+                return;
               }
 
               // Note: Critique/Audit loop has been decoupled to a separate endpoint (/api/audit)
               // to stay within Vercel Hobby Tier's 60s timeout limit.
               // The frontend will call the audit endpoint separately after receiving this response.
+
+              // TEMPLATE ASSEMBLY: Attempt to generate structured filing from template
+              if (parsedOutput.filing_template) {
+                try {
+                  // Try to parse filing_template as a LegalMotion object
+                  const potentialMotion = JSON.parse(parsedOutput.filing_template);
+                  const motionValidation = validateLegalMotion(potentialMotion as LegalMotion);
+                  
+                  if (motionValidation.isValid) {
+                    safeLog(`[Template Assembly] Valid motion schema detected: ${(potentialMotion as LegalMotion).type}`);
+                    const templateResult = await generateMotionDocument(
+                      jurisdiction,
+                      (potentialMotion as LegalMotion).type,
+                      potentialMotion as LegalMotion
+                    );
+                    
+                    if (templateResult.success && templateResult.content) {
+                      parsedOutput.filing_template = templateResult.content;
+                      safeLog(`[Template Assembly] Structured filing generated successfully`);
+                    } else {
+                      safeWarn(`[Template Assembly] Failed to generate structured filing:`, templateResult.errors);
+                      // Fall back to free-text template
+                    }
+                  }
+                  // If not a valid motion, keep the free-text template
+                } catch {
+                  // Not JSON, keep the free-text template (expected behavior)
+                }
+              }
 
               // HARD-GATE CITATION VERIFICATION
               const isStrictMode = CITATION_VERIFICATION.STRICT_MODE || process.env.CITATION_VERIFICATION_STRICT_MODE === 'true';

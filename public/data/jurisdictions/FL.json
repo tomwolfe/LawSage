@@ -1,0 +1,79 @@
+{
+  "jurisdiction": "Florida",
+  "state": "Florida",
+  "rules": [
+    {
+      "id": "fl-frcp-1.090",
+      "title": "Answer to Complaint",
+      "description": "Answer must be served within 20 days after service of process (FL Civ. R. 1.090)",
+      "category": "filing_deadline",
+      "statuteNumber": "FL Civ. R. 1.090",
+      "text": "A defendant must serve and file an answer within 20 days after service of process.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "fl-frcp-1.140",
+      "title": "Motion to Dismiss",
+      "description": "Motion to dismiss for failure to state a claim (FL Civ. R. 1.140)",
+      "category": "filing_deadline",
+      "statuteNumber": "FL Civ. R. 1.140",
+      "text": "A party may move to dismiss if the complaint fails to state a cause of action.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "fl-frcp-1.340",
+      "title": "Discovery - Interrogatories",
+      "description": "Response to interrogatories must be served within 30 days (FL Civ. R. 1.340)",
+      "category": "discovery_deadline",
+      "statuteNumber": "FL Civ. R. 1.340",
+      "text": "Responses to interrogatories must be served within 30 days after being served.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "fl-frcp-1.350",
+      "title": "Notice of Deposition",
+      "description": "Notice of deposition must be served at least 10 days before deposition (FL Civ. R. 1.350)",
+      "category": "discovery_deadline",
+      "statuteNumber": "FL Civ. R. 1.350",
+      "text": "A notice of deposition must be served at least 10 days before the deposition date.",
+      "effectiveDate": "2024-01-01"
+    }
+  ],
+  "localRules": [
+    {
+      "court": "Circuit Court, Miami-Dade County",
+      "ruleNumber": "Miami-Dade LR 1.090",
+      "title": "Motion Practice",
+      "text": "All motions require a statement of last known address and contact information.",
+      "category": "local_rule"
+    }
+  ],
+  "forms": [
+    {
+      "formNumber": "Florida Complaint",
+      "description": "Florida complaint form",
+      "required": true,
+      "url": "/forms/fl_complaint.pdf"
+    },
+    {
+      "formNumber": "Florida Summons",
+      "description": "Florida summons form",
+      "required": true,
+      "url": "/forms/fl_summons.pdf"
+    }
+  ],
+  "deadlines": [
+    {
+      "action": "Answer to Complaint",
+      "days": 20,
+      "description": "Answer filing deadline (20 days from service)",
+      "statuteReference": "FL Civ. R. 1.090"
+    },
+    {
+      "action": "Discovery Interrogatories",
+      "days": 30,
+      "description": "Response to interrogatories deadline",
+      "statuteReference": "FL Civ. R. 1.340"
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { safeLog, safeError } from '../../../lib/pii-redactor';
+import { fetchWithRetry } from '../../../lib/retry';
 
 interface InterviewRequest {
   user_input: string;
@@ -85,7 +86,7 @@ ${existingContext || 'None yet'}
 
 Generate clarifying questions. Focus on gaps in the information provided. If the user mentioned an eviction, ask about notice type, service date, service method, reason, and any defenses. If they mentioned a contract dispute, ask about contract terms, breach details, and damages.`;
 
-    const response = await fetch('https://api.z.ai/api/paas/v4/chat/completions', {
+    const response = await fetchWithRetry('https://api.z.ai/api/paas/v4/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -100,7 +101,7 @@ Generate clarifying questions. Focus on gaps in the information provided. If the
         temperature: 0.3,
         max_tokens: 1000,
       }),
-    });
+    }, 2, 2000); // 2 retries with 2s initial backoff
 
     if (!response.ok) {
       throw new Error(`GLM API error: ${response.status}`);

@@ -9,13 +9,36 @@ import ClientPortal from '@/components/ClientPortal';
 
 export default function Home() {
   const [consentAccepted, setConsentAccepted] = useState(false);
+  const [showReadOnly, setShowReadOnly] = useState(false);
 
   return (
     <div className="space-y-12 pb-20">
       <InformedConsentModal 
-        isOpen={!consentAccepted}
+        isOpen={!consentAccepted && !showReadOnly}
         onAccept={() => setConsentAccepted(true)}
+        onDecline={() => setShowReadOnly(true)}
       />
+      
+      {showReadOnly && (
+        <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+            <h3 className="text-xl font-bold text-amber-900 mb-4">Consent Required</h3>
+            <p className="text-slate-700 mb-6">
+              LawSage requires informed consent to function as a legal information tool. 
+              You have declined to provide consent. The tool requires consent to operate.
+            </p>
+            <p className="text-slate-600 text-sm">
+              You can change your decision at any time by re-enabling the tool.
+            </p>
+            <button
+              onClick={() => setShowReadOnly(false)}
+              className="mt-4 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+            >
+              Re-enable LawSage
+            </button>
+          </div>
+        </div>
+      )}
       
       <div className="text-center space-y-4 pt-4">
         <h1 className="text-4xl md:text-6xl font-extrabold text-slate-900 tracking-tight">

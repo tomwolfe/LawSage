@@ -3,7 +3,7 @@
 import React, { useRef } from 'react';
 import { Download, Upload } from 'lucide-react';
 import { toast } from 'sonner';
-import { safeError } from '../lib/pii-redactor';
+import { setEncryptedItem, getEncryptedItem } from '../lib/storage-encryption';
 
 interface Source {
   title: string | null;
@@ -31,14 +31,14 @@ interface HistoryActionsProps {
 export default function HistoryActions({ onImport }: Omit<HistoryActionsProps, 'history'>) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleExport = () => {
-    const savedHistory = localStorage.getItem('lawsage_history');
+  const handleExport = async () => {
+    const savedHistory = await getEncryptedItem<CaseHistoryItem[]>('lawsage_history');
     if (!savedHistory) {
       toast.error('No history found to export.');
       return;
     }
 
-    const blob = new Blob([savedHistory], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(savedHistory)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     const date = new Date().toISOString().split('T')[0];
@@ -55,12 +55,12 @@ export default function HistoryActions({ onImport }: Omit<HistoryActionsProps, '
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const content = e.target?.result as string;
         const importedData = JSON.parse(content);
@@ -90,21 +90,17 @@ export default function HistoryActions({ onImport }: Omit<HistoryActionsProps, '
         }
 
         // Merge with existing history, avoiding duplicates by id
-        const existingHistoryStr = localStorage.getItem('lawsage_history');
-        let existingHistory: CaseHistoryItem[] = [];
-        if (existingHistoryStr) {
-          try {
-            existingHistory = JSON.parse(existingHistoryStr).map((item: CaseHistoryItem) => ({
-              ...item,
-              timestamp: new Date(item.timestamp)
-            }));
-          } catch (err) {
-            safeError('Failed to parse existing history during merge', err);
-          }
+        const existingHistory = await getEncryptedItem<CaseHistoryItem[]>('lawsage_history') || [];
+        let existingHistoryItems: CaseHistoryItem[] = [];
+        if (existingHistory.length > 0) {
+          existingHistoryItems = existingHistory.map((item: CaseHistoryItem) => ({
+            ...item,
+            timestamp: new Date(item.timestamp)
+          }));
         }
 
         const mergedHistory = [...validatedItems];
-        existingHistory.forEach(existingItem => {
+        existingHistoryItems.forEach(existingItem => {
           if (!mergedHistory.find(item => item.id === existingItem.id)) {
             mergedHistory.push(existingItem);
           }
@@ -113,7 +109,7 @@ export default function HistoryActions({ onImport }: Omit<HistoryActionsProps, '
         // Sort by timestamp descending (newest first)
         mergedHistory.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
-        localStorage.setItem('lawsage_history', JSON.stringify(mergedHistory));
+        await setEncryptedItem('lawsage_history', mergedHistory);
         onImport(mergedHistory);
 
         if (fileInputRef.current) {

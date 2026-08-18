@@ -207,6 +207,16 @@ export function isValidCitationFormat(citation: string): boolean {
     /(?:Fed\.?\s+R\.?\s+(?:Civ\.?\s+)?P\.?|Cal\.?\s+Rules\s+of\s+Court|Local\s+Rule)\s+\d+/i,
     // Case citations
     /\d+\s+(?:F\.?\d+d?|F\.?\s+Supp\.?\s*\d*d?|Cal\.?\s+(?:App\.?\s*)?\d*|S\.?\s+Ct\.?|L\.?\s+Ed\.?\s*\d*)\s+\d+/i,
+    // Administrative regulations
+    /\d+\s+(?:C\.F\.R\.|CFR)\s+(?:tit\.\s*\d+,?\s*)?§?\s*\d+(?:\.\d+)?/i,
+    // State administrative codes
+    /[A-Z]+\.?\s*[A-Z]*\.?\s+Comp\.?\s+Codes?\s+R\.\s*&\s*Regs?\.?\s*tit\.\s+\d+,\s*§\s*\d+/i,
+    // Restatements
+    /Restatement\s*\((?:First|Second|Third|Fourth|Fifth)\)\s+of\s+[A-Za-z]+\s+§?\s*\d+(?:\.\d+)?[a-z]?/i,
+    // UCC
+    /U\.?C\.?C\.?\s+§?\s*\d+-\d+/i,
+    // Bankruptcy code
+    /\d+\s+U\.?S\.?C\.?\s+(?:§\s*)?((?:Ch\.?\s*)?\d+|§\s*\d+)/i,
   ];
   
   return citationPatterns.some(pattern => pattern.test(citation));
@@ -221,6 +231,16 @@ export function extractCitations(content: string): string[] {
     /[A-Z][a-z]+\.?\s+(?:Stat\.?|Code|Crim\.?\s+Proc\.?)\s+§?\s*\d+(?:\.\d+)?[a-z]?/gi,
     /(?:Fed\.?\s+R\.?\s+(?:Civ\.?\s+)?P\.?)\s+\d+(?:[a-z]|\(\d+\))?/gi,
     /\d+\s+(?:F\.?\d+d?|F\.?\s+Supp\.?\s*\d*d?|S\.?\s+Ct\.?|L\.?\s+Ed\.?\s*\d*)\s+\d+/gi,
+    // Administrative regulations
+    /\d+\s+(?:C\.F\.R\.|CFR)\s+(?:tit\.\s*\d+,?\s*)?§?\s*\d+(?:\.\d+)?/gi,
+    // State administrative codes
+    /[A-Z]+\.?\s*[A-Z]*\.?\s+Comp\.?\s+Codes?\s+R\.\s*&\s*Regs?\.?\s*tit\.\s+\d+,\s*§\s*\d+/gi,
+    // Restatements
+    /Restatement\s*\((?:First|Second|Third|Fourth|Fifth)\)\s+of\s+[A-Za-z]+\s+§?\s*\d+[a-z]?/gi,
+    // UCC
+    /U\.?C\.?C\.?\s+§?\s*\d+-\d+/gi,
+    // Bankruptcy code
+    /\d+\s+U\.?S\.?C\.?\s+(?:§\s*)?((?:Ch\.?\s*)?\d+|§\s*\d+)/gi,
   ];
   
   const citations = new Set<string>();

@@ -9,6 +9,7 @@ import { safeError } from '../lib/pii-redactor';
 import { cn } from './results/types';
 import { parseLegalOutput } from './results/parse';
 import { exportAnalysisToWord, generateProfessionalPdf, downloadFilingsAsMarkdown, downloadFilingsAsPDF } from './results/export';
+import { setEncryptedItem, getEncryptedItem } from '../lib/storage-encryption';
 import StrategyTab from './results/StrategyTab';
 import OppositionViewTab from './results/OppositionViewTab';
 import BattlePlanTab from './results/BattlePlanTab';
@@ -50,14 +51,14 @@ export default function ResultDisplay({ result, activeTab, setActiveTab, jurisdi
       try {
         const validation = validateLegalStructure(result.text);
         if (!validation.isValid) {
-          const log = JSON.parse(localStorage.getItem('lawsage_quality_audit') || '[]');
+          const log = await getEncryptedItem<Array<{timestamp: string; jurisdiction: string; input: string; missing: unknown}>>('lawsage_quality_audit') || [];
           log.push({
             timestamp: new Date().toISOString(),
             jurisdiction,
             input: result.text.substring(0, 100),
             missing: validation
           });
-          localStorage.setItem('lawsage_quality_audit', JSON.stringify(log.slice(-10)));
+          await setEncryptedItem('lawsage_quality_audit', log.slice(-10));
           console.warn('LawSage Quality Audit: Low quality response detected.');
         }
       } catch {

@@ -614,21 +614,47 @@ export async function verifyCitationsLive(
   citations: string[],
   jurisdiction: string
 ): Promise<Array<{ citation: string; is_verified: boolean; details?: string }>> {
-  const results = [];
+  // Use Promise.allSettled for parallel verification
+  // Each citation has an 8-second timeout to prevent blocking the response
+  const timeoutMs = 8000;
   
-  for (const citation of citations) {
-    try {
-      const result = await verifyCitationDirect(citation, jurisdiction, true);
-      results.push({
-        citation,
-        is_verified: result.is_verified,
-        details: result.details,
-      });
-    } catch (error) {
-      safeError(`Live verification failed for ${citation}:`, error);
-      results.push({ citation, is_verified: false, details: 'Network error during verification' });
-    }
-  }
+  // Track results in the same order as input citations
+  const results: Array<{ citation: string; is_verified: boolean; details?: string }> = 
+    citations.map(() => ({ citation: '', is_verified: false, details: '' }));
+  
+  await Promise.allSettled(
+    citations.map(async (citation, index) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      
+      try {
+        const result = await verifyCitationDirect(citation, jurisdiction, true, controller.signal);
+        clearTimeout(timeoutId);
+        results[index] = {
+          citation,
+          is_verified: result.is_verified,
+          details: result.details,
+        };
+      } catch (error) {
+        clearTimeout(timeoutId);
+        // If abort error (timeout), mark as unverified with clear message
+        if (error instanceof DOMException && error.name === 'AbortError') {
+          results[index] = {
+            citation,
+            is_verified: false,
+            details: 'Verification timed out',
+          };
+        } else {
+          safeError(`Live verification failed for ${citation}:`, error);
+          results[index] = {
+            citation,
+            is_verified: false,
+            details: 'Network error during verification',
+          };
+        }
+      }
+    })
+  );
   
   return results;
 }

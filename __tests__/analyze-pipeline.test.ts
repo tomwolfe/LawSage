@@ -68,19 +68,25 @@ const legalOutputFixture: LegalOutput = {
       description: 'File the motion at the courthouse.',
       counter_measure: 'The clerk may request additional copies.',
     },
+    {
+      step: 3,
+      title: 'Serve the opposition',
+      description: 'Serve the filed motion on all parties.',
+      counter_measure: 'Opposition has 30 days to respond.',
+    },
   ],
   filing_template:
-    'MOTION TO DISMISS\n\nCitation used: Cal. Civ. Code § 999999 and 123 Cal.App.5th 456.',
+    'MOTION TO DISMISS\n\nIN THE SUPERIOR COURT OF CALIFORNIA\n\nPLAINTIFF v. DEFENDANT\n\nCaption: Motion to Dismiss\n\nCitation used: Cal. Civ. Code § 999999 and 123 Cal.App.5th 456.',
   citations: [
-    { text: 'Cal. Civ. Code § 999999', source: 'statute', url: 'https://leginfo.legislature.ca.gov' },
-    { text: '42 U.S.C. § 1983', source: 'statute', url: 'https://uscode.house.gov' },
-    { text: '123 Cal.App.5th 456', source: 'case', url: 'https://www.courtlistener.com' },
+    { text: 'Cal. Civ. Code § 999999', source: 'state statute', url: 'https://leginfo.legislature.ca.gov' },
+    { text: '42 U.S.C. § 1983', source: 'federal statute', url: 'https://uscode.house.gov' },
+    { text: '123 Cal.App.5th 456', source: 'case law', url: 'https://www.courtlistener.com' },
   ],
   local_logistics: {
-    courthouse_address: '123 Main St, Los Angeles, CA',
+    courthouse_address: '123 Main St, Los Angeles, CA 90012',
     filing_fees: '$435',
   },
-  procedural_checks: ['File within 30 days', 'Attach proof of service'],
+  procedural_checks: ['File within 30 days', 'Attach proof of service', 'Include proper caption'],
 };
 
 function sseLine(data: unknown): Uint8Array {

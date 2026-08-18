@@ -8,6 +8,7 @@ const consentVersion = '1.0';
 interface InformedConsentModalProps {
   isOpen: boolean;
   onAccept: () => void;
+  onDecline: () => void;
 }
 
 /**
@@ -139,10 +140,9 @@ export default function InformedConsentModal({ isOpen, onAccept }: InformedConse
           </div>
           <button
             ref={lastButtonRef}
-            onClick={() => {}}
+            onClick={onDecline}
             className="text-amber-600 hover:text-amber-800 p-1 rounded-lg hover:bg-amber-100 transition-colors"
             aria-label="Close dialog"
-            disabled
           >
             <X size={20} />
           </button>
@@ -271,6 +271,16 @@ export default function InformedConsentModal({ isOpen, onAccept }: InformedConse
             }`}
           >
             {allChecked ? 'I Understand & Accept' : 'Check All Boxes to Continue'}
+          </button>
+          <button
+            onClick={onDecline}
+            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
+              allChecked
+                ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md hover:shadow-lg'
+                : 'bg-slate-300 text-slate-500 cursor-not-allowed'
+            }`}
+          >
+            Decline
           </button>
         </div>
       </div>

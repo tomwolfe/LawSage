@@ -1,0 +1,100 @@
+{
+  "jurisdiction": "Federal",
+  "state": "Federal",
+  "rules": [
+    {
+      "id": "frcp-12a1",
+      "title": "Answer to Complaint",
+      "description": "Answer must be served within 21 days after service of summons and complaint (FRCP § 12(a)(1)(A)(i))",
+      "category": "filing_deadline",
+      "statuteNumber": "FRCP § 12(a)(1)(A)(i)",
+      "text": "An answer must be served on the opposing party within 21 days after the service of the summons and complaint.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "frcp-12b",
+      "title": "Motion to Dismiss",
+      "description": "Motion to Dismiss must be filed before answer, typically within 21 days of service (FRCP § 12(b))",
+      "category": "filing_deadline",
+      "statuteNumber": "FRCP § 12(b)",
+      "text": "A motion to dismiss may be filed before the answer, typically within 21 days of service of the complaint.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "frcp-33b2",
+      "title": "Interrogatories",
+      "description": "Response to interrogatories must be served within 30 days (FRCP § 33(b)(2))",
+      "category": "discovery_deadline",
+      "statuteNumber": "FRCP § 33(b)(2)",
+      "text": "Responses to interrogatories must be served within 30 days after being served on the responding party.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "frcp-36a3",
+      "title": "Requests for Admission",
+      "description": "Response to requests for admission must be served within 30 days (FRCP § 36(a)(3))",
+      "category": "discovery_deadline",
+      "statuteNumber": "FRCP § 36(a)(3)",
+      "text": "Responses to requests for admission must be served within 30 days after being served on the responding party.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "frcp-30b1",
+      "title": "Deposition Notice",
+      "description": "Reasonable notice must be given for deposition (typically 14 days minimum)",
+      "category": "discovery_deadline",
+      "statuteNumber": "FRCP § 30(b)(1)",
+      "text": "Reasonable notice must be given to the deponent, typically at least 14 days before the deposition.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "frcp-26a1",
+      "title": "Initial Disclosure",
+      "description": "Initial disclosures due within 14 days after Rule 26(f) conference (FRCP § 26(a)(1)(C))",
+      "category": "filing_requirement",
+      "statuteNumber": "FRCP § 26(a)(1)(C)",
+      "text": "Initial disclosures must be provided within 14 days after the Rule 26(f) conference.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "frap-4a1",
+      "title": "Appeal Deadline",
+      "description": "Notice of Appeal must be filed within 30 days after entry of judgment (FRAP § 4(a)(1)(A))",
+      "category": "filing_deadline",
+      "statuteNumber": "FRAP § 4(a)(1)(A)",
+      "text": "A notice of appeal must be filed within 30 days after entry of the judgment or order being appealed.",
+      "effectiveDate": "2024-01-01"
+    }
+  ],
+  "localRules": [],
+  "forms": [
+    {
+      "formNumber": "AO 240",
+      "title": "Application to Proceed In Forma Pauperis",
+      "description": "Form for requesting waiver of court fees and costs",
+      "required": true,
+      "url": "/forms/ao240.pdf"
+    },
+    {
+      "formNumber": "AO 108",
+      "title": "Summons",
+      "description": "Form for notifying defendant of federal lawsuit",
+      "required": true,
+      "url": "/forms/ao108.pdf"
+    }
+  ],
+  "deadlines": [
+    {
+      "action": "Answer to Complaint",
+      "days": 21,
+      "description": "Answer must be served within 21 days after service of summons and complaint",
+      "statuteReference": "FRCP § 12(a)(1)(A)(i)"
+    },
+    {
+      "action": "Motion to Dismiss",
+      "days": 21,
+      "description": "Motion to Dismiss must be filed before answer, typically within 21 days of service",
+      "statuteReference": "FRCP § 12(b)"
+    }
+  ]
+}

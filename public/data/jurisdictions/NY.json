@@ -1,0 +1,88 @@
+{
+  "jurisdiction": "New York",
+  "state": "New York",
+  "rules": [
+    {
+      "id": "cpy-306",
+      "title": "Answer to Complaint",
+      "description": "Answer must be served within 20 days after service of summons (CPLR § 306)",
+      "category": "filing_deadline",
+      "statuteNumber": "CPLR § 306",
+      "text": "A defendant must serve and file an answer within 20 days after service of the summons.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "cpy-3211",
+      "title": "Motion to Dismiss",
+      "description": "Motion to dismiss for failure to state a cause of action (CPLR § 3211)",
+      "category": "filing_deadline",
+      "statuteNumber": "CPLR § 3211",
+      "text": "A party may move to dismiss for failure to state a cause of action at any time.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "cpy-3101",
+      "title": "Discovery - Interrogatories",
+      "description": "Response to interrogatories must be served within 30 days (CPLR § 3101)",
+      "category": "discovery_deadline",
+      "statuteNumber": "CPLR § 3101",
+      "text": "Responses to interrogatories must be served within 30 days after being served.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "cpy-3102",
+      "title": "Discovery - Deposition",
+      "description": "Notice of deposition must be served within 10 days (CPLR § 3102)",
+      "category": "discovery_deadline",
+      "statuteNumber": "CPLR § 3102",
+      "text": "A notice of deposition must be served at least 10 days before the deposition date.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "cpy-3212",
+      "title": "Motion for Summary Judgment",
+      "description": "Motion for summary judgment timing (CPLR § 3212)",
+      "category": "filing_requirement",
+      "statuteNumber": "CPLR § 3212",
+      "text": "A motion for summary judgment may be made at any time after issue is joined.",
+      "effectiveDate": "2024-01-01"
+    }
+  ],
+  "localRules": [
+    {
+      "court": "Supreme Court, New York County",
+      "ruleNumber": "22 NYCRR 202.32",
+      "title": "Motion Practice",
+      "text": "All motions require a statement of intended outcome and relief sought.",
+      "category": "local_rule"
+    }
+  ],
+  "forms": [
+    {
+      "formNumber": "Summons with Notice",
+      "description": "Summons initiating a personal injury action",
+      "required": true,
+      "url": "/forms/summons_notice.pdf"
+    },
+    {
+      "formNumber": "Complaint",
+      "description": "Complaint for personal injury",
+      "required": true,
+      "url": "/forms/complaint.pdf"
+    }
+  ],
+  "deadlines": [
+    {
+      "action": "Answer to Complaint",
+      "days": 20,
+      "description": "Answer to Complaint deadline (20 days from service)",
+      "statuteReference": "CPLR § 306"
+    },
+    {
+      "action": "Discovery Interrogatories",
+      "days": 30,
+      "description": "Response to interrogatories deadline",
+      "statuteReference": "CPLR § 3101"
+    }
+  ]
+}

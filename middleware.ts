@@ -22,8 +22,8 @@ function ensureSessionCookie(request: NextRequest): string {
     return existingSession;
   }
   
-  // Generate new session token
-  const sessionToken = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+  // Generate new session token using cryptographically secure random
+  const sessionToken = `sess_${Date.now()}_${crypto.randomUUID()}`;
   
   return sessionToken;
 }
@@ -102,13 +102,13 @@ async function checkRateLimit(
       limit: RATE_LIMIT.SERVER_MAX_REQUESTS,
     };
   } catch (error) {
-    // Redis unavailable or error - fail open with warning
-    console.warn('[RateLimiter] Redis error, failing open:', error instanceof Error ? error.message : error);
+    // Redis unavailable or error - fail closed for security
+    console.warn('[RateLimiter] Redis error, failing closed:', error instanceof Error ? error.message : error);
 
-    // Return permissive response but mark as degraded
+    // Reject request when rate limiter is degraded
     return {
-      allowed: true,
-      remaining: RATE_LIMIT.SERVER_MAX_REQUESTS - 1,
+      allowed: false,
+      remaining: 0,
       resetAt: now + RATE_LIMIT.WINDOW_MS,
       limit: RATE_LIMIT.SERVER_MAX_REQUESTS,
     };

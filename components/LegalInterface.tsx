@@ -108,8 +108,8 @@ export default function LegalInterface() {
   const [evidence, setEvidence] = useState<OCRResult[]>([]);
   /** Set to true to show the clarifying-questions interview before analysis */
   const [showInterview, setShowInterview] = useState(false);
-  /** Current state version for drift prevention */
-  const [currentStateId, setCurrentStateId] = useState<string>('');
+  /** Current state version for drift prevention (ref to avoid stale closures) */
+  const currentStateIdRef = useRef<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -340,7 +340,8 @@ export default function LegalInterface() {
     // STATE DRIFT PREVENTION: Include stateId and stateHash
     const currentState = { userInput: effectiveInput, jurisdiction, evidence, activeTab };
     const stateVersion = await createStateVersion(currentState);
-    setCurrentStateId(stateVersion.stateId);
+    // Update ref IMMEDIATELY so the audit callback captures the fresh value
+    currentStateIdRef.current = stateVersion.stateId;
 
     const auditPayload = {
       analysis: finalResult.text,
@@ -361,7 +362,8 @@ export default function LegalInterface() {
       .then(res => res.json())
       .then(auditData => {
         // STATE DRIFT CHECK: Reject audit if state has changed
-        if (auditData.stateId && auditData.stateId !== currentStateId) {
+        // Use ref.current instead of state to avoid stale closure
+        if (auditData.stateId && auditData.stateId !== currentStateIdRef.current) {
           safeWarn('[State Drift] Audit result rejected - state has changed');
           return; // Reject stale audit result
         }
@@ -537,7 +539,7 @@ export default function LegalInterface() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const ocrData = await processDocument(file);
+    const ocrData = await processDocument(file, jurisdiction);
 
     if (ocrData) {
       // 1. Add to our "Evidence Vault"

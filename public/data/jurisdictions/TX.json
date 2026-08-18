@@ -1,0 +1,79 @@
+{
+  "jurisdiction": "Texas",
+  "state": "Texas",
+  "rules": [
+    {
+      "id": "tcp-21.03",
+      "title": "Answer to Complaint",
+      "description": "Answer must be filed by Monday following expiration of 20 days after service of citation (Tex. R. Civ. P. 21a)",
+      "category": "filing_deadline",
+      "statuteNumber": "Tex. R. Civ. P. 21a",
+      "text": "A defendant must file an answer by the Monday following the expiration of 20 days after the defendant is served with citation.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "tcp-91a.01",
+      "title": "Motion to Dismiss",
+      "description": "Motion to dismiss for failure to state a claim (Tex. R. Civ. P. 91a.01)",
+      "category": "filing_deadline",
+      "statuteNumber": "Tex. R. Civ. P. 91a.01",
+      "text": "A party may move to dismiss a claim if it has no basis in law or fact.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "tcp-202.3",
+      "title": "Discovery - Interrogatories",
+      "description": "Response to interrogatories must be served within 30 days (Tex. R. Civ. P. 202.3)",
+      "category": "discovery_deadline",
+      "statuteNumber": "Tex. R. Civ. P. 202.3",
+      "text": "Responses to interrogatories must be served within 30 days after being served.",
+      "effectiveDate": "2024-01-01"
+    },
+    {
+      "id": "tcp-199.1",
+      "title": "Notice of Deposition",
+      "description": "Notice of deposition must be served at least 10 days before deposition date (Tex. R. Civ. P. 199.1)",
+      "category": "discovery_deadline",
+      "statuteNumber": "Tex. R. Civ. P. 199.1",
+      "text": "A notice of deposition must be served at least 10 days before the scheduled deposition date.",
+      "effectiveDate": "2024-01-01"
+    }
+  ],
+  "localRules": [
+    {
+      "court": "District Court, Travis County",
+      "ruleNumber": "Local Rule 2.3",
+      "title": "Motion Practice",
+      "text": "All motions must include a certificate of service and proposed order.",
+      "category": "local_rule"
+    }
+  ],
+  "forms": [
+    {
+      "formNumber": "Citation",
+      "description": "Citation to appear and answer",
+      "required": true,
+      "url": "/forms/citation.pdf"
+    },
+    {
+      "formNumber": "Original Petition",
+      "description": "Original petition initiating a lawsuit",
+      "required": true,
+      "url": "/forms/petition.pdf"
+    }
+  ],
+  "deadlines": [
+    {
+      "action": "Answer to Complaint",
+      "days": 20,
+      "description": "Answer filing deadline (Monday after 20 days)",
+      "statuteReference": "Tex. R. Civ. P. 21a"
+    },
+    {
+      "action": "Discovery Interrogatories",
+      "days": 30,
+      "description": "Response to interrogatories deadline",
+      "statuteReference": "Tex. R. Civ. P. 202.3"
+    }
+  ]
+}
